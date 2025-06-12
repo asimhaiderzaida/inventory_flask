@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        label { font-weight: bold; display: block; margin-top: 10px; }
+        input, textarea { width: 300px; padding: 6px; margin-top: 4px; }
+        button { margin-top: 15px; padding: 10px 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav style="background-color: #007BFF; padding: 10px; color: white;">
+        <a href="/main_dashboard" style="color: white; text-decoration: none;">← Back to Dashboard</a>
+    </nav>
+
+    <div style="padding: 20px;">
+        <h2>📤 Export Inventory</h2>
+        <form method="POST" action="/inventory/export">
+            <label>Model Number:</label>
+            <input type="text" name="model_number">
+
+            <label>Processor:</label>
+            <input type="text" name="processor">
+
+            <label>Video Card:</label>
+            <input type="text" name="video_card">
+
+            <label>Start Date:</label>
+            <input type="date" name="start_date">
+
+            <label>End Date:</label>
+            <input type="date" name="end_date">
+
+            <label>Serial Numbers (scan, paste, or type):</label>
+            <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..."></textarea>
+
+            <br>
+            <button type="submit" name="action" value="preview">🔍 Preview</button>
+            <button type="submit" name="action" value="download">📥 Download Excel</button>
+        </form>
+    </div>
+</body>
+</html>
+

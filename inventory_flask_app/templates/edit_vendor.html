@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit Vendor</h2>
+  <form method="POST" class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Vendor Name</label>
+      <input type="text" name="name" class="form-control" value="{{ vendor.name }}" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Contact</label>
+      <input type="text" name="contact" class="form-control" value="{{ vendor.contact or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" class="form-control" value="{{ vendor.email or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Company</label>
+      <input type="text" name="company" class="form-control" value="{{ vendor.company or '' }}">
+    </div>
+    <div class="col-md-12">
+      <label class="form-label">Address</label>
+      <textarea name="address" class="form-control" rows="2">{{ vendor.address or '' }}</textarea>
+    </div>
+    <div class="col-12 mt-3">
+      <button type="submit" class="btn btn-primary px-4">Save</button>
+      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary ms-2">Back to Vendor Center</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

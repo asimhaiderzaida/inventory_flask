@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Print Label</title>
+  <meta charset="utf-8">
+  <style>
+    @media print {
+      body {
+        margin: 0;
+        background: #fff !important;
+      }
+      .label-container {
+        width: 4in;
+        height: 1in;
+        padding: 0.1in 0.15in;
+        overflow: hidden;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .d-print-none { display: none !important; }
+    }
+    .label-container {
+      width: 4in;
+      height: 1in;
+      border: 1px solid #ddd;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      font-size: 12px;
+      padding: 0.08in 0.13in;
+      background: #fff;
+      margin: 15px auto;
+    }
+    .label-qr {
+      flex: 0 0 0.85in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0.18in;
+    }
+    .label-serial {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 4px;
+      letter-spacing: 1.3px;
+    }
+    .label-main {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .label-model {
+      font-size: 15px;
+      font-weight: bold;
+      margin-bottom: 2px;
+      letter-spacing: 1.5px;
+    }
+    .label-field {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 1px;
+    }
+    .label-specs {
+      font-size: 12px;
+      margin-bottom: 1px;
+    }
+    .label-small {
+      font-size: 10px;
+      color: #888;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="label-container">
+  <div class="label-qr">
+    <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code" width="80" height="80">
+    <div class="label-serial">
+      SN: <b>{{ instance.serial_number }}</b>
+    </div>
+  </div>
+  <div class="label-main">
+    <div class="label-model">
+      {{ instance.product.model_number or '' }}
+    </div>
+    <div class="label-field">
+      {{ instance.product.processor or '' }} | {{ instance.product.ram or '' }} | {{ instance.product.storage or '' }}
+    </div>
+    <div class="label-specs">
+      GPU: {{ instance.product.video_card or '' }} | Screen: {{ instance.product.screen_size or '' }} | Grade: {{ instance.product.grade or '' }}
+    </div>
+    <div class="label-small">
+      Printed: {{ printed_time.strftime('%d-%b-%Y %H:%M') }}
+    </div>
+  </div>
+</div>
+
+<div class="text-center d-print-none mt-4">
+  <button onclick="window.print()" class="btn btn-primary btn-lg">🖨️ Print Label</button>
+  <a href="{{ request.referrer or url_for('main_dashboard') }}" class="btn btn-secondary btn-lg">Back</a>
+</div>
+</body>
+</html>

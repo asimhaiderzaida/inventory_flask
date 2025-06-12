@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    <h2 class="mb-4 fw-bold text-primary" style="font-size: 1.35rem;">
+      <i class="bi bi-cart-check me-2"></i>Sold Items
+    </h2>
+    <form method="get" class="row g-2 mb-4">
+      <div class="col-auto">
+        <select name="customer" class="form-select rounded-pill">
+          <option value="">All Customers</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if selected_customer == customer.id|string %}selected{% endif %}>
+            {{ customer.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <input type="date" name="sale_date" value="{{ selected_date or '' }}" class="form-control rounded-pill">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary rounded-pill fw-semibold">Filter</button>
+      </div>
+    </form>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+        <thead class="table-light">
+          <tr>
+            <th>Serial Number</th>
+            <th>Product Name</th>
+            <th>Model Number</th>
+            <th>CPU</th>
+            <th>RAM</th>
+            <th>Storage</th>
+            <th>Screen Size</th>
+            <th>Resolution</th>
+            <th>Grade</th>
+            <th>Video Card</th>
+            <th>Customer</th>
+            <th>Sale Date</th>
+            <th>Sale Price (AED)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in sold_data %}
+          <tr>
+            <td>{{ item.serial_number }}</td>
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.model_number }}</td>
+            <td>{{ item.cpu }}</td>
+            <td>{{ item.ram }}</td>
+            <td>{{ item.storage }}</td>
+            <td>{{ item.screen_size }}</td>
+            <td>{{ item.resolution }}</td>
+            <td>{{ item.grade }}</td>
+            <td>{{ item.video_card }}</td>
+            <td>{{ item.customer }}</td>
+            <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ item.sale_date }}</span></td>
+            <td><span class="badge bg-success bg-opacity-10 text-success">{{ "%.2f"|format(item.price) if item.price else "" }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

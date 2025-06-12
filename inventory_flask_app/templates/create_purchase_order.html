@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Create Purchase Order{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 90vh;">
+  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 530px; width: 100%; background: #f6f7fa;">
+    <div class="mb-4 text-center">
+      <h2 class="fw-bold mb-1 text-primary" style="letter-spacing:0.01em;">
+        <i class="bi bi-clipboard-plus me-2"></i>Create Purchase Order
+      </h2>
+      <div class="text-muted" style="font-size:0.98rem;">Add a new PO and upload Excel with serials & specs</div>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label fw-bold">PO Number:</label>
+        <input type="text" name="po_number" class="form-control rounded-pill px-3" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Vendor:</label>
+        <div class="input-group">
+          <select name="vendor_id" class="form-select rounded-pill px-3" required>
+            <option value="">-- Select Vendor --</option>
+            {% for vendor in vendors %}
+              <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+            {% endfor %}
+          </select>
+          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill" target="_blank">
+            <i class="bi bi-plus-circle"></i> Add Vendor
+          </a>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Upload Excel File with Serials + Specs:</label>
+        <input type="file" name="file" class="form-control rounded-pill px-3" accept=".xlsx, .xls" required>
+        <small class="text-muted">Excel must include at least <code>serial_number</code> and <code>model_number</code> columns.</small>
+      </div>
+      <div class="d-grid gap-2 mt-3">
+        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold">
+          <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
+        </a>
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i>Create PO
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .po-box {
+    background-color: #ffffff;
+    padding: 40px 30px;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 600px;
+  }
+
+  h2 {
+    font-weight: bold;
+  }
+
+  .form-label {
+    font-size: 1rem;
+    color: #333;
+  }
+
+  .btn-success {
+    font-weight: bold;
+    padding: 10px 25px;
+  }
+</style>
+{% endblock %}

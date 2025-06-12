@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h2>📦 Export Inventory</h2>
+    <form method="POST" action="/inventory/export_excel">
+        <label>Filter by Model:</label>
+        <input type="text" name="model_number"><br><br>
+
+        <label>Filter by Processor:</label>
+        <input type="text" name="processor"><br><br>
+
+        <label>Filter by Video Card:</label>
+        <input type="text" name="video_card"><br><br>
+
+        <label>From Date:</label>
+        <input type="date" name="from_date"><br><br>
+
+        <label>To Date:</label>
+        <input type="date" name="to_date"><br><br>
+
+        <button type="submit">Export Excel</button>
+    </form>
+    <p><a href="/main_dashboard">← Back to Dashboard</a></p>
+</body>
+</html>
+

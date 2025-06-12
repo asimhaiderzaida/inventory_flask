@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Scan PO Serials{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center mt-4">
+  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 680px; width: 100%; background: #f6f7fa;">
+    <div class="mb-3">
+      <h3 class="fw-bold text-primary mb-1" style="font-size: 1.45rem;">
+        <i class="bi bi-upc-scan me-2"></i>Scan Serials for PO #{{ po.id }}
+      </h3>
+      <div class="text-muted" style="font-size:1.04rem;">
+        <span class="fw-semibold">Vendor:</span> {{ po.vendor.name }}<br>
+        <span class="fw-semibold">Expected Serials:</span> {{ total_expected }}
+      </div>
+    </div>
+
+    <form method="POST" class="d-flex mb-3 gap-2">
+      <input type="text" name="serial_input" class="form-control rounded-pill px-3" placeholder="Scan or type serial..." autofocus required>
+      <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4">
+        <i class="bi bi-plus-circle me-1"></i>Add
+      </button>
+    </form>
+
+    <div class="mb-3">
+      <span class="badge bg-success rounded-pill px-3 py-2 fs-6">✅ Matched: {{ matched|length }}</span>
+      <span class="badge bg-danger rounded-pill px-3 py-2 fs-6 ms-2">❌ Extra: {{ extra|length }}</span>
+      <span class="badge bg-warning text-dark rounded-pill px-3 py-2 fs-6 ms-2">⚠️ Missing: {{ missing|length }}</span>
+    </div>
+
+    <h5 class="mt-3 mb-2">🗂️ Scanned Serials</h5>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle bg-white rounded-4 overflow-hidden">
+        <thead class="table-light">
+          <tr><th>#</th><th>Serial</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for serial in scanned %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ serial }}</td>
+              <td>
+                {% if serial in matched %}
+                  <span class="badge bg-success rounded-pill">Matched</span>
+                {% elif serial in extra %}
+                  <span class="badge bg-danger rounded-pill">Extra</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <a href="{{ url_for('stock_bp.stock_receiving_select') }}" class="btn btn-outline-secondary rounded-pill fw-semibold w-50">
+        <i class="bi bi-arrow-left-circle me-1"></i>Back to PO Select
+      </a>
+      <a href="{{ url_for('stock_bp.stock_receiving_summary') }}" class="btn btn-primary rounded-pill fw-semibold w-50">
+        <i class="bi bi-arrow-right-circle me-1"></i>Next: Summary View
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

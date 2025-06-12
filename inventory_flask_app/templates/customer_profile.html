@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Customer Profile</h2>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5>{{ customer.name }}</h5>
+      <div><strong>Phone:</strong> {{ customer.phone }}</div>
+      <div><strong>Email:</strong> {{ customer.email }}</div>
+    </div>
+  </div>
+  <h4>Sales History</h4>
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>Date Sold</th>
+        <th>Serial Number</th>
+        <th>Product Name</th>
+        <th>Model Number</th>
+        <th>Status</th>
+        <th>Price</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sale in sales_data %}
+      <tr>
+        <td>{{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '' }}</td>
+        <td>{{ sale.serial_number }}</td>
+        <td>{{ sale.name }}</td>
+        <td>{{ sale.model_number }}</td>
+        <td>{{ sale.status }}</td>
+        <td>{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else "" }}</td>
+        <td>{{ sale.notes or "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center">No sales found for this customer.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success mt-3">Export Sales History (Excel)</a>
+  <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary mt-3">Back to Customer Center</a>
+</div>
+{% endblock %}

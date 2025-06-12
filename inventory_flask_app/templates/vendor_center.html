@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.vendor-center-card {
+  background: #f3f4f8;
+  border-radius: 1.1rem;
+  box-shadow: 0 2px 12px #0057b710;
+  border: none;
+}
+.table thead th {
+  background: #f8f9fa;
+  border-top: none;
+}
+.table-hover tbody tr:hover {
+  background: #f1f5f9;
+}
+.btn-modern {
+  border-radius: 2rem !important;
+  font-weight: 500;
+  font-size: 0.99rem;
+}
+</style>
+<div class="container mt-4">
+  <h2>Vendor Center</h2>
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+      <input type="text" name="search" class="form-control rounded-pill px-3" placeholder="Search by vendor name" value="{{ search or '' }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary btn-modern">Search</button>
+      <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-success btn-modern ms-2">Add Vendor</a>
+    </div>
+  </form>
+  <div class="card vendor-center-card mt-2">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Company</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vendor in vendors %}
+          <tr>
+            <td>{{ vendor.name }}</td>
+            <td>{{ vendor.phone or '' }}</td>
+            <td>{{ vendor.email or '' }}</td>
+            <td>{{ vendor.company or '' }}</td>
+            <td>
+              <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-primary btn-modern">View</a>
+              <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-secondary btn-modern">Edit</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center">No vendors found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

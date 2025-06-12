@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.6rem;">
+      <i class="bi bi-compass me-2"></i>Under Process Tracker
+    </h2>
+
+    <form method="GET" class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label">Filter by Stage</label>
+        <select name="stage" class="form-select rounded-pill px-3">
+          <option value="">-- All Stages --</option>
+          {% for stage in stages %}
+            <option value="{{ stage }}" {% if stage == selected_stage %}selected{% endif %}>{{ stage|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Filter by Team</label>
+        <select name="team" class="form-select rounded-pill px-3">
+          <option value="">-- All Teams --</option>
+          {% for team in teams %}
+            <option value="{{ team }}" {% if team == selected_team %}selected{% endif %}>{{ team }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary rounded-pill fw-semibold px-4">
+          <i class="bi bi-search me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+
+    {% if instances %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+        <thead class="table-light">
+          <tr>
+            <th>Serial</th>
+            <th>Model</th>
+            <th>Stage</th>
+            <th>Team</th>
+            <th>Last Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for instance in instances %}
+          <tr>
+            <td>{{ instance.serial_number }}</td>
+            <td>{{ instance.product.model_number }}</td>
+            <td>{{ instance.process_stage|capitalize }}</td>
+            <td>{{ instance.team_assigned }}</td>
+            <td>{{ instance.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted mb-0">No units currently under process.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

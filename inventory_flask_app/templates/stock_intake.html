@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Stock Intake | PCMart{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Stock Intake</h2>
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+    <div class="col">
+      <a href="{{ url_for('import_excel_bp.upload_excel') }}" class="btn btn-primary w-100 py-3 mb-3">
+        <i class="bi bi-upload me-2"></i>Upload Excel
+      </a>
+    </div>
+    <div class="col">
+      <a href="{{ url_for('stock_bp.add_product_page') }}" class="btn btn-success w-100 py-3 mb-3">
+        <i class="bi bi-plus-square me-2"></i>Add Product
+      </a>
+    </div>
+    <div class="col">
+      <a href="{{ url_for('stock_bp.create_purchase_order') }}" class="btn btn-warning w-100 py-3 mb-3">
+        <i class="bi bi-file-earmark-plus me-2"></i>Create PO
+      </a>
+    </div>
+    <div class="col">
+      <a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-info w-100 py-3 mb-3">
+        <i class="bi bi-truck me-2"></i>Receive Stock
+      </a>
+    </div>
+  </div>
+  <!-- Optional: Add quick stats, instructions, or a recent actions list here -->
+</div>
+{% endblock %}

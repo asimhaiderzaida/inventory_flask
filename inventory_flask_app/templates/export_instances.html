@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Product Instances</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <nav style="background-color: #007BFF; padding: 10px; color: white; display: flex; justify-content: space-between;">
+        <div><strong>📦 Inventory System</strong></div>
+        <div>
+            <a href="/main_dashboard" style="color: white; margin-right: 15px;">🏠 Dashboard</a>
+            <a href="/logout" style="color: white;">Logout</a>
+        </div>
+    </nav>
+
+    <div style="padding: 20px;">
+        <h2>📤 Export Product Instances</h2>
+        <form action="/export/instances" method="GET">
+            <button type="submit">Download Excel File</button>
+        </form>
+    </div>
+</body>
+</html>
+

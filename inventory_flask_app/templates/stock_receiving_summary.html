@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Receiving Summary{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">
+  📋 Receiving Summary for PO: {{ po.po_number }}
+  <small class="text-muted ms-2">(Internal ID: {{ po.id }})</small>
+</h3>
+
+<div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <span class="badge bg-success me-3">✅ Matched: {{ matched_count }}</span>
+    <span class="badge bg-danger me-3">❌ Extra: {{ extra_count }}</span>
+    <span class="badge bg-warning text-dark me-3">⚠ Missing: {{ missing_count }}</span>
+    <span class="badge bg-primary">📦 Total: {{ total_count }}</span>
+  </div>
+</div>
+
+<table class="table table-bordered table-hover">
+  <thead class="table-light">
+    <tr>
+      <th>#</th>
+      <th>Serial</th>
+      <th>Model</th>
+      <th>Processor</th>
+      <th>RAM</th>
+      <th>Grade</th>
+      <th>Storage</th>
+      <th>Status</th>
+      <th>Label</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in serials %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ item.serial_number }}</td>
+      <td>{{ item.model_number }}</td>
+      <td>{{ item.processor }}</td>
+      <td>{{ item.ram }}</td>
+      <td>{{ item.grade }}</td>
+      <td>{{ item.storage }}</td>
+      <td>
+        {% if item.match_status == 'Matched' %}
+          <span class="badge bg-success">Matched</span>
+        {% elif item.match_status == 'Extra' %}
+          <span class="badge bg-danger">Extra</span>
+        {% elif item.match_status == 'Missing' %}
+          <span class="badge bg-warning text-dark">Missing</span>
+        {% else %}
+          <span class="badge bg-secondary">Unknown</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if item.match_status == 'Matched' and item.instance_id %}
+          <a href="{{ url_for('stock_bp.print_label', instance_id=item.instance_id) }}"
+             class="btn btn-sm btn-outline-dark" target="_blank">
+            🖨️ Print Label
+          </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary">⬅ Back to Scan</a>
+
+<form method="POST" action="{{ url_for('stock_bp.stock_receiving_confirm') }}">
+  <div class="mb-3 mt-4">
+    <label for="status_choice" class="form-label fw-bold">Assign matched items to:</label>
+    <select name="status_choice" id="status_choice" class="form-select" required>
+      <option value="">-- Select Status --</option>
+      <option value="unprocessed">Unprocessed</option>
+      <option value="under_process">Under Process</option>
+      <option value="processed">Processed</option>
+      <option value="sold">Sold</option>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-success">✅ Import Matched Items</button>
+</form>
+{% endblock %}

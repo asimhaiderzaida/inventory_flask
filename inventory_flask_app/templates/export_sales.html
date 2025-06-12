@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export Sales</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <nav style="background-color: #007BFF; padding: 10px; color: white; display: flex; justify-content: space-between;">
+        <div><strong>📦 Inventory System</strong></div>
+        <div>
+            <a href="/main_dashboard" style="color: white; margin-right: 15px;">🏠 Dashboard</a>
+            <a href="/logout" style="color: white;">Logout</a>
+        </div>
+    </nav>
+
+    <div style="padding: 20px;">
+        <h2>📤 Export Sales Data</h2>
+        <form action="/sales/export" method="GET">
+            <label>Filter by Customer:</label>
+            <select name="customer_id">
+                <option value="">-- All Customers --</option>
+                {% for customer in customers %}
+                    <option value="{{ customer.id }}">{{ customer.name }}</option>
+                {% endfor %}
+            </select><br><br>
+
+            <label>From Date:</label>
+            <input type="date" name="start_date"><br><br>
+
+            <label>To Date:</label>
+            <input type="date" name="end_date"><br><br>
+
+            <button type="submit">Download Sales Excel</button>
+        </form>
+    </div>
+</body>
+</html>
+

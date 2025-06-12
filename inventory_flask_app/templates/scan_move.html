@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.5rem;">
+      <i class="bi bi-upc-scan me-2"></i>Batch Scan & Assign/Move
+    </h2>
+
+    <form method="POST" class="mb-4 d-flex gap-2">
+      <input type="text" name="serial_number" class="form-control rounded-pill px-3" placeholder="Scan or enter Serial..." required autofocus>
+      <button class="btn btn-primary rounded-pill fw-semibold px-4" type="submit">
+        <i class="bi bi-plus-circle me-1"></i>Scan/Add
+      </button>
+    </form>
+
+    {% if instances and instances|length > 0 %}
+      <h5 class="mb-3">Scanned Serials</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+          <thead class="table-light">
+            <tr>
+              <th>Serial</th>
+              <th>Status</th>
+              <th>Product</th>
+              <th>Model</th>
+              <th>Vendor</th>
+              <th>Specs</th>
+              <th>Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for instance in instances %}
+              <tr>
+                <td>{{ instance.serial_number }}</td>
+                <td>
+                  <span class="badge
+                    {% if instance.status == 'processed' %}bg-success
+                    {% elif instance.status == 'under_process' %}bg-warning text-dark
+                    {% elif instance.status == 'disputed' %}bg-danger
+                    {% else %}bg-secondary{% endif %}">
+                    {{ instance.status.replace('_', ' ').title() }}
+                  </span>
+                </td>
+                <td>{{ instance.product.name if instance.product else '' }}</td>
+                <td>{{ instance.product.model_number if instance.product else '' }}</td>
+                <td>{{ instance.product.vendor.name if instance.product and instance.product.vendor else '' }}</td>
+                <td>
+                  RAM: {{ instance.product.ram if instance.product else '' }},
+                  CPU: {{ instance.product.processor if instance.product else '' }},
+                  Storage: {{ instance.product.storage if instance.product else '' }}
+                </td>
+                <td>
+                  <form method="POST" style="display:inline;">
+                    <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                    <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <form method="POST" class="mt-3">
+        <input type="hidden" name="move_all" value="1">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label>Status</label>
+            <select name="status" class="form-select rounded-pill px-3" required>
+              <option value="unprocessed">Unprocessed</option>
+              <option value="under_process">Under Process</option>
+              <option value="processed">Processed</option>
+              <option value="sold">Sold</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label>Process Stage</label>
+            <input type="text" name="process_stage" class="form-control rounded-pill px-3">
+          </div>
+          <div class="col-md-4">
+            <label>Team Assigned</label>
+            <input type="text" name="team_assigned" class="form-control rounded-pill px-3">
+          </div>
+        </div>
+        <button class="btn btn-success btn-lg mt-3 rounded-pill fw-semibold px-4" type="submit">
+          <i class="bi bi-arrow-repeat me-1"></i>Assign/Move All
+        </button>
+      </form>
+    {% else %}
+      <div class="alert alert-info mt-4">Scan serials above to begin a batch move.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

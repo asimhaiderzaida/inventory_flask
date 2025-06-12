@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .comfortable-table th, .comfortable-table td {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  .comfortable-table .btn {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+  .comfortable-table thead th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+    box-shadow: 0 2px 2px -1px rgba(0,0,0,0.06);
+  }
+  .instances-card {
+    background: #f6f7fa;
+    border-radius: 1.1rem;
+    box-shadow: 0 2px 12px #0057b710;
+    border: none;
+    padding: 2.3rem 1.2rem 1.4rem 1.2rem;
+  }
+  .batch-action-bar .btn {
+    border-radius: 2rem !important;
+    font-weight: 500;
+    font-size: 0.97rem;
+  }
+</style>
+<div class="container mt-5">
+  <div class="instances-card">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="mb-0 fw-bold text-primary" style="font-size:1.35rem;">
+        <i class="bi bi-list-ul me-2"></i>{{ title }}
+      </h2>
+      <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-warning btn-lg rounded-pill batch-action-bar">
+        <i class="bi bi-upc-scan me-1"></i>Scan & Assign/Move
+      </a>
+    </div>
+    <form method="get" class="row g-2 mb-4">
+      <div class="col-md-3">
+        <select name="status" class="form-select rounded-pill" onchange="this.form.submit()">
+          <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="unprocessed" {% if request.args.get('status') == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
+          <option value="under_process" {% if request.args.get('status') == 'under_process' %}selected{% endif %}>Under Process</option>
+          <option value="processed" {% if request.args.get('status') == 'processed' %}selected{% endif %}>Processed</option>
+          <option value="disputed" {% if request.args.get('status') == 'disputed' %}selected{% endif %}>Disputed</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="model" class="form-select rounded-pill" onchange="this.form.submit()">
+          <option value="">Filter by Model</option>
+          {% for m in models %}
+            <option value="{{ m }}" {% if request.args.get('model') == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="processor" class="form-select rounded-pill" onchange="this.form.submit()">
+          <option value="">Filter by Processor</option>
+          {% for p in processors %}
+            <option value="{{ p }}" {% if request.args.get('processor') == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <input type="text" name="serial_search" value="{{ request.args.get('serial_search', '') }}" class="form-control rounded-pill" placeholder="Search Serial...">
+      </div>
+      <div class="col-md-3 text-end">
+        <button class="btn btn-outline-primary w-100 rounded-pill" type="submit">Apply Filters</button>
+      </div>
+    </form>
+    <div class="mb-3 text-end">
+      <a href="{{ url_for('stock_bp.export_instances', status=request.args.get('status', 'unprocessed'), model=request.args.get('model'), processor=request.args.get('processor'), serial_search=request.args.get('serial_search')) }}" class="btn btn-success rounded-pill">Export to Excel</a>
+    </div>
+    <form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form">
+      <div class="mb-2">
+        <button type="submit" class="btn btn-dark rounded-pill batch-action-bar">🖨️ Print Selected Labels</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-striped comfortable-table">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked;">
+              </th>
+              <th>Serial</th>
+              <th>Product</th>
+              <th>Model</th>
+              <th>Vendor</th>
+              <th>Status</th>
+              <th>Process Stage</th>
+              <th>Team</th>
+              <th>Location</th>
+              <th>RAM</th>
+              <th>Processor</th>
+              <th>Storage</th>
+              <th>Screen Size</th>
+              <th>Resolution</th>
+              <th>Grade</th>
+              <th>Video Card</th>
+              <th>Is Sold</th>
+              <th style="width:100px;">Label</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in instances %}
+              <tr>
+                <td>
+                  <input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}">
+                </td>
+                <td>{{ i.serial_number }}</td>
+                <td>{{ i.product.name if i.product else '' }}</td>
+                <td>{{ i.product.model_number if i.product else '' }}</td>
+                <td>{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
+                <td>{{ i.status }}</td>
+                <td>{{ i.process_stage or '' }}</td>
+                <td>{{ i.team_assigned or '' }}</td>
+                <td>{{ i.location.name if i.location else '' }}</td>
+                <td>{{ i.product.ram if i.product else '' }}</td>
+                <td>{{ i.product.processor if i.product else '' }}</td>
+                <td>{{ i.product.storage if i.product else '' }}</td>
+                <td>{{ i.product.screen_size if i.product else '' }}</td>
+                <td>{{ i.product.resolution if i.product else '' }}</td>
+                <td>{{ i.product.grade if i.product else '' }}</td>
+                <td>{{ i.product.video_card if i.product else '' }}</td>
+                <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
+                <td>
+                  <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
+                    class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">
+                    🖨️ Print Label
+                  </a>
+                </td>
+                <td>
+                  <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

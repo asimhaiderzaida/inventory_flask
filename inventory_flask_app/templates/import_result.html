@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Import Result{% endblock %}
+
+{% block content %}
+<div class="card shadow p-4">
+    <h2 class="mb-4 text-success">✅ Import Result Summary</h2>
+
+    <ul class="list-group mb-4">
+        <li class="list-group-item">🟢 Products Saved: <strong>{{ saved }}</strong></li>
+        <li class="list-group-item">🔴 Products Skipped: <strong>{{ skipped }}</strong></li>
+    </ul>
+
+    {% if skip_file %}
+    <div class="alert alert-warning">
+        Some products were skipped. 
+        <a href="{{ skip_file }}" class="alert-link" download>📥 Download Skipped Products</a>
+    </div>
+    {% endif %}
+
+    {% if skipped_rows %}
+    <h4 class="mt-4">🔎 Skipped Products Preview:</h4>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle mt-3">
+            <thead class="table-warning">
+                <tr>
+                    {% for col in skipped_rows[0].keys() %}
+                    <th>{{ col|capitalize }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in skipped_rows %}
+                <tr>
+                    {% for value in row.values() %}
+                    <td>{{ value }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="/main_dashboard" class="btn btn-primary">🏠 Back to Dashboard</a>
+        <a href="/upload_excel" class="btn btn-secondary ms-2">⬆️ Upload More Products</a>
+    </div>
+</div>
+{% endblock %}
+

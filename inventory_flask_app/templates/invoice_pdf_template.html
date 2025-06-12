@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice #{{ invoice.id if invoice else invoice_number }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #222; }
+        .header { text-align: center; margin-bottom: 10px; }
+        .header img { max-height: 70px; margin-bottom: 5px; }
+        .company-info { text-align: center; margin-bottom: 20px; font-size: 13px; }
+        .invoice-title { text-align: center; font-size: 28px; margin-bottom: 10px; letter-spacing: 2px; font-weight: bold; }
+        .info-table { width: 100%; margin-bottom: 20px; font-size: 14px; }
+        .info-table td { padding: 2px 8px; }
+        .border-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;}
+        .border-table th, .border-table td { border: 1px solid #666; padding: 5px; text-align: center; }
+        .totals { width: 100%; margin-top: 10px; font-size: 14px; }
+        .totals td { padding: 3px 10px; }
+        .summary { margin-top: 10px; font-size: 15px; font-weight: bold; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #555; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Company Logo">
+    </div>
+    <div class="company-info">
+        <strong>STAR USED COMPUTERS TR LLC</strong><br>
+        Al Salehi Building, Warehouse no 27, Industrial Area 6, JNP Signal, Sharjah<br>
+        TRN: 100619291600003 &nbsp;|&nbsp; Tel: 065939199<br>
+        Email: info@pcmart.ae &nbsp;|&nbsp; Website: pcmart.ae
+    </div>
+    <div class="invoice-title">INVOICE</div>
+    <table class="info-table">
+        <tr>
+            <td><strong>Invoice #:</strong> {{ invoice.id if invoice else invoice_number }}</td>
+            <td><strong>Date:</strong> {% if invoice %}{{ invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else "" }}{% else %}{{ sale_date }}{% endif %}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Bill To:</strong> {{ customer.name }}</td>
+        </tr>
+    </table>
+    <table class="border-table">
+        <thead>
+            <tr>
+                <th>Serial #</th>
+                <th>Product Name</th>
+                <th>Model</th>
+                <th>Unit Price (AED)</th>
+                <th>Line Total (AED)</th>
+                <th>VAT (%)</th>
+                <th>VAT Amount</th>
+                <th>Total (AED)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+                {% set qty = item.quantity if item.quantity is defined else 1 %}
+                {% set unit_price = (item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price)) * (exchange_rate if exchange_rate is defined else 1) %}
+                {% set line_total = unit_price * qty %}
+                {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
+                {% set vat_amount = line_total * (vat_rate / 100) %}
+                {% set total_with_vat = line_total + vat_amount %}
+                <tr>
+                    <td>{{ item.serial_number if item.serial_number is defined else "" }}</td>
+                    <td>{{ item.product_name if item.product_name is defined else item.name }}</td>
+                    <td>{{ item.model_number }}</td>
+                    <td>{{ "%.2f"|format(unit_price) }}</td>
+                    <td>{{ "%.2f"|format(line_total) }}</td>
+                    <td>{{ vat_rate }}</td>
+                    <td>{{ "%.2f"|format(vat_amount) }}</td>
+                    <td>{{ "%.2f"|format(total_with_vat) }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <table class="totals">
+        <tr>
+            <td style="text-align:right"><strong>Subtotal (AED):</strong></td>
+            <td style="width:110px; text-align:right">{{ "%.2f"|format(subtotal) }}</td>
+        </tr>
+        <tr>
+            <td style="text-align:right"><strong>Total VAT (AED):</strong></td>
+            <td style="width:110px; text-align:right">{{ "%.2f"|format(total_vat) }}</td>
+        </tr>
+        <tr>
+            <td style="text-align:right"><strong>Grand Total (AED):</strong></td>
+            <td style="width:110px; text-align:right">{{ "%.2f"|format(grand_total) }}</td>
+        </tr>
+    </table>
+    <div class="footer">
+        Thank you for your business!
+    </div>
+</body>
+</html>

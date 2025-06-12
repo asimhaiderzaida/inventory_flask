@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Add Product{% endblock %}
+
+{% block content %}
+<div class="container mt-5 d-flex justify-content-center">
+  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 520px; width: 100%; background: #f6f7fa;">
+    <div class="mb-4 text-center">
+      <h3 class="fw-bold mb-1" style="letter-spacing:0.01em;">
+        <i class="bi bi-plus-square text-primary me-2"></i>Add New Product
+      </h3>
+      <div class="text-muted" style="font-size:0.98rem;">Enter details to add a product</div>
+    </div>
+    <form method="POST" action="/stock/products/add" class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Product Name</label>
+        <input type="text" name="name" class="form-control rounded-pill px-3" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Model Number</label>
+        <input type="text" name="model_number" class="form-control rounded-pill px-3" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Serial Number</label>
+        <input type="text" name="serial_number" class="form-control rounded-pill px-3" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">RAM</label>
+        <input type="text" name="ram" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Processor</label>
+        <input type="text" name="processor" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Storage</label>
+        <input type="text" name="storage" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Screen Size</label>
+        <input type="text" name="screen_size" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Resolution</label>
+        <input type="text" name="resolution" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Grade</label>
+        <select name="grade" class="form-select rounded-pill px-3">
+          <option value="">Select Grade</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Video Card</label>
+        <input type="text" name="video_card" class="form-control rounded-pill px-3">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select rounded-pill px-3">
+          <option value="unprocessed" selected>Unprocessed</option>
+          <option value="under_process">Under Process</option>
+          <option value="processed">Processed</option>
+          <option value="sold">Sold</option>
+        </select>
+      </div>
+      <div class="col-12 mt-3 d-grid gap-2">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i> Save Product
+        </button>
+        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill">
+          <i class="bi bi-arrow-left-circle me-1"></i> Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

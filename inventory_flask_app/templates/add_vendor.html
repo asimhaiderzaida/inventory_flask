@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5 d-flex justify-content-center">
+  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 430px; width: 100%; background: #f6f7fa;">
+    <div class="mb-4 text-center">
+      <h3 class="fw-bold mb-1" style="letter-spacing:0.01em;">
+        <i class="bi bi-shop-window text-primary me-2"></i>Add Vendor
+      </h3>
+      <div class="text-muted" style="font-size:0.98rem;">Add or register a new vendor for PCMart</div>
+    </div>
+    <form method="POST" action="{{ url_for('vendors_bp.add_vendor') }}">
+      <div class="mb-3">
+        <label for="name" class="form-label">Vendor Name</label>
+        <input type="text" class="form-control rounded-pill px-3" id="name" name="name" placeholder="Enter vendor name" required>
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Vendor Email</label>
+        <input type="email" class="form-control rounded-pill px-3" id="email" name="email" placeholder="Enter vendor email">
+      </div>
+      <div class="mb-3">
+        <label for="phone" class="form-label">Vendor Phone</label>
+        <input type="text" class="form-control rounded-pill px-3" id="phone" name="phone" placeholder="Enter vendor phone">
+      </div>
+      <div class="mb-3">
+        <label for="address" class="form-label">Vendor Address</label>
+        <input type="text" class="form-control rounded-pill px-3" id="address" name="address" placeholder="Enter vendor address">
+      </div>
+      <div class="mb-3">
+        <label for="contact" class="form-label">Contact Person</label>
+        <input type="text" class="form-control rounded-pill px-3" id="contact" name="contact" placeholder="Enter contact person name">
+      </div>
+      <div class="d-grid gap-2 mt-3">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i> Save Vendor
+        </button>
+        <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary rounded-pill">
+          <i class="bi bi-arrow-left-circle me-1"></i> Back to Vendor Center
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

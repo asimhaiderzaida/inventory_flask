@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Upload Result{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">✅ Excel Upload: New Inventory Added for Vendor {{ vendor.name }}</h2>
+
+<form method="post" action="{{ url_for('stock_bp.batch_update_status') }}">
+  <div class="mb-2">
+    <button type="submit" class="btn btn-success">Assign Status to Selected</button>
+    <select name="status" required class="form-select d-inline w-auto mx-2">
+      <option value="">-- Select Status --</option>
+      <option value="unprocessed">Unprocessed</option>
+      <option value="under_process">Under Process</option>
+      <option value="processed">Processed</option>
+    </select>
+    <button type="button" onclick="batchPrint()" class="btn btn-dark mx-2">🖨️ Print Selected Labels</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-striped comfortable-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all" onclick="for(let cb of document.querySelectorAll('.batch-checkbox')) cb.checked=this.checked;"></th>
+          <th>Serial</th>
+          <th>Product</th>
+          <th>Model</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th>Storage</th>
+          <th>GPU</th>
+          <th>Grade</th>
+          <th>Screen</th>
+          <th>Status</th>
+          <th>Label</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in instances %}
+        <tr>
+          <td>
+            <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ i.id }}">
+          </td>
+          <td>{{ i.serial_number }}</td>
+          <td>{{ i.product.name if i.product else '' }}</td>
+          <td>{{ i.product.model_number if i.product else '' }}</td>
+          <td>{{ i.product.processor if i.product else '' }}</td>
+          <td>{{ i.product.ram if i.product else '' }}</td>
+          <td>{{ i.product.storage if i.product else '' }}</td>
+          <td>{{ i.product.video_card if i.product else '' }}</td>
+          <td>{{ i.product.grade if i.product else '' }}</td>
+          <td>{{ i.product.screen_size if i.product else '' }}</td>
+          <td>{{ i.status }}</td>
+          <td>
+            <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
+               class="btn btn-sm btn-outline-dark" target="_blank">
+              🖨️ Print Label
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+<form id="batchPrintForm" method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" style="display:none;">
+  <input type="hidden" name="instance_ids" id="batchPrintIds">
+</form>
+
+<script>
+function batchPrint() {
+  let ids = [];
+  document.querySelectorAll('.batch-checkbox:checked').forEach(cb => ids.push(cb.value));
+  if (ids.length === 0) {
+    alert("Select at least one item to print.");
+    return;
+  }
+  document.getElementById('batchPrintIds').value = ids.join(',');
+  document.getElementById('batchPrintForm').submit();
+}
+</script>
+{% endblock %}

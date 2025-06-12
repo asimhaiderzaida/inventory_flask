@@ -1,0 +1,18 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+venv/
+
+# Ignore SQLite DB
+instance/*.db
+
+# Ignore export files
+*.xlsx
+*.csv
+
+# Optional editor/OS stuff
+.vscode/
+.DS_Store
+

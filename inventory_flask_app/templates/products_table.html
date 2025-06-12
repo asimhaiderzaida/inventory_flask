@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}All Products{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f3f4f8;">
+    <h3 class="mb-4 fw-bold text-primary" style="font-size: 1.35rem;">
+      <i class="bi bi-boxes me-2"></i>All Products in Stock
+    </h3>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Barcode</th>
+            <th>Name</th>
+            <th>Model</th>
+            <th>Grade</th>
+            <th>RAM</th>
+            <th>Processor</th>
+            <th>Storage</th>
+            <th>Screen</th>
+            <th>Stock</th>
+            <th>Location</th>
+            <th>Vendor</th>
+            <th>Price</th>
+            <th>Damaged?</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td>{{ p.id }}</td>
+            <td>{{ p.barcode }}</td>
+            <td>{{ p.name }}</td>
+            <td>{{ p.model_number }}</td>
+            <td>{{ p.grade }}</td>
+            <td>{{ p.ram }}</td>
+            <td>{{ p.processor }}</td>
+            <td>{{ p.storage }}</td>
+            <td>{{ p.screen_size }}</td>
+            <td><span class="badge bg-primary bg-opacity-10 text-primary fw-bold">{{ p.stock }}</span></td>
+            <td>{{ p.location.name if p.location }}</td>
+            <td>{{ p.vendor.name if p.vendor }}</td>
+            <td><span class="badge bg-info bg-opacity-10 text-info">${{ "%.2f"|format(p.selling_price) }}</span></td>
+            <td>
+              {% if p.is_damaged %}
+                <span class="badge bg-danger">Yes</span>
+              {% else %}
+                <span class="badge bg-success">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill mt-3 fw-semibold">
+      <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}

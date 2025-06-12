@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    <h2 class="text-primary mb-4 fw-bold" style="font-size: 1.45rem;">
+      <i class="bi bi-inboxes me-2"></i>Receiving Report for PO #{{ po.id }}
+    </h2>
+
+    <div class="mb-4">
+      <h5 class="text-success fw-semibold">✅ Matched Serials <span class="badge bg-success rounded-pill">{{ matched|length }}</span></h5>
+      <ul class="list-group mb-3">
+        {% for s in matched %}
+          <li class="list-group-item py-1">{{ s }}</li>
+        {% endfor %}
+        {% if matched|length == 0 %}
+          <li class="list-group-item text-muted py-1">None</li>
+        {% endif %}
+      </ul>
+
+      <h5 class="text-danger fw-semibold">❌ Missing Serials <span class="badge bg-danger rounded-pill">{{ missing|length }}</span></h5>
+      <ul class="list-group mb-3">
+        {% for s in missing %}
+          <li class="list-group-item py-1">{{ s }}</li>
+        {% endfor %}
+        {% if missing|length == 0 %}
+          <li class="list-group-item text-muted py-1">None</li>
+        {% endif %}
+      </ul>
+
+      <h5 class="text-warning fw-semibold">⚠️ Extra Serials <span class="badge bg-warning text-dark rounded-pill">{{ extra|length }}</span></h5>
+      <ul class="list-group mb-3">
+        {% for s in extra %}
+          <li class="list-group-item py-1">{{ s }}</li>
+        {% endfor %}
+        {% if extra|length == 0 %}
+          <li class="list-group-item text-muted py-1">None</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <form method="POST" action="{{ url_for('confirm_receiving') }}">
+      <div class="d-flex justify-content-end mt-4 gap-2">
+        <a href="{{ url_for('stock_bp.stock_receiving') }}" class="btn btn-outline-secondary rounded-pill fw-semibold px-4">
+          <i class="bi bi-arrow-left-circle me-1"></i>Back
+        </a>
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4">
+          <i class="bi bi-check2-circle me-1"></i>Confirm Received
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

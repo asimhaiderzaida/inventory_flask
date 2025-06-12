@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Preview Upload{% endblock %}
+
+{% block content %}
+<div class="card shadow p-4">
+    <h2 class="mb-4 text-primary">🔍 Preview Products to Import</h2>
+
+    {% if data and columns|length > 0 %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle">
+            <thead class="table-primary">
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col|capitalize }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr>
+                    {% for col in columns %}
+                    <td>{{ row.get(col, '') }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No data available for preview.</p>
+    {% endif %}
+
+    <div class="mt-4">
+        <form method="POST" action="/confirm_import">
+            <button type="submit" class="btn btn-success">✅ Confirm Import</button>
+            <a href="/upload_excel" class="btn btn-secondary ms-2">⬅ Back to Upload</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

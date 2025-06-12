@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    <h2 class="mb-4 fw-bold text-primary" style="font-size: 1.35rem;">
+      <i class="bi bi-clipboard-check me-2"></i>Customer Order Tracker
+    </h2>
+    <form method="GET" class="row g-2 mb-4">
+      <div class="col-md-6">
+        <label for="customer_id" class="form-label">Filter by Customer:</label>
+        <select name="customer_id" class="form-select rounded-pill">
+          <option value="">-- All Customers --</option>
+          {% for customer in customers %}
+            <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|string %}selected{% endif %}>
+              {{ customer.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary rounded-pill fw-semibold">
+          <i class="bi bi-search me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+    <div class="mb-3">
+      <a href="{{ url_for('exports_bp.export_customer_orders', customer_id=selected_customer_id) }}" class="btn btn-outline-success rounded-pill">
+        <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
+      </a>
+    </div>
+    <div class="mb-3 d-flex align-items-center">
+      <button id="batch-move-btn" class="btn btn-warning rounded-pill fw-semibold" data-bs-toggle="modal" data-bs-target="#batchMoveModal">
+        <i class="bi bi-truck me-1"></i>Batch Move Units
+      </button>
+      <button id="batch-delivered-btn" class="btn btn-success rounded-pill fw-semibold ms-2" type="button">
+        <i class="bi bi-box-seam me-1"></i>Mark as Delivered
+      </button>
+      <button id="batch-create-sale-btn" class="btn btn-primary rounded-pill fw-semibold ms-2" type="button">
+        <i class="bi bi-cart-plus me-1"></i>Create Sale
+      </button>
+    </div>
+    {% if orders %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+        <thead class="table-light">
+          <tr>
+            <th><input type="checkbox" id="select-all-orders"></th>
+            <th>Customer</th>
+            <th>Serial</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Stage</th>
+            <th>Team</th>
+            <th>Reserved</th>
+            <th>Delivered</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          <tr data-customer-id="{{ order.customer.id }}">
+            <td>
+              {% if order.product_instance %}
+                <input type="checkbox" class="order-select" value="{{ order.product_instance.serial_number }}">
+              {% endif %}
+            </td>
+            <td>{{ order.customer.name }}</td>
+            <td>
+              {% if order.product_instance %}
+                {{ order.product_instance.serial_number }}
+              {% else %}
+                <span class="text-danger">N/A</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if order.product_instance and order.product_instance.product %}
+                {{ order.product_instance.product.model_number }}
+              {% else %}
+                <span class="text-danger">N/A</span>
+              {% endif %}
+            </td>
+            <td>{{ order.status|capitalize }}</td>
+            <td>{{ order.process_stage|capitalize }}</td>
+            <td>{{ order.team_assigned }}</td>
+            <td>{{ order.reserved_date.strftime('%Y-%m-%d') }}</td>
+            <td>
+              {% if order.delivered_date %}
+                <span class="badge bg-primary bg-opacity-10 text-primary">{{ order.delivered_date.strftime('%Y-%m-%d') }}</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if order.status != 'delivered' %}
+              <form method="POST" action="{{ url_for('order_bp.mark_delivered', order_id=order.id) }}">
+                <button class="btn btn-sm btn-success rounded-pill">Mark as Delivered</button>
+              </form>
+              {% else %}
+              <span class="badge bg-success">Delivered</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted">No reserved units found.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Batch Move Modal -->
+<div class="modal fade" id="batchMoveModal" tabindex="-1" aria-labelledby="batchMoveModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content rounded-4">
+      <div class="modal-header">
+        <h5 class="modal-title" id="batchMoveModalLabel">
+          <i class="bi bi-truck me-2"></i>Batch Move Units to Next Stage
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('order_bp.batch_move') }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Paste or Scan Serials<br>
+              <small class="text-muted">(One per line, or comma/space separated)</small>
+            </label>
+            <textarea name="serials_raw" class="form-control" rows="5" placeholder="Scan or paste serial numbers..."></textarea>
+          </div>
+          <div id="selected-serials-hint" class="mb-3 text-muted" style="white-space: pre-wrap;"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Next Stage</label>
+            <select name="to_stage" class="form-select rounded-pill" required>
+              <option value="">-- Select Stage --</option>
+              <option value="specs">Specs</option>
+              <option value="qc">QC</option>
+              <option value="paint">Paint</option>
+              <option value="deployment">Deployment</option>
+              <option value="ready">Ready</option>
+              <option value="delivered">Delivered</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Assign Team</label>
+            <input type="text" name="to_team" class="form-control rounded-pill" placeholder="Enter team (optional)">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success rounded-pill px-4 fw-semibold">
+            <i class="bi bi-arrow-right-circle me-1"></i>Move Units
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- End Batch Move Modal -->
+
+<form id="batch-delivered-form" method="POST" action="{{ url_for('order_bp.batch_delivered') }}" style="display:none;">
+</form>
+<form id="batch-create-sale-form" method="GET" action="{{ url_for('sales_bp.create_sale_form') }}" style="display:none;">
+</form>
+
+<script>
+// Before submit, split serials_raw into multiple <input name="serials">
+document.addEventListener('DOMContentLoaded', function() {
+  function getOrderCheckboxes() {
+    return document.querySelectorAll('.order-select');
+  }
+
+  var batchForm = document.querySelector('#batchMoveModal form');
+  var batchMoveBtn = document.getElementById('batch-move-btn');
+  var selectAllCheckbox = document.getElementById('select-all-orders');
+  var textarea = batchForm.querySelector('textarea[name="serials_raw"]');
+  var selectedSerialsHint = document.getElementById('selected-serials-hint');
+
+  // Select All toggle
+  if(selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', function() {
+      Array.from(getOrderCheckboxes()).forEach(function(cb) {
+        cb.checked = selectAllCheckbox.checked;
+      });
+    });
+  }
+
+  // When Batch Move Units button clicked
+  if(batchMoveBtn) {
+    batchMoveBtn.addEventListener('click', function() {
+      var checkedSerials = [];
+      Array.from(getOrderCheckboxes()).forEach(function(cb) {
+        if(cb.checked) {
+          checkedSerials.push(cb.value);
+        }
+      });
+      if(checkedSerials.length > 0) {
+        textarea.value = checkedSerials.join('\n');
+        selectedSerialsHint.textContent = "Selected serials:\n" + checkedSerials.join('\n');
+      } else {
+        textarea.value = '';
+        selectedSerialsHint.textContent = '';
+      }
+    });
+  }
+
+  function getCheckedOrders() {
+    var checked = [];
+    Array.from(getOrderCheckboxes()).forEach(function(cb) {
+      if (cb.checked) {
+        var row = cb.closest('tr');
+        var statusCell = row.querySelector('td:nth-child(5)');
+        checked.push({
+          serial: cb.value,
+          status: statusCell ? statusCell.textContent.trim().toLowerCase() : ''
+        });
+      }
+    });
+    return checked;
+  }
+
+  if(batchForm) {
+    batchForm.addEventListener('submit', function(e) {
+      // Remove any existing hidden serials
+      batchForm.querySelectorAll('input[name="serials"]').forEach(el => el.remove());
+      var serials = [];
+
+      // Collect serials from checked checkboxes
+      Array.from(getOrderCheckboxes()).forEach(function(cb) {
+        if(cb.checked) {
+          serials.push(cb.value);
+        }
+      });
+
+      // If no checked checkboxes, fallback to textarea
+      if(serials.length === 0 && textarea.value) {
+        serials = textarea.value.split(/[\s,]+/).filter(Boolean);
+      }
+
+      serials.forEach(function(serial) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'serials';
+        input.value = serial;
+        batchForm.appendChild(input);
+      });
+    });
+  }
+
+  var batchDeliveredBtn = document.getElementById('batch-delivered-btn');
+  var batchDeliveredForm = document.getElementById('batch-delivered-form');
+  var batchCreateSaleBtn = document.getElementById('batch-create-sale-btn');
+  var batchCreateSaleForm = document.getElementById('batch-create-sale-form');
+
+  if (batchDeliveredBtn && batchDeliveredForm) {
+    batchDeliveredBtn.addEventListener('click', function() {
+      // Only select non-delivered units
+      batchDeliveredForm.innerHTML = '';
+      var checked = getCheckedOrders().filter(o => o.status !== 'delivered');
+      if (checked.length === 0) {
+        alert('Please select at least one non-delivered unit.');
+        return;
+      }
+      checked.forEach(function(order) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'serials';
+        input.value = order.serial;
+        batchDeliveredForm.appendChild(input);
+      });
+      batchDeliveredForm.submit();
+    });
+  }
+
+  if (batchCreateSaleBtn) {
+    batchCreateSaleBtn.addEventListener('click', function() {
+      var checked = getCheckedOrders().filter(o => o.status === 'delivered');
+      if (checked.length === 0) {
+        alert('Please select at least one delivered unit.');
+        return;
+      }
+      var firstSerial = checked[0].serial;
+      var firstCheckbox = Array.from(getOrderCheckboxes()).find(cb => cb.value === firstSerial);
+      var customerId = '';
+      if (firstCheckbox) {
+        var row = firstCheckbox.closest('tr');
+        customerId = row ? row.getAttribute('data-customer-id') : '';
+      }
+      var params = checked.map(o => 'serials=' + encodeURIComponent(o.serial)).join('&');
+      window.location.href = '{{ url_for("sales_bp.create_sale_form") }}' + '?customer_id=' + customerId + '&' + params;
+    });
+  }
+});
+</script>
+{% endblock %}

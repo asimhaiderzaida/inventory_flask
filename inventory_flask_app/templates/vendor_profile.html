@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Vendor Profile</h2>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5>{{ vendor.name }}</h5>
+      <div><strong>Phone:</strong> {{ vendor.phone or '' }}</div>
+      <div><strong>Email:</strong> {{ vendor.email or '' }}</div>
+      <div><strong>Company:</strong> {{ vendor.company or '' }}</div>
+      <div><strong>Address:</strong> {{ vendor.address or '' }}</div>
+    </div>
+  </div>
+  <h4>Purchase Orders</h4>
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>PO Number</th>
+        <th>Date</th>
+        <th>Items Received</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for po in purchase_orders %}
+      <tr>
+        <td>{{ po.po_number or po.id }}</td>
+        <td>{{ po.created_at.strftime('%Y-%m-%d') if po.created_at else '' }}</td>
+        <td>
+          {% if po.instances %}
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Serial</th>
+                  <th>Product Name</th>
+                  <th>Model</th>
+                  <th>RAM</th>
+                  <th>Processor</th>
+                  <th>Storage</th>
+                  <th>Screen Size</th>
+                  <th>Resolution</th>
+                  <th>Grade</th>
+                  <th>Video Card</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inst in po.instances %}
+                <tr>
+                  <td>{{ inst.serial_number }}</td>
+                  <td>{{ inst.product.name if inst.product else '' }}</td>
+                  <td>{{ inst.product.model_number if inst.product else '' }}</td>
+                  <td>{{ inst.product.ram if inst.product else '' }}</td>
+                  <td>{{ inst.product.processor if inst.product else '' }}</td>
+                  <td>{{ inst.product.storage if inst.product else '' }}</td>
+                  <td>{{ inst.product.screen_size if inst.product else '' }}</td>
+                  <td>{{ inst.product.resolution if inst.product else '' }}</td>
+                  <td>{{ inst.product.grade if inst.product else '' }}</td>
+                  <td>{{ inst.product.video_card if inst.product else '' }}</td>
+                  <td>{{ inst.status }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="11" class="text-center">No items received for this PO.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <span class="text-muted">No items received for this PO.</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="text-center">No purchase orders found for this vendor.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="{{ url_for('vendors_bp.export_vendor_po', vendor_id=vendor.id) }}" class="btn btn-outline-success mt-3">Export PO History (Excel)</a>
+  <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-secondary mt-3">Back to Vendor Center</a>
+</div>
+{% endblock %}

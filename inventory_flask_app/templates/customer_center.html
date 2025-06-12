@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Customer Center</h2>
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+      <input type="text" name="search" class="form-control" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">Search</button>
+      <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-success ms-2">Add Customer</a>
+    </div>
+  </form>
+  <div class="card mt-2">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Company</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for customer in customers %}
+          <tr>
+            <td>{{ customer.name }}</td>
+            <td>{{ customer.phone }}</td>
+            <td>{{ customer.email }}</td>
+            <td>{{ customer.company or '' }}</td>
+            <td>
+              <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+              <a href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center">No customers found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

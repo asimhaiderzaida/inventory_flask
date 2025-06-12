@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5 d-flex justify-content-center">
+  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 430px; width: 100%; background: #f6f7fa;">
+    <div class="mb-4 text-center">
+      <h3 class="fw-bold mb-1" style="letter-spacing:0.01em;">
+        <i class="bi bi-person-plus text-primary me-2"></i>Add Customer
+      </h3>
+      <div class="text-muted" style="font-size:0.98rem;">Create a new customer profile</div>
+    </div>
+    <form method="POST" action="{{ url_for('customers_bp.add_customer') }}">
+      <div class="mb-3">
+        <label for="name" class="form-label">Customer Name</label>
+        <input type="text" class="form-control rounded-pill px-3" id="name" name="name" placeholder="Enter customer's name" required>
+      </div>
+      <div class="mb-3">
+        <label for="phone" class="form-label">Phone Number</label>
+        <input type="text" class="form-control rounded-pill px-3" id="phone" name="phone" placeholder="Enter phone number">
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Email Address</label>
+        <input type="email" class="form-control rounded-pill px-3" id="email" name="email" placeholder="Enter email address">
+      </div>
+      <div class="d-grid gap-2 mt-3">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i> Save Customer
+        </button>
+        <a href="{{ url_for('sales_bp.create_sale_form') }}" class="btn btn-outline-secondary rounded-pill">
+          <i class="bi bi-arrow-left-circle me-1"></i> Back to Sale
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

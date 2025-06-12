@@ -1,0 +1,73 @@
+<style>
+@media print {
+    .no-print {
+        display: none;
+    }
+}
+</style>
+
+<div class="container">
+    <h2>🧾 Invoice #{{ invoice.id if invoice else invoice_number }}</h2>
+
+    <p><strong>Customer:</strong> {{ customer.name }}</p>
+    <p><strong>Invoice Date:</strong>
+      {% if invoice %}
+        {{ invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else "" }}
+      {% else %}
+        {{ sale_date }}
+      {% endif %}
+    </p>
+
+    <table class="table table-bordered mt-4">
+        <thead>
+            <tr>
+                <th>Serial Number</th>
+                <th>Product Name</th>
+                <th>Model Number</th>
+                <th>Unit Price (AED)</th>
+                <th>Line Total (AED)</th>
+                <th>VAT %</th>
+                <th>VAT Amount (AED)</th>
+                <th>Total With VAT (AED)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+                {% set qty = item.quantity if item.quantity is defined else 1 %}
+                {% set unit_price = item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price) %}
+                {% set line_total = unit_price * qty %}
+                {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
+                {% set vat_amount = line_total * (vat_rate / 100) %}
+                {% set total_with_vat = line_total + vat_amount %}
+                <tr>
+                    <td>{{ item.serial_number }}</td>
+                    <td>{{ item.product_name or item.name or "Unnamed Product" }}</td>
+                    <td>{{ item.model_number }}</td>
+                    <td>{{ "%.2f"|format(unit_price) }}</td>
+                    <td>{{ "%.2f"|format(line_total) }}</td>
+                    <td>{{ vat_rate }}</td>
+                    <td>{{ "%.2f"|format(vat_amount) }}</td>
+                    <td>{{ "%.2f"|format(total_with_vat) }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Summary:</h4>
+    <ul>
+        <li><strong>Subtotal (AED):</strong> {{ "%.2f"|format(subtotal) }}</li>
+        <li><strong>Total VAT (AED):</strong> {{ "%.2f"|format(total_vat) }}</li>
+        <li><strong>Grand Total (AED, incl. VAT):</strong> {{ "%.2f"|format(grand_total) }}</li>
+    </ul>
+
+    {% if is_preview %}
+      <div class="mt-4">
+        <div class="alert alert-info">This is a preview only. To complete the sale, return to the previous tab and click "Create Invoice".</div>
+        <button onclick="window.close()" class="btn btn-secondary">Close Preview</button>
+      </div>
+    {% endif %}
+
+    <div class="mt-4 no-print">
+        <a href="/main_dashboard" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+</div>

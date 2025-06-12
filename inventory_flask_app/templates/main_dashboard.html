@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<style>
+.stat-card {
+  background: #eceff3;
+  border-radius: 0.7rem;
+  transition: box-shadow 0.2s;
+  box-shadow: 0 1px 4px rgba(44, 62, 80, 0.07);
+  font-size: 0.91rem;
+  padding: 0.5rem 0.5rem !important;
+}
+.stat-card .stat-icon {
+  font-size: 1.1rem;
+}
+.stat-card .stat-value {
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+.stat-card .stat-label {
+  font-size: 0.87rem;
+  color: #666;
+  margin-bottom: 0.08rem;
+}
+.btn-xs { font-size: 0.85rem !important; padding: 0.14rem 0.5rem !important; }
+</style>
+<h2 class="mb-4">📊 PCMart Dashboard</h2>
+
+<!-- Dynamic Filter Dropdown -->
+<form method="get" class="row g-2 mb-4">
+  <div class="col-md-3">
+    <select name="model" class="form-select" onchange="this.form.submit()">
+      <option value="">Filter by Model</option>
+      {% for model in available_models %}
+        <option value="{{ model }}" {% if request.args.get('model') == model %}selected{% endif %}>{{ model }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="form-control" onchange="this.form.submit()">
+  </div>
+  <div class="col-md-3">
+    <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="form-control" onchange="this.form.submit()">
+  </div>
+  <div class="col-md-3">
+    <button class="btn btn-outline-secondary w-100" type="submit">Apply Filters</button>
+  </div>
+</form>
+
+{% set stats = [
+  {'label': 'Total Sales', 'value': total_sales, 'icon': '<i class="bi bi-graph-up-arrow text-success"></i>', 'url': '/customer_orders'},
+  {'label': 'Low Stock Items', 'value': low_stock_items, 'icon': '<i class="bi bi-exclamation-circle text-warning"></i>', 'url': '/products?filter=low'},
+  {'label': 'Unprocessed', 'value': unprocessed, 'icon': '<i class="bi bi-hourglass text-secondary"></i>', 'url': '/stock/under_process?status=unprocessed'},
+  {'label': 'Under Process', 'value': under_process, 'icon': '<i class="bi bi-arrow-repeat text-primary"></i>', 'url': '/stock/under_process?status=under_process'},
+  {'label': 'Processed', 'value': processed, 'icon': '<i class="bi bi-check-circle text-success"></i>', 'url': '/stock/under_process?status=processed'},
+  {'label': 'Disputed', 'value': disputed, 'icon': '<i class="bi bi-x-circle text-danger"></i>', 'url': '/customer_orders?filter=disputed'}
+] %}
+
+<div class="row g-3 mb-4">
+  {% for stat in stats %}
+  <div class="col-6 col-md-4 col-lg-2 d-flex">
+    <a href="{{ stat.url }}" class="text-decoration-none flex-grow-1 w-100">
+      <div class="card stat-card border-0 h-100">
+        <div class="card-body text-center d-flex flex-column justify-content-center h-100 py-2 px-2">
+          <div class="stat-icon mb-1" style="font-size: 1.25rem;">{{ stat.icon|safe }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+          <div class="stat-value" style="font-size: 1.12rem;" id="{{ stat.label|lower|replace(' ', '-') }}-count">{{ stat.value }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card shadow-sm border-0 rounded-4 my-3 p-3" style="max-width: 640px;">
+  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <h6 class="mb-0 me-2 text-secondary fw-semibold" style="font-size: 1rem;">📈 Analytics Overview</h6>
+    <button class="btn btn-outline-success btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('sales')">Sales</button>
+    <button class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('stock')">Stock</button>
+    <button class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('models')">Top Models</button>
+  </div>
+  <canvas id="mainChart" height="160"></canvas>
+  <ul class="mb-0 mt-2 ps-3" style="font-size: 0.96rem;">
+    {% for product in top_models %}
+      <li>{{ product.product_name }} – {{ product.instance_count }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctxMain = document.getElementById('mainChart').getContext('2d');
+  const chartData = {
+    sales: {
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      data: [8, 12, 10, 15, 9, 14, 18]
+    },
+    stock: {
+      labels: ['Laptops', 'Desktops', 'Tablets', 'Monitors', 'Parts'],
+      data: [150, 90, 40, 70, 120]
+    },
+    models: {
+      labels: {{ top_models | map(attribute='product_name') | list | tojson }},
+      data: {{ top_models | map(attribute='instance_count') | list | tojson }}
+    }
+  };
+
+  let currentChart = new Chart(ctxMain, {
+    type: 'bar',
+    data: {
+      labels: chartData.sales.labels,
+      datasets: [{
+        label: 'Weekly Sales',
+        data: chartData.sales.data,
+        backgroundColor: 'rgba(40,167,69,0.6)'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: 'Weekly Sales Overview' }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  function switchChart(type) {
+    currentChart.data.labels = chartData[type].labels;
+    currentChart.data.datasets[0].data = chartData[type].data;
+    currentChart.options.plugins.title.text =
+      type === 'sales' ? 'Weekly Sales Overview' :
+      type === 'stock' ? 'Stock by Category' :
+      'Top Products by Instances';
+    currentChart.update();
+  }
+
+  document.querySelectorAll('.sparkline').forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    const data = JSON.parse(canvas.getAttribute('data-values'));
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map((_, i) => i),
+        datasets: [{
+          data: data,
+          borderColor: '#28a745',
+          backgroundColor: 'rgba(40,167,69,0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } }
+      }
+    });
+  });
+</script>
+<script>
+function updateDashboardStats() {
+  fetch('/api/dashboard_stats')
+    .then(res => res.json())
+    .then(data => {
+      if (data.unprocessed !== undefined) document.getElementById('unprocessed-count').textContent = data.unprocessed;
+      if (data.under_process !== undefined) document.getElementById('under-process-count').textContent = data.under_process;
+      if (data.processed !== undefined) document.getElementById('processed-count').textContent = data.processed;
+      if (data.low_stock_items !== undefined) document.getElementById('low-stock-count').textContent = data.low_stock_items;
+      if (data.disputed !== undefined) document.getElementById('disputed-count').textContent = data.disputed;
+      if (data.total_sales !== undefined) document.getElementById('total-sales-count').textContent = data.total_sales;
+    });
+}
+setInterval(updateDashboardStats, 15000); // 15 seconds
+window.addEventListener('DOMContentLoaded', updateDashboardStats);
+</script>
+{% endblock %}

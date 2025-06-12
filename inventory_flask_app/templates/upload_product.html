@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Upload Excel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 90vh;">
+  <div class="card shadow border-0 rounded-4 p-4" style="width: 100%; max-width: 520px; background: #f3f4f8;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} mt-3">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <div class="mb-3 text-center">
+      <h3 class="fw-bold mb-2" style="letter-spacing:0.01em;">
+        <i class="bi bi-file-earmark-arrow-up text-primary me-2"></i>Upload Product Excel
+      </h3>
+      <div class="text-muted" style="font-size:0.98rem;">Import inventory in bulk from Excel</div>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label">Select Vendor:</label>
+        <div class="input-group">
+          <select id="vendorSelect" name="vendor_id" class="form-select rounded-pill px-3" required>
+            <option value="">-- Select Vendor --</option>
+            {% for vendor in vendors %}
+              <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+            {% endfor %}
+          </select>
+          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill">
+            <i class="bi bi-plus-circle"></i> Add Vendor
+          </a>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Upload Excel File:</label>
+        <input type="file" name="file" class="form-control rounded-pill px-3" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-success rounded-pill w-100 fw-semibold">
+        <i class="bi bi-upload me-1"></i> Upload & Preview
+      </button>
+    </form>
+
+    {% if error %}
+      <div class="alert alert-danger mt-4">{{ error }}</div>
+    {% endif %}
+
+    {% if preview_data %}
+      <!-- Button to trigger modal (auto-clicked by script below) -->
+      <button type="button" id="previewModalTrigger" class="d-none" data-bs-toggle="modal" data-bs-target="#previewModal"></button>
+
+      <!-- Preview Modal -->
+      <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="previewModalLabel">Preview Products to Import</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                  {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-2">{{ message }}</div>
+                  {% endfor %}
+                {% endif %}
+              {% endwith %}
+              <div class="table-responsive w-100">
+                <table class="table table-sm table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
+                  <thead>
+                    <tr>
+                      {% for col in preview_columns %}
+                        <th>{{ col }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in preview_data %}
+                      <tr>
+                        {% for col in preview_columns %}
+                          <td>{{ row[col] }}</td>
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <form method="POST">
+                <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
+                <input type="hidden" name="excel_data" value="{{ excel_data }}">
+                <input type="hidden" name="confirm" value="yes">
+                <button type="submit" class="btn btn-success rounded-pill fw-semibold mt-2">
+                  <i class="bi bi-check2-circle me-1"></i>Confirm Import
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        document.addEventListener("DOMContentLoaded", function() {
+          {% if preview_data %}
+            document.getElementById('previewModalTrigger').click();
+          {% endif %}
+        });
+      </script>
+    {% endif %}
+
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-link mt-3">
+      <i class="bi bi-arrow-left-circle me-1"></i> Back to Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Select2 Live Search -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+    $('#vendorSelect').select2({
+      placeholder: "Search or select a vendor",
+      allowClear: true,
+      width: 'resolve'
+    });
+  });
+</script>
+{% endblock %}
