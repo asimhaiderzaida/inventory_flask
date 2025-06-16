@@ -5,15 +5,15 @@
 <h2 class="mb-4">✅ Excel Upload: New Inventory Added for Vendor {{ vendor.name }}</h2>
 
 <form method="post" action="{{ url_for('stock_bp.batch_update_status') }}">
-  <div class="mb-2">
-    <button type="submit" class="btn btn-success">Assign Status to Selected</button>
-    <select name="status" required class="form-select d-inline w-auto mx-2">
+  <div class="mb-2 mb-3">
+    <button type="submit" class="btn btn-success btn-lg w-100 mt-2">Assign Status to Selected</button>
+    <select name="status" required class="form-select form-select-lg d-inline w-auto mx-2">
       <option value="">-- Select Status --</option>
       <option value="unprocessed">Unprocessed</option>
       <option value="under_process">Under Process</option>
       <option value="processed">Processed</option>
     </select>
-    <button type="button" onclick="batchPrint()" class="btn btn-dark mx-2">🖨️ Print Selected Labels</button>
+    <button type="button" onclick="batchPrint()" class="btn btn-dark btn-lg w-100 mt-2 mx-2">🖨️ Print Selected Labels</button>
   </div>
   <div style="overflow-x:auto;">
     <table class="table table-striped comfortable-table">

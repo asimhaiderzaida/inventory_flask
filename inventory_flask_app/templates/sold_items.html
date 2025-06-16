@@ -6,8 +6,8 @@
       <i class="bi bi-cart-check me-2"></i>Sold Items
     </h2>
     <form method="get" class="row g-2 mb-4">
-      <div class="col-auto">
-        <select name="customer" class="form-select rounded-pill">
+      <div class="col-12 col-md-auto mb-2 mb-md-0">
+        <select name="customer" class="form-select form-control-lg rounded-pill">
           <option value="">All Customers</option>
           {% for customer in customers %}
           <option value="{{ customer.id }}" {% if selected_customer == customer.id|string %}selected{% endif %}>
@@ -16,14 +16,14 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-auto">
-        <input type="date" name="sale_date" value="{{ selected_date or '' }}" class="form-control rounded-pill">
+      <div class="col-12 col-md-auto mb-2 mb-md-0">
+        <input type="date" name="sale_date" value="{{ selected_date or '' }}" class="form-control form-control-lg rounded-pill">
       </div>
-      <div class="col-auto">
-        <button type="submit" class="btn btn-primary rounded-pill fw-semibold">Filter</button>
+      <div class="col-12 col-md-auto mb-2 mb-md-0">
+        <button type="submit" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2">Filter</button>
       </div>
     </form>
-    <div class="table-responsive">
+    <div style="overflow-x:auto;">
       <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
         <thead class="table-light">
           <tr>
@@ -34,9 +34,9 @@
             <th>RAM</th>
             <th>Storage</th>
             <th>Screen Size</th>
-            <th>Resolution</th>
-            <th>Grade</th>
-            <th>Video Card</th>
+            <th class="d-none d-md-table-cell">Resolution</th>
+            <th class="d-none d-md-table-cell">Grade</th>
+            <th class="d-none d-md-table-cell">Video Card</th>
             <th>Customer</th>
             <th>Sale Date</th>
             <th>Sale Price (AED)</th>
@@ -52,9 +52,9 @@
             <td>{{ item.ram }}</td>
             <td>{{ item.storage }}</td>
             <td>{{ item.screen_size }}</td>
-            <td>{{ item.resolution }}</td>
-            <td>{{ item.grade }}</td>
-            <td>{{ item.video_card }}</td>
+            <td class="d-none d-md-table-cell">{{ item.resolution }}</td>
+            <td class="d-none d-md-table-cell">{{ item.grade }}</td>
+            <td class="d-none d-md-table-cell">{{ item.video_card }}</td>
             <td>{{ item.customer }}</td>
             <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ item.sale_date }}</span></td>
             <td><span class="badge bg-success bg-opacity-10 text-success">{{ "%.2f"|format(item.price) if item.price else "" }}</span></td>

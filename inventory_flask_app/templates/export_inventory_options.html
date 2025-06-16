@@ -5,26 +5,37 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h2>📦 Export Inventory</h2>
-    <form method="POST" action="/inventory/export_excel">
-        <label>Filter by Model:</label>
-        <input type="text" name="model_number"><br><br>
+    <div class="container mt-4">
+        <h2>📦 Export Inventory</h2>
+        <form method="POST" action="/inventory/export_excel">
+            <div class="mb-3">
+                <label>Filter by Model:</label>
+                <input type="text" name="model_number" class="form-control form-control-lg">
+            </div>
 
-        <label>Filter by Processor:</label>
-        <input type="text" name="processor"><br><br>
+            <div class="mb-3">
+                <label>Filter by Processor:</label>
+                <input type="text" name="processor" class="form-control form-control-lg">
+            </div>
 
-        <label>Filter by Video Card:</label>
-        <input type="text" name="video_card"><br><br>
+            <div class="mb-3">
+                <label>Filter by Video Card:</label>
+                <input type="text" name="video_card" class="form-control form-control-lg">
+            </div>
 
-        <label>From Date:</label>
-        <input type="date" name="from_date"><br><br>
+            <div class="mb-3">
+                <label>From Date:</label>
+                <input type="date" name="from_date" class="form-control form-control-lg">
+            </div>
 
-        <label>To Date:</label>
-        <input type="date" name="to_date"><br><br>
+            <div class="mb-3">
+                <label>To Date:</label>
+                <input type="date" name="to_date" class="form-control form-control-lg">
+            </div>
 
-        <button type="submit">Export Excel</button>
-    </form>
-    <p><a href="/main_dashboard">← Back to Dashboard</a></p>
+            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">Export Excel</button>
+        </form>
+        <a href="/main_dashboard" class="btn btn-outline-secondary btn-lg w-100 mt-2">← Back to Dashboard</a>
+    </div>
 </body>
 </html>
-

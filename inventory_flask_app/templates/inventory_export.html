@@ -14,30 +14,35 @@
         <a href="/main_dashboard" style="color: white; text-decoration: none;">← Back to Dashboard</a>
     </nav>
 
-    <div style="padding: 20px;">
+    <div class="container mt-4">
         <h2>📤 Export Inventory</h2>
         <form method="POST" action="/inventory/export">
-            <label>Model Number:</label>
-            <input type="text" name="model_number">
-
-            <label>Processor:</label>
-            <input type="text" name="processor">
-
-            <label>Video Card:</label>
-            <input type="text" name="video_card">
-
-            <label>Start Date:</label>
-            <input type="date" name="start_date">
-
-            <label>End Date:</label>
-            <input type="date" name="end_date">
-
-            <label>Serial Numbers (scan, paste, or type):</label>
-            <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..."></textarea>
-
-            <br>
-            <button type="submit" name="action" value="preview">🔍 Preview</button>
-            <button type="submit" name="action" value="download">📥 Download Excel</button>
+            <div class="mb-3">
+                <label>Model Number:</label>
+                <input type="text" name="model_number" class="form-control form-control-lg">
+            </div>
+            <div class="mb-3">
+                <label>Processor:</label>
+                <input type="text" name="processor" class="form-control form-control-lg">
+            </div>
+            <div class="mb-3">
+                <label>Video Card:</label>
+                <input type="text" name="video_card" class="form-control form-control-lg">
+            </div>
+            <div class="mb-3">
+                <label>Start Date:</label>
+                <input type="date" name="start_date" class="form-control form-control-lg">
+            </div>
+            <div class="mb-3">
+                <label>End Date:</label>
+                <input type="date" name="end_date" class="form-control form-control-lg">
+            </div>
+            <div class="mb-3">
+                <label>Serial Numbers (scan, paste, or type):</label>
+                <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..." class="form-control form-control-lg"></textarea>
+            </div>
+            <button type="submit" name="action" value="preview" class="btn btn-primary btn-lg w-100 mt-2">🔍 Preview</button>
+            <button type="submit" name="action" value="download" class="btn btn-success btn-lg w-100 mt-2">📥 Download Excel</button>
         </form>
     </div>
 </body>

@@ -5,6 +5,8 @@ from inventory_flask_app.utils.utils import get_instance_id
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, make_response
 from flask_login import login_required
 from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location
+from inventory_flask_app.models import CustomerOrderTracking
+from sqlalchemy.orm import aliased
 from datetime import datetime
 import csv
 from io import StringIO
@@ -343,6 +345,15 @@ def under_process():
     # Always exclude sold items for inventory views
     if not status_filter or status_filter == 'all':
         query = query.filter(ProductInstance.is_sold == False)
+
+    # Exclude all reserved units from inventory views
+    reserved_order = aliased(CustomerOrderTracking)
+    query = query.outerjoin(
+        reserved_order,
+        (reserved_order.product_instance_id == ProductInstance.id) &
+        (reserved_order.status == 'reserved')
+    ).filter(reserved_order.id == None)
+
     instances = query.all()
     all_models = list({i.product.model_number for i in instances if i.product and i.product.model_number})
     all_processors = list({i.product.processor for i in instances if i.product and i.product.processor})
@@ -522,6 +533,8 @@ def scan_move():
             status = request.form.get('status')
             process_stage = request.form.get('process_stage')
             team_assigned = request.form.get('team_assigned')
+            location_id = request.form.get('location_id')
+            shelf_bin = request.form.get('shelf_bin', '').strip()
             updated = 0
             for serial in batch_serials:
                 if status not in ['unprocessed', 'under_process', 'processed', 'sold']:
@@ -532,6 +545,10 @@ def scan_move():
                     instance.status = status
                     instance.process_stage = process_stage
                     instance.team_assigned = team_assigned
+                    if location_id:
+                        instance.location_id = int(location_id)
+                    if shelf_bin:
+                        instance.shelf_bin = shelf_bin
                     updated += 1
             db.session.commit()
             flash(f"{updated} serial(s) updated successfully.", "success")
@@ -547,7 +564,8 @@ def scan_move():
     return render_template(
         'scan_move.html',
         instances=instances,
-        serial_number=serial_number
+        serial_number=serial_number,
+        locations=Location.query.all()
     )
 
 

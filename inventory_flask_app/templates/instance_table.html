@@ -40,7 +40,7 @@
       </a>
     </div>
     <form method="get" class="row g-2 mb-4">
-      <div class="col-md-3">
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="status" class="form-select rounded-pill" onchange="this.form.submit()">
           <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
           <option value="unprocessed" {% if request.args.get('status') == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
@@ -49,7 +49,7 @@
           <option value="disputed" {% if request.args.get('status') == 'disputed' %}selected{% endif %}>Disputed</option>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="model" class="form-select rounded-pill" onchange="this.form.submit()">
           <option value="">Filter by Model</option>
           {% for m in models %}
@@ -57,7 +57,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="processor" class="form-select rounded-pill" onchange="this.form.submit()">
           <option value="">Filter by Processor</option>
           {% for p in processors %}
@@ -65,11 +65,11 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
         <input type="text" name="serial_search" value="{{ request.args.get('serial_search', '') }}" class="form-control rounded-pill" placeholder="Search Serial...">
       </div>
-      <div class="col-md-3 text-end">
-        <button class="btn btn-outline-primary w-100 rounded-pill" type="submit">Apply Filters</button>
+      <div class="col-12 col-md-3 text-end">
+        <button class="btn btn-outline-primary w-100 rounded-pill btn-lg" type="submit">Apply Filters</button>
       </div>
     </form>
     <div class="mb-3 text-end">
@@ -89,20 +89,21 @@
               <th>Serial</th>
               <th>Product</th>
               <th>Model</th>
-              <th>Vendor</th>
+              <th class="d-none d-md-table-cell">Vendor</th>
               <th>Status</th>
               <th>Process Stage</th>
               <th>Team</th>
               <th>Location</th>
-              <th>RAM</th>
-              <th>Processor</th>
-              <th>Storage</th>
-              <th>Screen Size</th>
-              <th>Resolution</th>
-              <th>Grade</th>
-              <th>Video Card</th>
-              <th>Is Sold</th>
-              <th style="width:100px;">Label</th>
+              <th>Shelf/Bin</th>
+              <th class="d-none d-md-table-cell">RAM</th>
+              <th class="d-none d-md-table-cell">Processor</th>
+              <th class="d-none d-md-table-cell">Storage</th>
+              <th class="d-none d-md-table-cell">Screen Size</th>
+              <th class="d-none d-md-table-cell">Resolution</th>
+              <th class="d-none d-md-table-cell">Grade</th>
+              <th class="d-none d-md-table-cell">Video Card</th>
+              <th class="d-none d-md-table-cell">Is Sold</th>
+              <th class="d-none d-md-table-cell" style="width:100px;">Label</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -115,20 +116,21 @@
                 <td>{{ i.serial_number }}</td>
                 <td>{{ i.product.name if i.product else '' }}</td>
                 <td>{{ i.product.model_number if i.product else '' }}</td>
-                <td>{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
                 <td>{{ i.status }}</td>
                 <td>{{ i.process_stage or '' }}</td>
                 <td>{{ i.team_assigned or '' }}</td>
                 <td>{{ i.location.name if i.location else '' }}</td>
-                <td>{{ i.product.ram if i.product else '' }}</td>
-                <td>{{ i.product.processor if i.product else '' }}</td>
-                <td>{{ i.product.storage if i.product else '' }}</td>
-                <td>{{ i.product.screen_size if i.product else '' }}</td>
-                <td>{{ i.product.resolution if i.product else '' }}</td>
-                <td>{{ i.product.grade if i.product else '' }}</td>
-                <td>{{ i.product.video_card if i.product else '' }}</td>
-                <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
-                <td>
+                <td>{{ i.shelf_bin or '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.ram if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.processor if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.storage if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.screen_size if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.resolution if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.grade if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ i.product.video_card if i.product else '' }}</td>
+                <td class="d-none d-md-table-cell">{{ 'Yes' if i.is_sold else 'No' }}</td>
+                <td class="d-none d-md-table-cell">
                   <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
                     class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">
                     🖨️ Print Label

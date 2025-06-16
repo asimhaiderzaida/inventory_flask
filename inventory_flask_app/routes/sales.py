@@ -157,6 +157,21 @@ def preview_invoice():
         if not item.get('product_name') and item.get('name'):
             item['product_name'] = item['name']
 
+    for item in items:
+        # Pick correct field names and support variations from cart data
+        model = item.get('model_number', '') or item.get('model', '') or ''
+        processor = item.get('processor', '') or item.get('cpu', '') or ''
+        ram = item.get('ram', '')
+        storage = item.get('storage', '')
+        vga = item.get('video_card', '') or item.get('gpu', '')
+
+        specs_parts = [model]
+        if processor: specs_parts.append(processor)
+        if ram: specs_parts.append(ram)
+        if storage: specs_parts.append(storage)
+        if vga: specs_parts.append(vga)
+        item['specs'] = " / ".join(specs_parts)
+
     return render_template(
         'invoice_template.html',
         invoice_number=fake_invoice_number,

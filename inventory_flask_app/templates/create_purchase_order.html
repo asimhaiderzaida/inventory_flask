@@ -11,14 +11,14 @@
       <div class="text-muted" style="font-size:0.98rem;">Add a new PO and upload Excel with serials & specs</div>
     </div>
     <form method="POST" enctype="multipart/form-data">
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label class="form-label fw-bold">PO Number:</label>
-        <input type="text" name="po_number" class="form-control rounded-pill px-3" required>
+        <input type="text" name="po_number" class="form-control form-control-lg rounded-pill px-3" required>
       </div>
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label class="form-label fw-bold">Vendor:</label>
         <div class="input-group">
-          <select name="vendor_id" class="form-select rounded-pill px-3" required>
+          <select name="vendor_id" class="form-select form-select-lg rounded-pill px-3" required>
             <option value="">-- Select Vendor --</option>
             {% for vendor in vendors %}
               <option value="{{ vendor.id }}">{{ vendor.name }}</option>
@@ -29,16 +29,16 @@
           </a>
         </div>
       </div>
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label class="form-label fw-bold">Upload Excel File with Serials + Specs:</label>
-        <input type="file" name="file" class="form-control rounded-pill px-3" accept=".xlsx, .xls" required>
+        <input type="file" name="file" class="form-control form-control-lg rounded-pill px-3" accept=".xlsx, .xls" required>
         <small class="text-muted">Excel must include at least <code>serial_number</code> and <code>model_number</code> columns.</small>
       </div>
       <div class="d-grid gap-2 mt-3">
-        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold">
+        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
         </a>
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-check2-circle me-1"></i>Create PO
         </button>
       </div>

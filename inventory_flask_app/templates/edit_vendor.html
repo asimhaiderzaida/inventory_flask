@@ -3,29 +3,29 @@
 <div class="container mt-4">
   <h2>Edit Vendor</h2>
   <form method="POST" class="row g-3">
-    <div class="col-md-6">
+    <div class="col-md-6 mb-3">
       <label class="form-label">Vendor Name</label>
-      <input type="text" name="name" class="form-control" value="{{ vendor.name }}" required>
+      <input type="text" name="name" class="form-control form-control-lg" value="{{ vendor.name }}" required>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-6 mb-3">
       <label class="form-label">Contact</label>
-      <input type="text" name="contact" class="form-control" value="{{ vendor.contact or '' }}">
+      <input type="text" name="contact" class="form-control form-control-lg" value="{{ vendor.contact or '' }}">
     </div>
-    <div class="col-md-6">
+    <div class="col-md-6 mb-3">
       <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-control" value="{{ vendor.email or '' }}">
+      <input type="email" name="email" class="form-control form-control-lg" value="{{ vendor.email or '' }}">
     </div>
-    <div class="col-md-6">
+    <div class="col-md-6 mb-3">
       <label class="form-label">Company</label>
-      <input type="text" name="company" class="form-control" value="{{ vendor.company or '' }}">
+      <input type="text" name="company" class="form-control form-control-lg" value="{{ vendor.company or '' }}">
     </div>
-    <div class="col-md-12">
+    <div class="col-md-12 mb-3">
       <label class="form-label">Address</label>
-      <textarea name="address" class="form-control" rows="2">{{ vendor.address or '' }}</textarea>
+      <textarea name="address" class="form-control form-control-lg" rows="2">{{ vendor.address or '' }}</textarea>
     </div>
     <div class="col-12 mt-3">
-      <button type="submit" class="btn btn-primary px-4">Save</button>
-      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary ms-2">Back to Vendor Center</a>
+      <button type="submit" class="btn btn-primary px-4 btn-lg w-100 mt-2">Save</button>
+      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary ms-2 btn-lg w-100 mt-2">Back to Vendor Center</a>
     </div>
   </form>
 </div>

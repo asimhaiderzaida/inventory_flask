@@ -6,9 +6,9 @@
       <i class="bi bi-clipboard-check me-2"></i>Customer Order Tracker
     </h2>
     <form method="GET" class="row g-2 mb-4">
-      <div class="col-md-6">
+      <div class="col-12 col-md-6 mb-2 mb-md-0">
         <label for="customer_id" class="form-label">Filter by Customer:</label>
-        <select name="customer_id" class="form-select rounded-pill">
+        <select name="customer_id" class="form-select rounded-pill form-control-lg">
           <option value="">-- All Customers --</option>
           {% for customer in customers %}
             <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|string %}selected{% endif %}>
@@ -17,8 +17,16 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-6 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary rounded-pill fw-semibold">
+      <div class="col-12 col-md-3 mb-2 mb-md-0 d-flex align-items-end">
+        <div class="form-check w-100">
+          <input class="form-check-input form-control-lg" type="checkbox" name="show_completed" value="1" id="showCompletedToggle" {% if request.args.get('show_completed') %}checked{% endif %}>
+          <label class="form-check-label" for="showCompletedToggle">
+            Show Completed
+          </label>
+        </div>
+      </div>
+      <div class="col-12 col-md-3 mb-2 mb-md-0 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-search me-1"></i>Filter
         </button>
       </div>
@@ -28,82 +36,92 @@
         <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
       </a>
     </div>
-    <div class="mb-3 d-flex align-items-center">
-      <button id="batch-move-btn" class="btn btn-warning rounded-pill fw-semibold" data-bs-toggle="modal" data-bs-target="#batchMoveModal">
+    {% if orders %}
+    <form id="batch-cancel-form" method="POST" action="{{ url_for('order_bp.batch_cancel_reservation') }}">
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2">
+      <button id="batch-move-btn" class="btn btn-warning rounded-pill fw-semibold btn-lg w-100 mt-2">
         <i class="bi bi-truck me-1"></i>Batch Move Units
       </button>
-      <button id="batch-delivered-btn" class="btn btn-success rounded-pill fw-semibold ms-2" type="button">
+      <button id="batch-delivered-btn" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2" type="button">
         <i class="bi bi-box-seam me-1"></i>Mark as Delivered
       </button>
-      <button id="batch-create-sale-btn" class="btn btn-primary rounded-pill fw-semibold ms-2" type="button">
+      <button id="batch-create-sale-btn" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2" type="button">
         <i class="bi bi-cart-plus me-1"></i>Create Sale
       </button>
+      <button type="submit" class="btn btn-danger rounded-pill fw-semibold btn-lg w-100 mt-2">
+        <i class="bi bi-x-circle me-1"></i>Cancel Reservation
+      </button>
     </div>
-    {% if orders %}
-    <div class="table-responsive">
-      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
-        <thead class="table-light">
-          <tr>
-            <th><input type="checkbox" id="select-all-orders"></th>
-            <th>Customer</th>
-            <th>Serial</th>
-            <th>Model</th>
-            <th>Status</th>
-            <th>Stage</th>
-            <th>Team</th>
-            <th>Reserved</th>
-            <th>Delivered</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in orders %}
-          <tr data-customer-id="{{ order.customer.id }}">
-            <td>
-              {% if order.product_instance %}
-                <input type="checkbox" class="order-select" value="{{ order.product_instance.serial_number }}">
-              {% endif %}
-            </td>
-            <td>{{ order.customer.name }}</td>
-            <td>
-              {% if order.product_instance %}
-                {{ order.product_instance.serial_number }}
-              {% else %}
-                <span class="text-danger">N/A</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if order.product_instance and order.product_instance.product %}
-                {{ order.product_instance.product.model_number }}
-              {% else %}
-                <span class="text-danger">N/A</span>
-              {% endif %}
-            </td>
-            <td>{{ order.status|capitalize }}</td>
-            <td>{{ order.process_stage|capitalize }}</td>
-            <td>{{ order.team_assigned }}</td>
-            <td>{{ order.reserved_date.strftime('%Y-%m-%d') }}</td>
-            <td>
-              {% if order.delivered_date %}
-                <span class="badge bg-primary bg-opacity-10 text-primary">{{ order.delivered_date.strftime('%Y-%m-%d') }}</span>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-            <td>
-              {% if order.status != 'delivered' %}
-              <form method="POST" action="{{ url_for('order_bp.mark_delivered', order_id=order.id) }}">
-                <button class="btn btn-sm btn-success rounded-pill">Mark as Delivered</button>
-              </form>
-              {% else %}
-              <span class="badge bg-success">Delivered</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="mb-3">
+      <!-- Space for Cancel Reservation batch button to visually separate -->
     </div>
+    <div style="overflow-x:auto;">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
+          <thead class="table-light">
+            <tr>
+              <th><input type="checkbox" id="select-all-orders"></th>
+              <th>Customer</th>
+              <th>Serial</th>
+              <th>Model</th>
+              <th>Status</th>
+              <th class="d-none d-md-table-cell">Stage</th>
+              <th class="d-none d-md-table-cell">Team</th>
+              <th>Reserved</th>
+              <th class="d-none d-md-table-cell">Delivered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            <tr data-customer-id="{{ order.customer.id }}">
+              <td>
+                {% if order.product_instance %}
+                  <input type="checkbox" class="order-select" name="serials" value="{{ order.product_instance.serial_number }}">
+                {% endif %}
+              </td>
+              <td>{{ order.customer.name }}</td>
+              <td>
+                {% if order.product_instance %}
+                  {{ order.product_instance.serial_number }}
+                {% else %}
+                  <span class="text-danger">N/A</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if order.product_instance and order.product_instance.product %}
+                  {{ order.product_instance.product.model_number }}
+                {% else %}
+                  <span class="text-danger">N/A</span>
+                {% endif %}
+              </td>
+              <td>{{ order.status|capitalize }}</td>
+              <td class="d-none d-md-table-cell">{{ order.process_stage|capitalize }}</td>
+              <td class="d-none d-md-table-cell">{{ order.team_assigned }}</td>
+              <td>{{ order.reserved_date.strftime('%Y-%m-%d') }}</td>
+              <td class="d-none d-md-table-cell">
+                {% if order.delivered_date %}
+                  <span class="badge bg-primary bg-opacity-10 text-primary">{{ order.delivered_date.strftime('%Y-%m-%d') }}</span>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if order.status != 'delivered' %}
+                <form method="POST" action="{{ url_for('order_bp.mark_delivered', order_id=order.id) }}">
+                  <button class="btn btn-sm btn-success rounded-pill">Mark as Delivered</button>
+                </form>
+                {% else %}
+                <span class="badge bg-success">Delivered</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </form>
     {% else %}
       <p class="text-muted">No reserved units found.</p>
     {% endif %}

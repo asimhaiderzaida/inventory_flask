@@ -10,6 +10,7 @@
     </div>
   </div>
   <h4>Sales History</h4>
+  <div style="overflow-x:auto;">
   <table class="table table-bordered table-striped">
     <thead>
       <tr>
@@ -19,7 +20,7 @@
         <th>Model Number</th>
         <th>Status</th>
         <th>Price</th>
-        <th>Notes</th>
+        <th class="d-none d-md-table-cell">Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -31,14 +32,15 @@
         <td>{{ sale.model_number }}</td>
         <td>{{ sale.status }}</td>
         <td>{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else "" }}</td>
-        <td>{{ sale.notes or "" }}</td>
+        <td class="d-none d-md-table-cell">{{ sale.notes or "" }}</td>
       </tr>
       {% else %}
       <tr><td colspan="7" class="text-center">No sales found for this customer.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success mt-3">Export Sales History (Excel)</a>
-  <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary mt-3">Back to Customer Center</a>
+  </div>
+  <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success mt-3 btn-lg w-100 mt-2">Export Sales History (Excel)</a>
+  <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary mt-3 btn-lg w-100 mt-2">Back to Customer Center</a>
 </div>
 {% endblock %}

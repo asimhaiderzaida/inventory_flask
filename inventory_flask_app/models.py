@@ -73,6 +73,7 @@ class ProductInstance(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'))
+    shelf_bin = db.Column(db.String(64))
     po_id = db.Column(db.Integer, db.ForeignKey('purchase_order.id'))
     po = db.relationship('PurchaseOrder', backref='instances')
     is_sold = db.Column(db.Boolean, default=False)
@@ -210,3 +211,44 @@ def add_product_and_instance(db, data):
 
     return product, instance
 print(">>> LOADED add_product_and_instance!")
+
+
+# --- PARTS INVENTORY MODELS ---
+class Part(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    part_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(128), nullable=False)
+    part_type = db.Column(db.String(64))
+    vendor = db.Column(db.String(128))
+    min_stock = db.Column(db.Integer, default=1)
+    price = db.Column(db.Float)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    stocks = db.relationship('PartStock', backref='part', lazy=True)
+
+
+class PartStock(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    part_id = db.Column(db.Integer, db.ForeignKey('part.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
+    quantity = db.Column(db.Integer, default=0)
+    # Relationships
+    location = db.relationship('Location', backref='part_stocks')
+    __table_args__ = (db.UniqueConstraint('part_id', 'location_id', name='uix_part_location'),)
+
+
+class PartMovement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    part_id = db.Column(db.Integer, db.ForeignKey('part.id'))
+    from_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)
+    to_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)
+    quantity = db.Column(db.Integer)
+    movement_type = db.Column(db.String(32))  # "stock_in", "consume", "sell", "transfer"
+    note = db.Column(db.String(256))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # Who did it (optional)
+    part = db.relationship('Part', backref='movements')
+    from_location = db.relationship('Location', foreign_keys=[from_location_id], backref='parts_moved_from')
+    to_location = db.relationship('Location', foreign_keys=[to_location_id], backref='parts_moved_to')
+    user = db.relationship('User', backref='part_movements')

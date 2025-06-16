@@ -9,15 +9,49 @@
         .header img { max-height: 70px; margin-bottom: 5px; }
         .company-info { text-align: center; margin-bottom: 20px; font-size: 13px; }
         .invoice-title { text-align: center; font-size: 28px; margin-bottom: 10px; letter-spacing: 2px; font-weight: bold; }
-        .info-table { width: 100%; margin-bottom: 20px; font-size: 14px; }
-        .info-table td { padding: 2px 8px; }
+        .info-table { width: 100%; margin-bottom: 20px; font-size: 14px; border-collapse: collapse; }
+        .info-table td { padding: 4px 8px; }
+        .info-table td.left { text-align: left; }
+        .info-table td.center { text-align: center; }
+        .info-table td.right { text-align: right; }
         .border-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;}
-        .border-table th, .border-table td { border: 1px solid #666; padding: 5px; text-align: center; }
-        .totals { width: 100%; margin-top: 10px; font-size: 14px; }
-        .totals td { padding: 3px 10px; }
+        .border-table th, .border-table td { border: 1px solid #666; padding: 4px 6px; text-align: center; font-size: 11px; }
+        .totals { width: 100%; margin-top: 10px; font-size: 14px; border-top: 1px solid #666; border-collapse: collapse; }
+        .totals td.label { text-align: right; padding: 6px 10px; }
+        .totals td.value { width: 110px; text-align: right; padding: 6px 10px; }
         .summary { margin-top: 10px; font-size: 15px; font-weight: bold; }
         .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #555; }
+        .model-col {
+            text-align: left;
+            vertical-align: middle;
+            font-size: 11px;
+            width: 520px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .currency-col {
+            text-align: center;
+            vertical-align: middle;
+            width: 60px;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .serial-col {
+            width: 120px;
+            word-break: break-all;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 11px;
+        }
     </style>
+    <!--
+    <style>
+    .invoice-table th.serial-col, .invoice-table td.serial-col { width: 12%; }
+    .invoice-table th.model-col, .invoice-table td.model-col { width: 40%; }
+    .invoice-table th.currency-col, .invoice-table td.currency-col { width: 9%; text-align: right; }
+    </style>
+    -->
 </head>
 <body>
     <div class="header">
@@ -32,59 +66,51 @@
     <div class="invoice-title">INVOICE</div>
     <table class="info-table">
         <tr>
-            <td><strong>Invoice #:</strong> {{ invoice.id if invoice else invoice_number }}</td>
-            <td><strong>Date:</strong> {% if invoice %}{{ invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else "" }}{% else %}{{ sale_date }}{% endif %}</td>
-        </tr>
-        <tr>
-            <td colspan="2"><strong>Bill To:</strong> {{ customer.name }}</td>
+            <td class="left"><strong>Invoice #:</strong> {{ invoice.id if invoice else invoice_number }}</td>
+            <td class="center"><strong>Date:</strong> {% if invoice %}{{ invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else "" }}{% else %}{{ sale_date }}{% endif %}</td>
+            <td class="right"><strong>Bill To:</strong> {{ customer.name }}</td>
         </tr>
     </table>
-    <table class="border-table">
+    <table class="border-table invoice-table">
         <thead>
             <tr>
-                <th>Serial #</th>
-                <th>Product Name</th>
-                <th>Model</th>
-                <th>Unit Price (AED)</th>
-                <th>Line Total (AED)</th>
-                <th>VAT (%)</th>
-                <th>VAT Amount</th>
-                <th>Total (AED)</th>
+                <th class="serial-col" style="text-align: center;">Serial #</th>
+                <th class="model-col" style="text-align: center;">Model & Specs</th>
+                <th class="currency-col" style="text-align:center; vertical-align:middle;">Unit<br>Price</th>
+                <th class="currency-col" style="text-align:center; vertical-align:middle;">VAT<br>%</th>
+                <th class="currency-col" style="text-align:center; vertical-align:middle;">VAT<br>Amt</th>
+                <th class="currency-col" style="text-align:center; vertical-align:middle;">Total</th>
             </tr>
         </thead>
         <tbody>
             {% for item in items %}
-                {% set qty = item.quantity if item.quantity is defined else 1 %}
                 {% set unit_price = (item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price)) * (exchange_rate if exchange_rate is defined else 1) %}
-                {% set line_total = unit_price * qty %}
                 {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
-                {% set vat_amount = line_total * (vat_rate / 100) %}
-                {% set total_with_vat = line_total + vat_amount %}
+                {% set vat_amount = unit_price * (vat_rate / 100) %}
+                {% set total_with_vat = unit_price + vat_amount %}
                 <tr>
-                    <td>{{ item.serial_number if item.serial_number is defined else "" }}</td>
-                    <td>{{ item.product_name if item.product_name is defined else item.name }}</td>
-                    <td>{{ item.model_number }}</td>
-                    <td>{{ "%.2f"|format(unit_price) }}</td>
-                    <td>{{ "%.2f"|format(line_total) }}</td>
-                    <td>{{ vat_rate }}</td>
-                    <td>{{ "%.2f"|format(vat_amount) }}</td>
-                    <td>{{ "%.2f"|format(total_with_vat) }}</td>
+                    <td class="serial-col">{{ item.serial_number if item.serial_number is defined else "" }}</td>
+                    <td class="model-col">{{ item.specs }}</td>
+                    <td class="currency-col">{{ "%.2f"|format(unit_price) }}</td>
+                    <td class="currency-col">{{ vat_rate }}</td>
+                    <td class="currency-col">{{ "%.2f"|format(vat_amount) }}</td>
+                    <td class="currency-col">{{ "%.2f"|format(total_with_vat) }}</td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
     <table class="totals">
         <tr>
-            <td style="text-align:right"><strong>Subtotal (AED):</strong></td>
-            <td style="width:110px; text-align:right">{{ "%.2f"|format(subtotal) }}</td>
+            <td class="label"><strong>Subtotal (AED):</strong></td>
+            <td class="value">{{ "%.2f"|format(subtotal) }}</td>
         </tr>
         <tr>
-            <td style="text-align:right"><strong>Total VAT (AED):</strong></td>
-            <td style="width:110px; text-align:right">{{ "%.2f"|format(total_vat) }}</td>
+            <td class="label"><strong>Total VAT (AED):</strong></td>
+            <td class="value">{{ "%.2f"|format(total_vat) }}</td>
         </tr>
         <tr>
-            <td style="text-align:right"><strong>Grand Total (AED):</strong></td>
-            <td style="width:110px; text-align:right">{{ "%.2f"|format(grand_total) }}</td>
+            <td class="label"><strong>Grand Total (AED):</strong></td>
+            <td class="value">{{ "%.2f"|format(grand_total) }}</td>
         </tr>
     </table>
     <div class="footer">

@@ -5,6 +5,11 @@
     }
 }
 </style>
+<style>
+.invoice-table th.serial-col, .invoice-table td.serial-col { width: 12%; }
+.invoice-table th.model-col, .invoice-table td.model-col { width: 40%; }
+.invoice-table th.currency-col, .invoice-table td.currency-col { width: 9%; text-align: right; }
+</style>
 
 <div class="container">
     <h2>🧾 Invoice #{{ invoice.id if invoice else invoice_number }}</h2>
@@ -18,40 +23,36 @@
       {% endif %}
     </p>
 
-    <table class="table table-bordered mt-4">
-        <thead>
-            <tr>
-                <th>Serial Number</th>
-                <th>Product Name</th>
-                <th>Model Number</th>
-                <th>Unit Price (AED)</th>
-                <th>Line Total (AED)</th>
-                <th>VAT %</th>
-                <th>VAT Amount (AED)</th>
-                <th>Total With VAT (AED)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in items %}
-                {% set qty = item.quantity if item.quantity is defined else 1 %}
-                {% set unit_price = item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price) %}
-                {% set line_total = unit_price * qty %}
-                {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
-                {% set vat_amount = line_total * (vat_rate / 100) %}
-                {% set total_with_vat = line_total + vat_amount %}
+    <div style="overflow-x:auto;">
+        <table class="table table-bordered mt-4 invoice-table">
+            <thead>
                 <tr>
-                    <td>{{ item.serial_number }}</td>
-                    <td>{{ item.product_name or item.name or "Unnamed Product" }}</td>
-                    <td>{{ item.model_number }}</td>
-                    <td>{{ "%.2f"|format(unit_price) }}</td>
-                    <td>{{ "%.2f"|format(line_total) }}</td>
-                    <td>{{ vat_rate }}</td>
-                    <td>{{ "%.2f"|format(vat_amount) }}</td>
-                    <td>{{ "%.2f"|format(total_with_vat) }}</td>
+                    <th class="serial-col">Serial Number</th>
+                    <th class="model-col">Model & Specs</th>
+                    <th class="currency-col">Unit Price (AED)</th>
+                    <th class="currency-col">VAT %</th>
+                    <th class="currency-col">VAT Amount (AED)</th>
+                    <th class="currency-col">Total With VAT (AED)</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    {% set unit_price = item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price) %}
+                    {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
+                    {% set vat_amount = unit_price * (vat_rate / 100) %}
+                    {% set total_with_vat = unit_price + vat_amount %}
+                    <tr>
+                        <td class="serial-col">{{ item.serial_number }}</td>
+                        <td class="model-col">{{ item.specs }}</td>
+                        <td class="currency-col">{{ "%.2f"|format(unit_price) }}</td>
+                        <td class="currency-col">{{ vat_rate }}</td>
+                        <td class="currency-col">{{ "%.2f"|format(vat_amount) }}</td>
+                        <td class="currency-col">{{ "%.2f"|format(total_with_vat) }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
     <h4 class="mt-4">Summary:</h4>
     <ul>
@@ -63,11 +64,11 @@
     {% if is_preview %}
       <div class="mt-4">
         <div class="alert alert-info">This is a preview only. To complete the sale, return to the previous tab and click "Create Invoice".</div>
-        <button onclick="window.close()" class="btn btn-secondary">Close Preview</button>
+        <button onclick="window.close()" class="btn btn-secondary btn-lg w-100 mt-2">Close Preview</button>
       </div>
     {% endif %}
 
     <div class="mt-4 no-print">
-        <a href="/main_dashboard" class="btn btn-primary">Back to Dashboard</a>
+        <a href="/main_dashboard" class="btn btn-primary btn-lg w-100 mt-2">Back to Dashboard</a>
     </div>
 </div>

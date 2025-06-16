@@ -59,8 +59,8 @@ var products = [];
   <form id="saleForm">
       <div class="mb-3">
           <label for="customerSelect" class="form-label">Select Customer:</label>
-          <div class="d-flex">
-              <select id="customerSelect" class="form-select me-2 rounded-pill px-3" name="customer_id" required>
+          <div class="d-flex flex-column flex-md-row">
+              <select id="customerSelect" class="form-select form-control-lg me-md-2 rounded-pill px-3" name="customer_id" required>
                   <option value="">-- Select Customer --</option>
                   {% for customer in customers %}
                       <option value="{{ customer.id }}"
@@ -68,39 +68,41 @@ var products = [];
                       >{{ customer.name }}</option>
                   {% endfor %}
               </select>
-              <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-primary rounded-pill fw-semibold">➕ Add New Customer</a>
+              <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2 mt-md-0">➕ Add New Customer</a>
           </div>
       </div>
       
-      <div id="scan-add-row">
+      <div id="scan-add-row" class="mb-3">
           <div class="mb-3">
               <label for="scanSerial" class="form-label">Scan or Type Serial Number:</label>
-              <input type="text" id="scanSerial" class="form-control rounded-pill px-3" placeholder="Enter or scan serial number">
+              <input type="text" id="scanSerial" class="form-control form-control-lg rounded-pill px-3" placeholder="Enter or scan serial number">
           </div>
-          <button type="button" class="btn btn-primary mb-3 rounded-pill fw-semibold" onclick="addProduct()">Add Product</button>
+          <button type="button" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold" onclick="addProduct()">Add Product</button>
       </div>
               
-      <table class="table table-hover table-sm align-middle" id="productTable" style="display: none;">
-          <thead>
-              <tr>
-                  <th>Serial Number</th>
-                  <th>Product Name</th>
-                  <th>Model Number</th>
-                  <th>CPU</th>
-                  <th>RAM</th>
-                  <th>Storage</th>
-                  <th>GPU</th>
-                  <th>Grade</th>
-                  <th>Screen</th>
-                  <th>Price (USD)</th>
-                  <th>Remove</th>
-              </tr>
-          </thead>
-          <tbody id="productList"></tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover table-sm align-middle" id="productTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Serial Number</th>
+                    <th>Product Name</th>
+                    <th>Model Number</th>
+                    <th class="d-none d-md-table-cell">CPU</th>
+                    <th class="d-none d-md-table-cell">RAM</th>
+                    <th class="d-none d-md-table-cell">Storage</th>
+                    <th class="d-none d-md-table-cell">GPU</th>
+                    <th class="d-none d-md-table-cell">Grade</th>
+                    <th class="d-none d-md-table-cell">Screen</th>
+                    <th class="d-none d-md-table-cell">Price (USD)</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody id="productList"></tbody>
+        </table>
+      </div>
           
-      <button type="submit" id="submitInvoiceBtn" class="btn btn-success rounded-pill fw-semibold" style="display: none;">Confirm Sale & Create Invoice</button>
-      <button type="button" id="previewInvoiceBtn" class="btn btn-info rounded-pill fw-semibold" style="display: none; margin-left:10px;">Preview Invoice</button>
+      <button type="submit" id="submitInvoiceBtn" class="btn btn-success btn-lg w-100 mt-2 rounded-pill fw-semibold" style="display: none;">Confirm Sale & Create Invoice</button>
+      <button type="button" id="previewInvoiceBtn" class="btn btn-info btn-lg w-100 mt-2 rounded-pill fw-semibold" style="display: none;">Preview Invoice</button>
   </form>
 </div>
 
@@ -173,6 +175,14 @@ function addProduct() {
         });
 }
 
+// Listen for Enter key on the serial input to trigger addProduct
+document.getElementById('scanSerial').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addProduct();
+    }
+});
+
 function updateProductTable() {
     const table = document.getElementById('productTable');
     const tbody = document.getElementById('productList');
@@ -186,13 +196,13 @@ function updateProductTable() {
             <td>${product.serial_number}</td>
             <td>${product.name}</td>
             <td>${product.model_number}</td>
-            <td>${product.cpu || ''}</td>
-            <td>${product.ram || ''}</td>
-            <td>${product.storage || ''}</td>
-            <td>${product.gpu || ''}</td>
-            <td>${product.grade || ''}</td>
-            <td>${product.screen_size || ''}</td>
-            <td><input type="number" value="${product.price_at_sale}" min="0" onchange="updatePrice(${index}, this.value)" class="form-control"></td>
+            <td class="d-none d-md-table-cell">${product.cpu || ''}</td>
+            <td class="d-none d-md-table-cell">${product.ram || ''}</td>
+            <td class="d-none d-md-table-cell">${product.storage || ''}</td>
+            <td class="d-none d-md-table-cell">${product.gpu || ''}</td>
+            <td class="d-none d-md-table-cell">${product.grade || ''}</td>
+            <td class="d-none d-md-table-cell">${product.screen_size || ''}</td>
+            <td class="d-none d-md-table-cell"><input type="number" value="${product.price_at_sale}" min="0" onchange="updatePrice(${index}, this.value)" class="form-control"></td>
             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">Remove</button></td>
         `;
         tbody.appendChild(row);
@@ -262,7 +272,10 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.invoice_url) {
-                window.location.href = data.invoice_url;
+                window.open(data.invoice_url, "_blank");
+                setTimeout(function() {
+                    window.location.href = "/create_sale_form";
+                }, 2000);
                 showDownloadPdfBtn(data.invoice_url);
             } else {
                 alert(data.error || "Failed to confirm sale.");

@@ -16,6 +16,7 @@
   </div>
 </div>
 
+<div style="overflow-x:auto;">
 <table class="table table-bordered table-hover">
   <thead class="table-light">
     <tr>
@@ -63,13 +64,14 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
-<a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary">⬅ Back to Scan</a>
+<a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary btn-lg w-100 mt-2">⬅ Back to Scan</a>
 
 <form method="POST" action="{{ url_for('stock_bp.stock_receiving_confirm') }}">
   <div class="mb-3 mt-4">
     <label for="status_choice" class="form-label fw-bold">Assign matched items to:</label>
-    <select name="status_choice" id="status_choice" class="form-select" required>
+    <select name="status_choice" id="status_choice" class="form-select form-select-lg" required>
       <option value="">-- Select Status --</option>
       <option value="unprocessed">Unprocessed</option>
       <option value="under_process">Under Process</option>
@@ -77,6 +79,6 @@
       <option value="sold">Sold</option>
     </select>
   </div>
-  <button type="submit" class="btn btn-success">✅ Import Matched Items</button>
+  <button type="submit" class="btn btn-success btn-lg w-100 mt-2">✅ Import Matched Items</button>
 </form>
 {% endblock %}

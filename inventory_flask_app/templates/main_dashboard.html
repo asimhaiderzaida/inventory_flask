@@ -29,7 +29,7 @@
 
 <!-- Dynamic Filter Dropdown -->
 <form method="get" class="row g-2 mb-4">
-  <div class="col-md-3">
+  <div class="col-12 col-md-3 mb-2 mb-md-0">
     <select name="model" class="form-select" onchange="this.form.submit()">
       <option value="">Filter by Model</option>
       {% for model in available_models %}
@@ -37,14 +37,14 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-md-3">
+  <div class="col-12 col-md-3 mb-2 mb-md-0">
     <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="form-control" onchange="this.form.submit()">
   </div>
-  <div class="col-md-3">
+  <div class="col-12 col-md-3 mb-2 mb-md-0">
     <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="form-control" onchange="this.form.submit()">
   </div>
-  <div class="col-md-3">
-    <button class="btn btn-outline-secondary w-100" type="submit">Apply Filters</button>
+  <div class="col-12 col-md-3 mb-2 mb-md-0">
+    <button class="btn btn-outline-secondary w-100 btn-lg" type="submit">Apply Filters</button>
   </div>
 </form>
 
@@ -59,7 +59,7 @@
 
 <div class="row g-3 mb-4">
   {% for stat in stats %}
-  <div class="col-6 col-md-4 col-lg-2 d-flex">
+  <div class="col-6 col-md-4 col-lg-2 mb-3 d-flex">
     <a href="{{ stat.url }}" class="text-decoration-none flex-grow-1 w-100">
       <div class="card stat-card border-0 h-100">
         <div class="card-body text-center d-flex flex-column justify-content-center h-100 py-2 px-2">
@@ -80,7 +80,9 @@
     <button class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('stock')">Stock</button>
     <button class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('models')">Top Models</button>
   </div>
-  <canvas id="mainChart" height="160"></canvas>
+  <div style="overflow-x:auto;">
+    <canvas id="mainChart" height="160"></canvas>
+  </div>
   <ul class="mb-0 mt-2 ps-3" style="font-size: 0.96rem;">
     {% for product in top_models %}
       <li>{{ product.product_name }} – {{ product.instance_count }}</li>

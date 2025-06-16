@@ -6,7 +6,7 @@
     <h2 class="mb-4 text-primary">🔍 Preview Products to Import</h2>
 
     {% if data and columns|length > 0 %}
-    <div class="table-responsive">
+    <div style="overflow-x:auto;">
         <table class="table table-bordered table-striped table-hover align-middle">
             <thead class="table-primary">
                 <tr>
@@ -32,10 +32,9 @@
 
     <div class="mt-4">
         <form method="POST" action="/confirm_import">
-            <button type="submit" class="btn btn-success">✅ Confirm Import</button>
-            <a href="/upload_excel" class="btn btn-secondary ms-2">⬅ Back to Upload</a>
+            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">✅ Confirm Import</button>
+            <a href="/upload_excel" class="btn btn-secondary btn-lg w-100 mt-2">⬅ Back to Upload</a>
         </form>
     </div>
 </div>
 {% endblock %}
-

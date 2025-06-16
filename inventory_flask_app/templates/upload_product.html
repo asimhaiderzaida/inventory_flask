@@ -21,22 +21,22 @@
       <div class="mb-3">
         <label class="form-label">Select Vendor:</label>
         <div class="input-group">
-          <select id="vendorSelect" name="vendor_id" class="form-select rounded-pill px-3" required>
+          <select id="vendorSelect" name="vendor_id" class="form-select rounded-pill px-3 form-control-lg" required>
             <option value="">-- Select Vendor --</option>
             {% for vendor in vendors %}
               <option value="{{ vendor.id }}">{{ vendor.name }}</option>
             {% endfor %}
           </select>
-          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill">
+          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill btn-lg">
             <i class="bi bi-plus-circle"></i> Add Vendor
           </a>
         </div>
       </div>
       <div class="mb-3">
         <label class="form-label">Upload Excel File:</label>
-        <input type="file" name="file" class="form-control rounded-pill px-3" accept=".xlsx,.xls" required>
+        <input type="file" name="file" class="form-control rounded-pill px-3 form-control-lg" accept=".xlsx,.xls" required>
       </div>
-      <button type="submit" class="btn btn-success rounded-pill w-100 fw-semibold">
+      <button type="submit" class="btn btn-success rounded-pill w-100 fw-semibold btn-lg mt-2">
         <i class="bi bi-upload me-1"></i> Upload & Preview
       </button>
     </form>
@@ -65,31 +65,33 @@
                   {% endfor %}
                 {% endif %}
               {% endwith %}
-              <div class="table-responsive w-100">
-                <table class="table table-sm table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
-                  <thead>
-                    <tr>
-                      {% for col in preview_columns %}
-                        <th>{{ col }}</th>
-                      {% endfor %}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in preview_data %}
+              <div style="overflow-x:auto;">
+                <div class="table-responsive w-100">
+                  <table class="table table-sm table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
+                    <thead>
                       <tr>
                         {% for col in preview_columns %}
-                          <td>{{ row[col] }}</td>
+                          <th>{{ col }}</th>
                         {% endfor %}
                       </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {% for row in preview_data %}
+                        <tr>
+                          {% for col in preview_columns %}
+                            <td>{{ row[col] }}</td>
+                          {% endfor %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <form method="POST">
                 <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
                 <input type="hidden" name="excel_data" value="{{ excel_data }}">
                 <input type="hidden" name="confirm" value="yes">
-                <button type="submit" class="btn btn-success rounded-pill fw-semibold mt-2">
+                <button type="submit" class="btn btn-success rounded-pill fw-semibold mt-2 btn-lg w-100">
                   <i class="bi bi-check2-circle me-1"></i>Confirm Import
                 </button>
               </form>
@@ -107,7 +109,7 @@
       </script>
     {% endif %}
 
-    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-link mt-3">
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-link mt-3 btn-lg w-100">
       <i class="bi bi-arrow-left-circle me-1"></i> Back to Dashboard
     </a>
   </div>

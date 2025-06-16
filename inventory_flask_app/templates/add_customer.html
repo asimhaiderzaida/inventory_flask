@@ -10,23 +10,23 @@
       <div class="text-muted" style="font-size:0.98rem;">Create a new customer profile</div>
     </div>
     <form method="POST" action="{{ url_for('customers_bp.add_customer') }}">
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label for="name" class="form-label">Customer Name</label>
-        <input type="text" class="form-control rounded-pill px-3" id="name" name="name" placeholder="Enter customer's name" required>
+        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="name" name="name" placeholder="Enter customer's name" required>
       </div>
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label for="phone" class="form-label">Phone Number</label>
-        <input type="text" class="form-control rounded-pill px-3" id="phone" name="phone" placeholder="Enter phone number">
+        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="phone" name="phone" placeholder="Enter phone number">
       </div>
-      <div class="mb-3">
+      <div class="mb-3 mb-3">
         <label for="email" class="form-label">Email Address</label>
-        <input type="email" class="form-control rounded-pill px-3" id="email" name="email" placeholder="Enter email address">
+        <input type="email" class="form-control form-control-lg rounded-pill px-3" id="email" name="email" placeholder="Enter email address">
       </div>
       <div class="d-grid gap-2 mt-3">
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-check2-circle me-1"></i> Save Customer
         </button>
-        <a href="{{ url_for('sales_bp.create_sale_form') }}" class="btn btn-outline-secondary rounded-pill">
+        <a href="{{ url_for('sales_bp.create_sale_form') }}" class="btn btn-outline-secondary rounded-pill btn-lg w-100 mt-2">
           <i class="bi bi-arrow-left-circle me-1"></i> Back to Sale
         </a>
       </div>

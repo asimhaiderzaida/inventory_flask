@@ -8,15 +8,15 @@
 
     <form method="POST" class="mb-4">
       <div class="row g-3 align-items-end">
-        <div class="col-md-5">
+        <div class="col-md-5 mb-3">
           <label for="serials" class="form-label fw-semibold">Scan or Paste Serials<br>
             <small class="text-muted">(One per line, or comma/space separated)</small>
           </label>
-          <textarea name="serials" id="serials" class="form-control" rows="5" placeholder="Scan or paste serial numbers..." required></textarea>
+          <textarea name="serials" id="serials" class="form-control form-control-lg" rows="5" placeholder="Scan or paste serial numbers..." required></textarea>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 mb-3">
           <label for="process_stage" class="form-label fw-semibold">Next Stage</label>
-          <select name="process_stage" id="process_stage" class="form-select rounded-pill" required>
+          <select name="process_stage" id="process_stage" class="form-select form-select-lg rounded-pill" required>
             <option value="">Select Stage</option>
             <option value="specs">Specs</option>
             <option value="deployment">Deployment</option>
@@ -27,12 +27,12 @@
             <option value="processed">Processed</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 mb-3">
           <label for="team_assigned" class="form-label fw-semibold">Assign Team</label>
-          <input type="text" name="team_assigned" id="team_assigned" class="form-control rounded-pill" placeholder="Assigned Team" required>
+          <input type="text" name="team_assigned" id="team_assigned" class="form-control form-control-lg rounded-pill" placeholder="Assigned Team" required>
         </div>
-        <div class="col-md-1 d-grid">
-          <button type="submit" class="btn btn-primary rounded-pill fw-semibold py-2">
+        <div class="col-md-1 d-grid mb-3">
+          <button type="submit" class="btn btn-primary rounded-pill fw-semibold py-2 btn-lg w-100 mt-2">
             <i class="bi bi-arrow-repeat me-1"></i>Process Batch
           </button>
         </div>
@@ -40,7 +40,7 @@
     </form>
 
     {% if results %}
-    <div class="table-responsive">
+    <div style="overflow-x:auto;">
       <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
         <thead class="table-light">
           <tr>

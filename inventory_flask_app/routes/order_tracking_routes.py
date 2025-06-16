@@ -9,9 +9,12 @@ order_bp = Blueprint('order_bp', __name__)
 @login_required
 def customer_orders():
     customer_id = request.args.get('customer_id')
+    show_completed = request.args.get('show_completed')
     query = CustomerOrderTracking.query
+    if not show_completed:
+        query = query.join(ProductInstance).filter(ProductInstance.is_sold == False)
     if customer_id:
-        query = query.filter_by(customer_id=customer_id)
+        query = query.filter(CustomerOrderTracking.customer_id == customer_id)
 
     orders = query.all()
     customers = Customer.query.all()
@@ -57,6 +60,14 @@ def reserve_product():
                     flash(f"Serial {serial} not found in available stock.", "danger")
                 elif serial in session['pending_reserve_serials']:
                     flash(f"Serial {serial} already added for reservation.", "warning")
+                # Prevent duplicate reservation for this serial (any customer)
+                elif (
+                    CustomerOrderTracking.query.join(ProductInstance).filter(
+                        ProductInstance.serial_number == serial,
+                        CustomerOrderTracking.status == 'reserved'
+                    ).first()
+                ):
+                    flash(f"Serial {serial} is already reserved by another customer.", "danger")
                 else:
                     session['pending_reserve_serials'].append(serial)
                     session.modified = True
@@ -173,4 +184,26 @@ def batch_delivered():
             updated += 1
 
     flash(f"✅ {updated} unit(s) marked as delivered.", "success")
+    return redirect(url_for('order_bp.customer_orders'))
+
+
+# --- Batch Cancel Reservation Route ---
+@order_bp.route('/customer_orders/batch_cancel_reservation', methods=['POST'])
+@login_required
+def batch_cancel_reservation():
+    serials = request.form.getlist('serials')
+    if not serials:
+        flash("No units selected.", "warning")
+        return redirect(url_for('order_bp.customer_orders'))
+    canceled = 0
+    for serial in serials:
+        order = CustomerOrderTracking.query.join(ProductInstance).filter(
+            ProductInstance.serial_number == serial,
+            CustomerOrderTracking.status == 'reserved'
+        ).first()
+        if order:
+            db.session.delete(order)
+            canceled += 1
+    db.session.commit()
+    flash(f"✅ {canceled} reservation(s) canceled and unit(s) returned to inventory.", "success")
     return redirect(url_for('order_bp.customer_orders'))

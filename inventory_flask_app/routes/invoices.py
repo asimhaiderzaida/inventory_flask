@@ -25,10 +25,25 @@ def download_invoice(invoice_id):
     items_data = []
 
     for item in sale_items:
-        product = item.product_instance.product
+        pi = item.product_instance
+        prod = pi.product
+
+        # Try from instance first, then fallback to product
+        processor = getattr(pi, 'processor', '') or getattr(prod, 'processor', '') or ''
+        ram = getattr(pi, 'ram', '') or getattr(prod, 'ram', '') or ''
+        storage = getattr(pi, 'storage', '') or getattr(prod, 'storage', '') or ''
+        vga = getattr(pi, 'vga', '') or getattr(prod, 'vga', '') or ''
+        model = getattr(pi, 'model_number', '') or getattr(prod, 'model_number', '') or ''
+
+        specs_parts = [model]
+        if processor: specs_parts.append(processor)
+        if ram: specs_parts.append(ram)
+        if storage: specs_parts.append(storage)
+        if vga: specs_parts.append(vga)
+        specs_str = ", ".join(specs_parts)
+
         unit_price = item.price_at_sale or 0
         vat_rate = getattr(item, 'vat_rate', 5)
-
         line_total = unit_price
         vat_amount = (line_total * vat_rate) / 100
         total_with_vat = line_total + vat_amount
@@ -38,9 +53,10 @@ def download_invoice(invoice_id):
         grand_total += total_with_vat
 
         items_data.append({
-            'serial_number': item.product_instance.serial_number,
-            'product_name': product.name,
-            'model_number': product.model_number,
+            'serial_number': pi.serial_number,
+            'product_name': prod.name,
+            'model_number': model,
+            'specs': specs_str,
             'unit_price': unit_price,
             'line_total': line_total,
             'vat_rate': vat_rate,

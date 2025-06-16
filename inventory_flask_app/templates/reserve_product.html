@@ -10,7 +10,7 @@
       <input type="hidden" name="action" value="add">
       <div class="mb-3">
         <label class="form-label fw-semibold">Select Customer:</label>
-        <select id="customer_id_main" name="customer_id" class="form-select rounded-pill px-3" required {% if preview_instances and preview_instances|length > 0 %}disabled{% endif %}>
+        <select id="customer_id_main" name="customer_id" class="form-select form-control-lg rounded-pill px-3" required {% if preview_instances and preview_instances|length > 0 %}disabled{% endif %}>
           <option value="">-- Select --</option>
           {% for customer in customers %}
             <option value="{{ customer.id }}" {% if customer.id|string == selected_customer_id|string %}selected{% endif %}>{{ customer.name }}</option>
@@ -20,15 +20,15 @@
       <div class="d-flex gap-2 align-items-end">
         <div class="flex-grow-1">
           <label class="form-label fw-semibold">Scan or Enter Serial:</label>
-          <input type="text" name="serial_input" class="form-control rounded-pill px-3" placeholder="Scan or type serial..." autofocus>
+          <input type="text" name="serial_input" class="form-control form-control-lg rounded-pill px-3" placeholder="Scan or type serial..." autofocus>
         </div>
-        <button type="submit" class="btn btn-primary rounded-pill fw-semibold mb-1 px-4">
+        <button type="submit" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold mb-1 px-4">
           <i class="bi bi-plus-circle me-1"></i>Add
         </button>
         {% if preview_instances %}
           <form id="reset-batch-form" method="POST" style="display:inline;">
             <input type="hidden" name="action" value="reset_batch">
-            <button type="submit" class="btn btn-warning rounded-pill fw-semibold ms-2">Reset Batch</button>
+            <button type="submit" class="btn btn-warning btn-lg w-100 mt-2 rounded-pill fw-semibold ms-2">Reset Batch</button>
           </form>
         {% endif %}
       </div>
@@ -37,41 +37,43 @@
     <!-- Reserve Preview Table -->
     {% if preview_instances %}
       <div class="mb-4">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
-            <thead class="table-light">
-              <tr>
-                <th>Serial</th>
-                <th>Model</th>
-                <th>Specs</th>
-                <th>Remove</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for instance in preview_instances %}
+        <div style="overflow-x:auto;">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
+              <thead class="table-light">
                 <tr>
-                  <td>{{ instance.serial_number }}</td>
-                  <td>{{ instance.product.model_number if instance.product else "" }}</td>
-                  <td>
-                    RAM: {{ instance.product.ram if instance.product else "" }},
-                    CPU: {{ instance.product.processor if instance.product else "" }},
-                    Storage: {{ instance.product.storage if instance.product else "" }}
-                  </td>
-                  <td>
-                    <form method="POST" style="display:inline;">
-                      <input type="hidden" name="action" value="remove">
-                      <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
-                      <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
-                    </form>
-                  </td>
+                  <th>Serial</th>
+                  <th>Model</th>
+                  <th>Specs</th>
+                  <th>Remove</th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {% for instance in preview_instances %}
+                  <tr>
+                    <td>{{ instance.serial_number }}</td>
+                    <td>{{ instance.product.model_number if instance.product else "" }}</td>
+                    <td>
+                      RAM: {{ instance.product.ram if instance.product else "" }},
+                      CPU: {{ instance.product.processor if instance.product else "" }},
+                      Storage: {{ instance.product.storage if instance.product else "" }}
+                    </td>
+                    <td>
+                      <form method="POST" style="display:inline;">
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                        <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="text-end mt-2">
-        <button type="button" class="btn btn-primary rounded-pill fw-semibold px-4"
+        <button type="button" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold px-4"
           data-bs-toggle="modal" data-bs-target="#reserveModal">
           <i class="bi bi-eye me-1"></i>Preview & Confirm
         </button>
@@ -99,42 +101,44 @@
               {% if not found_customer %}-{% endif %}
             </div>
             <div class="mb-4">
-              <div class="table-responsive">
-                <table class="table table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Serial</th>
-                      <th>Model</th>
-                      <th>Specs</th>
-                      <th>Remove</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for instance in preview_instances %}
+              <div style="overflow-x:auto;">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
+                    <thead class="table-light">
                       <tr>
-                        <td>{{ instance.serial_number }}</td>
-                        <td>{{ instance.product.model_number if instance.product else "" }}</td>
-                        <td>
-                          RAM: {{ instance.product.ram if instance.product else "" }},
-                          CPU: {{ instance.product.processor if instance.product else "" }},
-                          Storage: {{ instance.product.storage if instance.product else "" }}
-                        </td>
-                        <td>
-                          <form method="POST" style="display:inline;">
-                            <input type="hidden" name="action" value="remove">
-                            <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
-                            <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
-                          </form>
-                        </td>
+                        <th>Serial</th>
+                        <th>Model</th>
+                        <th>Specs</th>
+                        <th>Remove</th>
                       </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {% for instance in preview_instances %}
+                        <tr>
+                          <td>{{ instance.serial_number }}</td>
+                          <td>{{ instance.product.model_number if instance.product else "" }}</td>
+                          <td>
+                            RAM: {{ instance.product.ram if instance.product else "" }},
+                            CPU: {{ instance.product.processor if instance.product else "" }},
+                            Storage: {{ instance.product.storage if instance.product else "" }}
+                          </td>
+                          <td>
+                            <form method="POST" style="display:inline;">
+                              <input type="hidden" name="action" value="remove">
+                              <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                              <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
+                            </form>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-success rounded-pill w-100 fw-semibold" id="confirmReserveBtn">
+            <button type="button" class="btn btn-success btn-lg w-100 mt-2 rounded-pill fw-semibold" id="confirmReserveBtn">
               <i class="bi bi-check-circle me-1"></i>Confirm Reserve
             </button>
           </div>

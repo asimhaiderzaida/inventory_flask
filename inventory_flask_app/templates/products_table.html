@@ -8,7 +8,7 @@
       <i class="bi bi-boxes me-2"></i>All Products in Stock
     </h3>
 
-    <div class="table-responsive">
+    <div style="overflow-x:auto;">
       <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
         <thead class="table-light">
           <tr>
@@ -16,16 +16,16 @@
             <th>Barcode</th>
             <th>Name</th>
             <th>Model</th>
-            <th>Grade</th>
-            <th>RAM</th>
-            <th>Processor</th>
-            <th>Storage</th>
-            <th>Screen</th>
+            <th class="d-none d-md-table-cell">Grade</th>
+            <th class="d-none d-md-table-cell">RAM</th>
+            <th class="d-none d-md-table-cell">Processor</th>
+            <th class="d-none d-md-table-cell">Storage</th>
+            <th class="d-none d-md-table-cell">Screen</th>
             <th>Stock</th>
             <th>Location</th>
-            <th>Vendor</th>
+            <th class="d-none d-md-table-cell">Vendor</th>
             <th>Price</th>
-            <th>Damaged?</th>
+            <th class="d-none d-md-table-cell">Damaged?</th>
           </tr>
         </thead>
         <tbody>
@@ -35,16 +35,16 @@
             <td>{{ p.barcode }}</td>
             <td>{{ p.name }}</td>
             <td>{{ p.model_number }}</td>
-            <td>{{ p.grade }}</td>
-            <td>{{ p.ram }}</td>
-            <td>{{ p.processor }}</td>
-            <td>{{ p.storage }}</td>
-            <td>{{ p.screen_size }}</td>
+            <td class="d-none d-md-table-cell">{{ p.grade }}</td>
+            <td class="d-none d-md-table-cell">{{ p.ram }}</td>
+            <td class="d-none d-md-table-cell">{{ p.processor }}</td>
+            <td class="d-none d-md-table-cell">{{ p.storage }}</td>
+            <td class="d-none d-md-table-cell">{{ p.screen_size }}</td>
             <td><span class="badge bg-primary bg-opacity-10 text-primary fw-bold">{{ p.stock }}</span></td>
             <td>{{ p.location.name if p.location }}</td>
-            <td>{{ p.vendor.name if p.vendor }}</td>
+            <td class="d-none d-md-table-cell">{{ p.vendor.name if p.vendor }}</td>
             <td><span class="badge bg-info bg-opacity-10 text-info">${{ "%.2f"|format(p.selling_price) }}</span></td>
-            <td>
+            <td class="d-none d-md-table-cell">
               {% if p.is_damaged %}
                 <span class="badge bg-danger">Yes</span>
               {% else %}
@@ -57,7 +57,7 @@
       </table>
     </div>
 
-    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill mt-3 fw-semibold">
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill mt-3 fw-semibold btn-lg w-100 mt-2">
       <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
     </a>
   </div>

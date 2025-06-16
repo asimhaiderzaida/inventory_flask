@@ -43,7 +43,9 @@ def create_app():
     from .routes.invoices import invoices_bp
     from .routes.import_excel import import_excel_bp
     from .routes.exports import exports_bp
+    from .routes.parts import parts_bp
 
+    app.register_blueprint(parts_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(instances_bp)
