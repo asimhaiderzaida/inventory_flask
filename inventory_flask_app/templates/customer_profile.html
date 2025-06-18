@@ -1,46 +1,224 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-  <h2>Customer Profile</h2>
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5>{{ customer.name }}</h5>
-      <div><strong>Phone:</strong> {{ customer.phone }}</div>
-      <div><strong>Email:</strong> {{ customer.email }}</div>
+<style>
+.fixed-profile-header {
+  position: fixed;
+  top: 0;
+  left: 240px; /* sidebar width */
+  right: 0;
+  background: #fff;
+  z-index: 1051;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  border-bottom: 1px solid #eee;
+  padding: 24px 0 12px 0;
+}
+@media (max-width: 991px) {
+  .fixed-profile-header { left: 0; }
+}
+.fixed-profile-header .row {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  align-items: flex-start;
+}
+.profile-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.profile-actions .btn {
+  min-width: 220px;
+}
+.profile-main-content {
+  margin-top: 200px;
+  padding: 0 16px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (max-width: 767px) {
+  .fixed-profile-header {
+    left: 0 !important;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .fixed-profile-header .row {
+    flex-direction: column;
+    max-width: 100%;
+  }
+  .profile-actions {
+    flex-direction: column !important;
+    width: 100%;
+    gap: 8px;
+  }
+  .profile-actions .btn {
+    min-width: 0;
+    width: 100%;
+  }
+  .profile-main-content {
+    margin-top: 260px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+</style>
+
+<div class="fixed-profile-header">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col d-flex flex-column justify-content-start">
+        <h2 class="mb-2">Customer Profile</h2>
+        <div class="card shadow-sm mb-0" style="max-width:400px;">
+          <div class="card-body py-2 px-3">
+            <h5>{{ customer.name }}</h5>
+            <div><strong>Phone:</strong> {{ customer.phone }}</div>
+            <div><strong>Email:</strong> {{ customer.email }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-auto profile-actions align-items-center">
+        <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success btn-lg">Export Sales History (Excel)</a>
+        <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary btn-lg">Back to Customer Center</a>
+      </div>
+    </div>
+    <div class="row mt-2">
+      <div class="col d-flex gap-2">
+        <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}"
+           class="btn btn-outline-primary {% if view == 'orders' %}active{% endif %}">View Orders</a>
+        <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='units') }}"
+           class="btn btn-outline-secondary {% if view != 'orders' %}active{% endif %}">View All Units</a>
+      </div>
     </div>
   </div>
-  <h4>Sales History</h4>
-  <div style="overflow-x:auto;">
-  <table class="table table-bordered table-striped">
-    <thead>
-      <tr>
-        <th>Date Sold</th>
-        <th>Serial Number</th>
-        <th>Product Name</th>
-        <th>Model Number</th>
-        <th>Status</th>
-        <th>Price</th>
-        <th class="d-none d-md-table-cell">Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for sale in sales_data %}
-      <tr>
-        <td>{{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '' }}</td>
-        <td>{{ sale.serial_number }}</td>
-        <td>{{ sale.name }}</td>
-        <td>{{ sale.model_number }}</td>
-        <td>{{ sale.status }}</td>
-        <td>{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else "" }}</td>
-        <td class="d-none d-md-table-cell">{{ sale.notes or "" }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7" class="text-center">No sales found for this customer.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success mt-3 btn-lg w-100 mt-2">Export Sales History (Excel)</a>
-  <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary mt-3 btn-lg w-100 mt-2">Back to Customer Center</a>
+</div>
+
+<div class="profile-main-content">
+  {% if view == "orders" %}
+    <h4>Order List</h4>
+    <div style="overflow-x:auto;">
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th class="align-middle">Invoice #</th>
+          <th class="align-middle">Date</th>
+          <th class="align-middle">Total Units</th>
+          <th class="align-middle">Total Amount</th>
+          <th class="align-middle">Export</th>
+          <th class="align-middle">Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders_list %}
+        <tr>
+          <td class="align-middle">{{ order.invoice_number }}</td>
+          <td class="align-middle">{{ order.date.strftime('%Y-%m-%d') if order.date else "" }}</td>
+          <td class="align-middle">{{ order.total_units }}</td>
+          <td class="align-middle">{{ "%.2f"|format(order.total_amount) if order.total_amount else "0.00" }}</td>
+          <td class="align-middle">
+            <a href="{{ url_for('exports_bp.export_customer_orders', invoice_id=order.invoice_id) }}" class="btn btn-outline-success btn-sm">Export</a>
+          </td>
+          <td class="align-middle">
+            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#order-details-{{ order.invoice_id }}">View Details</button>
+          </td>
+        </tr>
+        <tr class="collapse" id="order-details-{{ order.invoice_id }}">
+          <td colspan="6">
+            {% if order_details_map and (order.invoice_id in order_details_map) %}
+              <table class="table table-sm table-bordered mb-0">
+                <thead>
+                  <tr>
+                    <th class="align-middle">Serial Number</th>
+                    <th class="align-middle">Product Name</th>
+                    <th class="align-middle">Model Number</th>
+                    <th class="align-middle">Grade</th>
+                    <th class="align-middle">RAM</th>
+                    <th class="align-middle">Processor</th>
+                    <th class="align-middle">Storage</th>
+                    <th class="align-middle">Screen Size</th>
+                    <th class="align-middle">Resolution</th>
+                    <th class="align-middle">Video Card</th>
+                    <th class="align-middle">Status</th>
+                    <th class="align-middle">Price</th>
+                    <th class="align-middle d-none d-md-table-cell">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for unit in order_details_map[order.invoice_id] %}
+                  <tr>
+                    <td class="align-middle">{{ unit.serial_number }}</td>
+                    <td class="align-middle">{{ unit.name }}</td>
+                    <td class="align-middle">{{ unit.model_number }}</td>
+                    <td class="align-middle">{{ unit.grade }}</td>
+                    <td class="align-middle">{{ unit.ram }}</td>
+                    <td class="align-middle">{{ unit.processor }}</td>
+                    <td class="align-middle">{{ unit.storage }}</td>
+                    <td class="align-middle">{{ unit.screen_size }}</td>
+                    <td class="align-middle">{{ unit.resolution }}</td>
+                    <td class="align-middle">{{ unit.video_card }}</td>
+                    <td class="align-middle">{{ unit.status }}</td>
+                    <td class="align-middle">{{ "%.2f"|format(unit.price_at_sale) if unit.price_at_sale else "" }}</td>
+                    <td class="align-middle d-none d-md-table-cell">{{ unit.notes or "" }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <div class="alert alert-info mb-0">Order details will be implemented here.</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center align-middle">No orders found for this customer.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <h4>Sales History</h4>
+    <div style="overflow-x:auto;">
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th class="align-middle">Date Sold</th>
+          <th class="align-middle">Serial Number</th>
+          <th class="align-middle">Product Name</th>
+          <th class="align-middle">Model Number</th>
+          <th class="align-middle">Grade</th>
+          <th class="align-middle">RAM</th>
+          <th class="align-middle">Processor</th>
+          <th class="align-middle">Storage</th>
+          <th class="align-middle">Screen Size</th>
+          <th class="align-middle">Resolution</th>
+          <th class="align-middle">Video Card</th>
+          <th class="align-middle">Status</th>
+          <th class="align-middle">Price</th>
+          <th class="align-middle d-none d-md-table-cell">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales_data %}
+        <tr>
+          <td class="align-middle">{{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '' }}</td>
+          <td class="align-middle">{{ sale.serial_number }}</td>
+          <td class="align-middle">{{ sale.name }}</td>
+          <td class="align-middle">{{ sale.model_number }}</td>
+          <td class="align-middle">{{ sale.grade }}</td>
+          <td class="align-middle">{{ sale.ram }}</td>
+          <td class="align-middle">{{ sale.processor }}</td>
+          <td class="align-middle">{{ sale.storage }}</td>
+          <td class="align-middle">{{ sale.screen_size }}</td>
+          <td class="align-middle">{{ sale.resolution }}</td>
+          <td class="align-middle">{{ sale.video_card }}</td>
+          <td class="align-middle">{{ sale.status }}</td>
+          <td class="align-middle">{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else "" }}</td>
+          <td class="align-middle d-none d-md-table-cell">{{ sale.notes or "" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="14" class="text-center align-middle">No sales found for this customer.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

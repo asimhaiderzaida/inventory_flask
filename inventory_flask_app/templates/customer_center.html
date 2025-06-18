@@ -2,14 +2,10 @@
 {% block content %}
 <div class="container mt-4">
   <h2>Customer Center</h2>
-  <form method="get" class="row g-2 mb-3">
-    <div class="col-12 col-md-auto mb-2 mb-md-0">
-      <input type="text" name="search" class="form-control form-control-lg" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
-    </div>
-    <div class="col-12 col-md-auto mb-2 mb-md-0">
-      <button type="submit" class="btn btn-primary btn-lg w-100 mt-2">Search</button>
-      <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-success btn-lg w-100 mt-2">Add Customer</a>
-    </div>
+  <form method="get" class="d-flex justify-content-center align-items-center gap-3 mb-4 flex-wrap">
+    <input type="text" name="search" class="form-control form-control-lg" style="max-width:340px;" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
+    <button type="submit" class="btn btn-primary btn-lg">Search</button>
+    <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-success btn-lg">Add Customer</a>
   </form>
   <div class="card mt-2">
     <div class="card-body p-0">

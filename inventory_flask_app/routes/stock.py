@@ -317,6 +317,7 @@ def under_process():
     serial_search = request.args.get('serial_search', '').strip()
     stage_filter = request.args.get('stage')
     team_filter = request.args.get('team')
+    location_id = request.args.get('location_id')
 
     # Enhanced: Support "all" for status
     if not status_filter or status_filter == 'all':
@@ -331,16 +332,27 @@ def under_process():
             query = ProductInstance.query.filter_by(status='processed', is_sold=False)
         else:
             query = ProductInstance.query.filter_by(status=status_filter)
+
+    # Low stock filter (for /stock/under_process?low_stock=1)
+    low_stock = request.args.get('low_stock')
+    if low_stock:
+        query = query.join(Product).filter(Product.stock != None, Product.stock <= 3)
+
+    # Join Product only once if any filter is present
+    if model_filter or processor_filter:
+        query = query.join(Product)
     if model_filter:
-        query = query.join(Product).filter(Product.model_number == model_filter)
+        query = query.filter(Product.model_number == model_filter)
     if processor_filter:
-        query = query.join(Product).filter(Product.processor == processor_filter)
+        query = query.filter(Product.processor == processor_filter)
     if serial_search:
         query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_search}%"))
     if stage_filter:
         query = query.filter_by(process_stage=stage_filter)
     if team_filter:
         query = query.filter(ProductInstance.team_assigned.ilike(f"%{team_filter}%"))
+    if location_id:
+        query = query.filter(ProductInstance.location_id == int(location_id))
 
     # Always exclude sold items for inventory views
     if not status_filter or status_filter == 'all':
@@ -363,6 +375,9 @@ def under_process():
     print("INSTANCES:", instances)
     if instances:
         print("First instance:", instances[0], "ID:", instances[0].id)
+    # Debug output for locations passed to template
+    locations_debug = Location.query.all()
+    print("DEBUG - locations passed to template:", [loc.name for loc in locations_debug])
     return render_template(
         'instance_table.html',
         instances=instances,
@@ -373,10 +388,14 @@ def under_process():
         selected_stage=stage_filter,
         selected_team=team_filter,
         title=(
-            "Unprocessed Inventory" if status_filter == 'unprocessed'
+            "Total Inventory" if not status_filter or status_filter == 'all'
+            else "Unprocessed Inventory" if status_filter == 'unprocessed'
             else "Processed Inventory" if status_filter == 'processed'
-            else "Under Process Inventory"
-        )
+            else "Under Process Inventory" if status_filter == 'under_process'
+            else "Disputed Inventory" if status_filter == 'disputed'
+            else "Inventory"
+        ),
+        locations=Location.query.all(),
     )
 
 @stock_bp.route('/process_stage/update', methods=['GET', 'POST'])
@@ -463,34 +482,63 @@ def delete_instance(instance_id):
 @stock_bp.route('/export_instances')
 @login_required
 def export_instances():
+    # Use the same filter/query logic as under_process route
     status = request.args.get('status')
     model = request.args.get('model')
     processor = request.args.get('processor')
     serial_search = request.args.get('serial_search', '').strip()
+    stage_filter = request.args.get('stage')
+    team_filter = request.args.get('team')
+    location_id = request.args.get('location_id')
 
-    query = ProductInstance.query
-    if status:
-        query = query.filter_by(status=status)
+    if not status or status == 'all':
+        query = ProductInstance.query
+    else:
+        if status == 'unprocessed':
+            query = ProductInstance.query.filter_by(status='unprocessed', is_sold=False)
+        elif status == 'under_process':
+            query = ProductInstance.query.filter_by(status='under_process', is_sold=False)
+        elif status == 'processed':
+            query = ProductInstance.query.filter_by(status='processed', is_sold=False)
+        else:
+            query = ProductInstance.query.filter_by(status=status)
     if model:
         query = query.join(Product).filter(Product.model_number == model)
     if processor:
         query = query.join(Product).filter(Product.processor == processor)
     if serial_search:
         query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_search}%"))
+    if stage_filter:
+        query = query.filter_by(process_stage=stage_filter)
+    if team_filter:
+        query = query.filter(ProductInstance.team_assigned.ilike(f"%{team_filter}%"))
+    if location_id:
+        query = query.filter(ProductInstance.location_id == int(location_id))
+
+    if not status or status == 'all':
+        query = query.filter(ProductInstance.is_sold == False)
+
+    reserved_order = aliased(CustomerOrderTracking)
+    query = query.outerjoin(
+        reserved_order,
+        (reserved_order.product_instance_id == ProductInstance.id) &
+        (reserved_order.status == 'reserved')
+    ).filter(reserved_order.id == None)
 
     instances = query.all()
     data = []
     for i in instances:
         data.append({
-            "Serial": i.serial_number,
+            "Serial Number": i.serial_number,
             "Product": i.product.name if i.product else '',
-            "Model": i.product.model_number if i.product else '',
-            "Vendor": i.product.vendor.name if i.product and i.product.vendor else '',
-            "Status": i.status,
-            "Process Stage": i.process_stage or '',
-            "Team": i.team_assigned or '',
-            "Location": i.location.name if i.location else '',
-            "Is Sold": "Yes" if i.is_sold else "No"
+            "Model Number": i.product.model_number if i.product else '',
+            "Grade": i.product.grade if i.product else '',
+            "RAM": i.product.ram if i.product else '',
+            "Processor": i.product.processor if i.product else '',
+            "Storage": i.product.storage if i.product else '',
+            "Screen Size": i.product.screen_size if i.product else '',
+            "Resolution": i.product.resolution if i.product else '',
+            "Video Card": i.product.video_card if i.product else ''
         })
     import pandas as pd
     from io import BytesIO
@@ -558,7 +606,10 @@ def scan_move():
 
     # Build instances list for display (show info for each scanned serial)
     for s in batch_serials:
-        instance = ProductInstance.query.filter_by(serial_number=s).first()
+        clean_serial = s.strip().upper()
+        instance = ProductInstance.query.filter(
+            db.func.upper(ProductInstance.serial_number) == clean_serial
+        ).first()
         instances.append(instance)
 
     return render_template(

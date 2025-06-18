@@ -71,6 +71,7 @@ class ProductInstance(db.Model):
     process_stage = db.Column(db.String(50))
     team_assigned = db.Column(db.String(100))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'))
     shelf_bin = db.Column(db.String(64))

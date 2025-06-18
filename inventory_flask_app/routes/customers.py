@@ -50,23 +50,60 @@ def customer_center():
 @login_required
 def customer_profile(customer_id):
     customer = Customer.query.get_or_404(customer_id)
-    from inventory_flask_app.models import SaleTransaction, ProductInstance, Product
-    # Find all sale transactions for this customer, with instance and product info
-    sales = SaleTransaction.query.filter_by(customer_id=customer.id).order_by(SaleTransaction.date_sold.desc()).all()
+    from inventory_flask_app.models import SaleTransaction, ProductInstance, Product, Invoice
+    view = request.args.get('view', 'units')
+    order_details_map = {}
+    orders_list = []
     sales_data = []
-    for sale in sales:
-        instance = ProductInstance.query.get(sale.product_instance_id)
-        product = Product.query.get(instance.product_id) if instance else None
-        sales_data.append({
-            "serial_number": instance.serial_number if instance else "",
-            "model_number": product.model_number if product else "",
-            "name": product.name if product else "",
-            "status": instance.status if instance else "",
-            "price_at_sale": sale.price_at_sale,
-            "date_sold": sale.date_sold,
-            "notes": sale.notes
-        })
-    return render_template("customer_profile.html", customer=customer, sales_data=sales_data)
+    if view == 'units':
+        # Find all sale transactions for this customer, with instance and product info
+        sales = SaleTransaction.query.filter_by(customer_id=customer.id).order_by(SaleTransaction.date_sold.desc()).all()
+        for sale in sales:
+            instance = ProductInstance.query.get(sale.product_instance_id)
+            product = Product.query.get(instance.product_id) if instance else None
+            sales_data.append({
+                "serial_number": instance.serial_number if instance else "",
+                "model_number": product.model_number if product else "",
+                "name": product.name if product else "",
+                "status": instance.status if instance else "",
+                "price_at_sale": sale.price_at_sale,
+                "date_sold": sale.date_sold,
+                "notes": sale.notes
+            })
+    elif view == 'orders':
+        orders_list = []
+        order_details_map = {}
+        invoices = Invoice.query.filter_by(customer_id=customer.id).order_by(Invoice.created_at.desc()).all()
+        for invoice in invoices:
+            units_list = []
+            for sale in invoice.items:
+                instance = ProductInstance.query.get(sale.product_instance_id)
+                product = Product.query.get(instance.product_id) if instance else None
+                units_list.append({
+                    "serial_number": instance.serial_number if instance else "",
+                    "model_number": product.model_number if product else "",
+                    "name": product.name if product else "",
+                    "grade": product.grade if product else "",
+                    "ram": product.ram if product else "",
+                    "processor": product.processor if product else "",
+                    "storage": product.storage if product else "",
+                    "screen_size": product.screen_size if product else "",
+                    "resolution": product.resolution if product else "",
+                    "video_card": product.video_card if product else "",
+                    "status": instance.status if instance else "",
+                    "price_at_sale": sale.price_at_sale,
+                    "date_sold": sale.date_sold,
+                    "notes": sale.notes
+                })
+            orders_list.append({
+                "invoice_id": invoice.id,
+                "invoice_number": invoice.invoice_number,
+                "date": invoice.created_at,
+                "total_units": len(units_list),
+                "total_amount": sum([u["price_at_sale"] or 0 for u in units_list])
+            })
+            order_details_map[invoice.id] = units_list
+    return render_template("customer_profile.html", customer=customer, sales_data=sales_data, orders_list=orders_list, order_details_map=order_details_map, view=view)
 
 @customers_bp.route('/customers/<int:customer_id>/edit', methods=['GET', 'POST'])
 @login_required

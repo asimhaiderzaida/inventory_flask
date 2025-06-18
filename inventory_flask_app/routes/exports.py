@@ -4,6 +4,7 @@ from ..models import db, Product, CustomerOrderTracking, Customer
 from datetime import datetime
 from io import BytesIO, StringIO
 import pandas as pd
+import csv
 
 exports_bp = Blueprint('exports_bp', __name__)
 
@@ -14,54 +15,36 @@ def export_products():
         from_date = request.args.get('from_date')
         to_date = request.args.get('to_date')
 
-        query = Product.query.filter_by(is_deleted=False)
+        from inventory_flask_app.models import ProductInstance
 
-        if from_date:
-            query = query.filter(Product.created_at >= datetime.strptime(from_date, "%Y-%m-%d"))
-        if to_date:
-            query = query.filter(Product.created_at <= datetime.strptime(to_date, "%Y-%m-%d"))
+        instances = ProductInstance.query.all()
 
-        products = query.all()
+        data = []
+        for i in instances:
+            data.append({
+                "Serial Number": i.serial_number,
+                "Product": i.product.name if i.product else '',
+                "Model Number": i.product.model_number if i.product else '',
+                "Grade": i.product.grade if i.product else '',
+                "RAM": i.product.ram if i.product else '',
+                "Processor": i.product.processor if i.product else '',
+                "Storage": i.product.storage if i.product else '',
+                "Screen Size": i.product.screen_size if i.product else '',
+                "Resolution": i.product.resolution if i.product else '',
+                "Video Card": i.product.video_card if i.product else ''
+            })
 
-        output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow([
-            "ID", "Name", "Model Number", "Barcode", "Grade", "RAM", "Processor", "Storage", "Screen Size", "Resolution",
-            "Video Card", "Purchase Price", "Selling Price", "Stock", "Warranty Date", "Vendor", "Location", "Created At"
-        ])
+        df = pd.DataFrame(data)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Products')
 
-        for product in products:
-            writer.writerow([
-                product.id,
-                product.name,
-                product.model_number,
-                product.barcode,
-                product.grade,
-                product.ram,
-                product.processor,
-                product.storage,
-                product.screen_size,
-                product.resolution,
-                product.video_card,
-                product.purchase_price,
-                product.selling_price,
-                product.stock,
-                product.warranty_date.strftime('%Y-%m-%d') if product.warranty_date else '',
-                product.vendor.name if product.vendor else '',
-                product.location.name if product.location else '',
-                product.created_at.strftime('%Y-%m-%d %H:%M')
-            ])
-
-        mem = BytesIO()
-        mem.write(output.getvalue().encode('utf-8'))
-        mem.seek(0)
-        output.close()
-
+        output.seek(0)
         return send_file(
-            mem,
-            mimetype='text/csv',
-            download_name='product_inventory_export.csv',
-            as_attachment=True
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='product_inventory_export.xlsx'
         )
     except Exception as e:
         return jsonify({"error": f"Failed to export products: {str(e)}"}), 500
@@ -69,41 +52,66 @@ def export_products():
 @exports_bp.route('/customer_orders/export')
 @login_required
 def export_customer_orders():
+    invoice_id = request.args.get('invoice_id')
     customer_id = request.args.get('customer_id')
 
-    query = CustomerOrderTracking.query
-    if customer_id:
-        query = query.filter_by(customer_id=customer_id)
-
-    orders = query.all()
-
     data = []
-    for order in orders:
-        product = order.product_instance.product if order.product_instance and order.product_instance.product else None
-        data.append({
-            'Customer': order.customer.name if order.customer else '',
-            'Serial Number': order.product_instance.serial_number if order.product_instance else '',
-            'Model Number': product.model_number if product else '',
-            'RAM': product.ram if product else '',
-            'Processor': product.processor if product else '',
-            'Storage': product.storage if product else '',
-            'Screen Size': product.screen_size if product else '',
-            'Resolution': product.resolution if product else '',
-            'Grade': product.grade if product else '',
-            'Video Card': product.video_card if product else '',
-            'Status': order.status,
-            'Stage': order.process_stage,
-            'Team': order.team_assigned,
-            'Reserved Date': order.reserved_date.strftime('%Y-%m-%d'),
-            'Delivered Date': order.delivered_date.strftime('%Y-%m-%d') if order.delivered_date else ''
-        })
+    if invoice_id:
+        from inventory_flask_app.models import Invoice, ProductInstance, Product
+        invoice = Invoice.query.get(invoice_id)
+        if invoice:
+            for sale in invoice.items:
+                instance = ProductInstance.query.get(sale.product_instance_id)
+                product = Product.query.get(instance.product_id) if instance else None
+                data.append({
+                    'Serial Number': instance.serial_number if instance else '',
+                    'Product Name': product.name if product else '',
+                    'Model Number': product.model_number if product else '',
+                    'Grade': product.grade if product else '',
+                    'RAM': product.ram if product else '',
+                    'Processor': product.processor if product else '',
+                    'Storage': product.storage if product else '',
+                    'Screen Size': product.screen_size if product else '',
+                    'Resolution': product.resolution if product else '',
+                    'Video Card': product.video_card if product else '',
+                    'Status': instance.status if instance else '',
+                    'Price': sale.price_at_sale,
+                    'Date Sold': sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else ''
+                })
+    else:
+        query = CustomerOrderTracking.query
+        if customer_id:
+            query = query.filter_by(customer_id=customer_id)
+        orders = query.all()
+        for order in orders:
+            product = order.product_instance.product if order.product_instance and order.product_instance.product else None
+            data.append({
+                'Customer': order.customer.name if order.customer else '',
+                'Serial Number': order.product_instance.serial_number if order.product_instance else '',
+                'Product Name': product.name if product else '',
+                'Model Number': product.model_number if product else '',
+                'Grade': product.grade if product else '',
+                'RAM': product.ram if product else '',
+                'Processor': product.processor if product else '',
+                'Storage': product.storage if product else '',
+                'Screen Size': product.screen_size if product else '',
+                'Resolution': product.resolution if product else '',
+                'Video Card': product.video_card if product else '',
+                'Sale Price': order.price if hasattr(order, "price") else '',
+                'Status': order.status,
+                'Stage': order.process_stage,
+                'Team': order.team_assigned,
+                'Reserved Date': order.reserved_date.strftime('%Y-%m-%d'),
+                'Delivered Date': order.delivered_date.strftime('%Y-%m-%d') if order.delivered_date else ''
+            })
 
     df = pd.DataFrame(data)
-
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Customer Orders')
-
+        if invoice_id:
+            df.to_excel(writer, index=False, sheet_name='Invoice Items')
+        else:
+            df.to_excel(writer, index=False, sheet_name='Customer Orders')
     output.seek(0)
     return send_file(output, download_name='customer_orders.xlsx', as_attachment=True)
 

@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from ..models import Product, ProductInstance
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 dashboard_bp = Blueprint('dashboard_bp', __name__)
@@ -11,7 +11,7 @@ dashboard_bp = Blueprint('dashboard_bp', __name__)
 @dashboard_bp.route('/main_dashboard')
 @login_required
 def main_dashboard():
-    from inventory_flask_app.models import SaleTransaction
+    from inventory_flask_app.models import ProductInstance
 
     model_filter = request.args.get('model')
     start_date = request.args.get('start_date')
@@ -29,19 +29,22 @@ def main_dashboard():
             end = datetime.strptime(end_date, "%Y-%m-%d")
             query = query.filter(Product.created_at.between(start, end))
         except ValueError:
-            pass
+            start = None
+            end = None
+    else:
+        start = None
+        end = None
 
     products = query.all()
 
     # Stats
     total_products = len(products)
     total_stock = sum([p.stock or 0 for p in products])
-    low_stock_items = sum(1 for p in products if p.stock and p.stock <= (p.low_stock_threshold or 0))
 
     all_instances = ProductInstance.query.join(Product).filter(Product.is_deleted == False)
     if model_filter:
         all_instances = all_instances.filter(Product.model_number == model_filter)
-    if start_date and end_date:
+    if start and end:
         all_instances = all_instances.filter(ProductInstance.created_at.between(start, end))
 
     instances = all_instances.all()
@@ -59,6 +62,13 @@ def main_dashboard():
     processed = sum(1 for i in instances if i.status == 'processed')
     disputed = sum(1 for i in instances if i.status == 'disputed')
 
+    analytic_overview = {
+        "Unprocessed": unprocessed,
+        "Under Process": under_process,
+        "Processed": processed,
+        "Disputed": disputed
+    }
+
     # Top model aggregation
     model_counts = defaultdict(int)
     for i in instances:
@@ -70,10 +80,31 @@ def main_dashboard():
         reverse=True
     )[:5]
 
-    # Unique model list for dropdown
-    available_models = [m[0] for m in Product.query.with_entities(Product.model_number).distinct().all() if m[0]]
+    # Unique model list for dropdown (only models present in current inventory instances)
+    available_models = list(set(
+        i.product.model_number
+        for i in ProductInstance.query.join(Product).filter(Product.is_deleted == False).all()
+        if i.product and i.product.model_number
+    ))
 
-    total_sales = SaleTransaction.query.count()
+    total_sales = ProductInstance.query.filter_by(is_sold=True).count()
+
+    # Generate real sales data for the past 7 days for the "Sales" analytics chart
+    today = datetime.utcnow().date()
+    last_seven_days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    sales_by_day = []
+    from inventory_flask_app.models import SaleTransaction
+    for day in last_seven_days:
+        count = SaleTransaction.query.filter(
+            SaleTransaction.date_sold >= datetime.combine(day, datetime.min.time()),
+            SaleTransaction.date_sold < datetime.combine(day + timedelta(days=1), datetime.min.time())
+        ).count()
+        sales_by_day.append(count)
+    sales_chart_labels = [day.strftime("%a") for day in last_seven_days]
+    sales_chart = {
+        'labels': sales_chart_labels,
+        'data': sales_by_day
+    }
 
     return render_template('main_dashboard.html',
         total_products=total_products,
@@ -82,14 +113,15 @@ def main_dashboard():
         total_instances=total_instances,
         sold_instances=sold_instances,
         unsold_instances=unsold_instances,
-        low_stock_items=low_stock_items,
         unprocessed=unprocessed,
         under_process=under_process,
         processed=processed,
         disputed=disputed,
         top_models=top_models,
         available_models=available_models,
-        total_inventory=total_inventory
+        total_inventory=total_inventory,
+        analytic_overview=analytic_overview,
+        sales_chart=sales_chart,
     )
 
 @dashboard_bp.route('/')
@@ -106,10 +138,6 @@ def dashboard_stats():
     processed = ProductInstance.query.filter_by(status='processed', is_sold=False).count()
     disputed = ProductInstance.query.filter_by(status='disputed', is_sold=False).count()
     sold_instances = ProductInstance.query.filter_by(is_sold=True).count()
-    low_stock_items = sum(
-        1 for p in Product.query.filter_by(is_deleted=False)
-        if p.stock and p.stock <= (p.low_stock_threshold or 0)
-    )
     total_products = Product.query.filter_by(is_deleted=False).count()
     # You can adjust/add any other stats you want to update live
 
@@ -119,6 +147,5 @@ def dashboard_stats():
         "processed": processed,
         "disputed": disputed,
         "sold_instances": sold_instances,
-        "low_stock_items": low_stock_items,
         "total_products": total_products,
     })

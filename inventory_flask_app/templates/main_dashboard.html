@@ -25,32 +25,14 @@
 }
 .btn-xs { font-size: 0.85rem !important; padding: 0.14rem 0.5rem !important; }
 </style>
-<h2 class="mb-4">📊 PCMart Dashboard</h2>
-
-<!-- Dynamic Filter Dropdown -->
-<form method="get" class="row g-2 mb-4">
-  <div class="col-12 col-md-3 mb-2 mb-md-0">
-    <select name="model" class="form-select" onchange="this.form.submit()">
-      <option value="">Filter by Model</option>
-      {% for model in available_models %}
-        <option value="{{ model }}" {% if request.args.get('model') == model %}selected{% endif %}>{{ model }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-12 col-md-3 mb-2 mb-md-0">
-    <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="form-control" onchange="this.form.submit()">
-  </div>
-  <div class="col-12 col-md-3 mb-2 mb-md-0">
-    <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="form-control" onchange="this.form.submit()">
-  </div>
-  <div class="col-12 col-md-3 mb-2 mb-md-0">
-    <button class="btn btn-outline-secondary w-100 btn-lg" type="submit">Apply Filters</button>
-  </div>
-</form>
+<h2 class="mb-4 d-flex align-items-center gap-2">
+  <i class="bi bi-bar-chart-line-fill text-primary" style="font-size:2.2rem;"></i>
+  <span class="fw-bold">PCMart Dashboard</span>
+</h2>
 
 {% set stats = [
   {'label': 'Total Sales', 'value': total_sales, 'icon': '<i class="bi bi-graph-up-arrow text-success"></i>', 'url': '/customer_orders'},
-  {'label': 'Low Stock Items', 'value': low_stock_items, 'icon': '<i class="bi bi-exclamation-circle text-warning"></i>', 'url': '/products?filter=low'},
+  {'label': 'Total Inventory', 'value': total_inventory, 'icon': '<i class="bi bi-box-seam text-primary"></i>', 'url': '/stock/under_process?status=all'},
   {'label': 'Unprocessed', 'value': unprocessed, 'icon': '<i class="bi bi-hourglass text-secondary"></i>', 'url': '/stock/under_process?status=unprocessed'},
   {'label': 'Under Process', 'value': under_process, 'icon': '<i class="bi bi-arrow-repeat text-primary"></i>', 'url': '/stock/under_process?status=under_process'},
   {'label': 'Processed', 'value': processed, 'icon': '<i class="bi bi-check-circle text-success"></i>', 'url': '/stock/under_process?status=processed'},
@@ -73,21 +55,50 @@
   {% endfor %}
 </div>
 
-<div class="card shadow-sm border-0 rounded-4 my-3 p-3" style="max-width: 640px;">
-  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-    <h6 class="mb-0 me-2 text-secondary fw-semibold" style="font-size: 1rem;">📈 Analytics Overview</h6>
-    <button class="btn btn-outline-success btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('sales')">Sales</button>
-    <button class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('stock')">Stock</button>
-    <button class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('models')">Top Models</button>
+<div class="row">
+  <div class="col-12 mb-3">
+    <!-- Dynamic Filter Dropdown -->
+    <form method="get" class="row g-2 mb-4">
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <select name="model" class="form-select" onchange="this.form.submit()">
+          <option value="">Filter by Model</option>
+          {% for model in available_models %}
+            <option value="{{ model }}" {% if request.args.get('model') == model %}selected{% endif %}>{{ model }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="form-control" onchange="this.form.submit()">
+      </div>
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="form-control" onchange="this.form.submit()">
+      </div>
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <button class="btn btn-outline-secondary w-100" type="submit" style="height: 40px;">Apply Filters</button>
+      </div>
+    </form>
   </div>
-  <div style="overflow-x:auto;">
-    <canvas id="mainChart" height="160"></canvas>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow-sm border-0 rounded-4 my-3 p-3" style="max-width: 640px;">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <h6 class="mb-0 me-2 text-secondary fw-semibold" style="font-size: 1rem;">📈 Analytics Overview</h6>
+        <button class="btn btn-outline-success btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('sales')">Sales</button>
+        <button class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('stock')">Stock</button>
+        <button class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('models')">Top Models</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <canvas id="mainChart" height="160"></canvas>
+      </div>
+      <ul class="mb-0 mt-2 ps-3" style="font-size: 0.96rem;">
+        {% for product in top_models %}
+          <li>{{ product.product_name }} – {{ product.instance_count }}</li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
-  <ul class="mb-0 mt-2 ps-3" style="font-size: 0.96rem;">
-    {% for product in top_models %}
-      <li>{{ product.product_name }} – {{ product.instance_count }}</li>
-    {% endfor %}
-  </ul>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -99,8 +110,8 @@
       data: [8, 12, 10, 15, 9, 14, 18]
     },
     stock: {
-      labels: ['Laptops', 'Desktops', 'Tablets', 'Monitors', 'Parts'],
-      data: [150, 90, 40, 70, 120]
+      labels: {{ analytic_overview.keys() | list | tojson }},
+      data: {{ analytic_overview.values() | list | tojson }}
     },
     models: {
       labels: {{ top_models | map(attribute='product_name') | list | tojson }},
@@ -172,9 +183,20 @@ function updateDashboardStats() {
       if (data.unprocessed !== undefined) document.getElementById('unprocessed-count').textContent = data.unprocessed;
       if (data.under_process !== undefined) document.getElementById('under-process-count').textContent = data.under_process;
       if (data.processed !== undefined) document.getElementById('processed-count').textContent = data.processed;
-      if (data.low_stock_items !== undefined) document.getElementById('low-stock-count').textContent = data.low_stock_items;
       if (data.disputed !== undefined) document.getElementById('disputed-count').textContent = data.disputed;
       if (data.total_sales !== undefined) document.getElementById('total-sales-count').textContent = data.total_sales;
+      if (data.total_inventory !== undefined) document.getElementById('total-inventory-count').textContent = data.total_inventory;
+      // --- PATCH: update the analytics bar chart ---
+      if (currentChart && currentChart.data && currentChart.options.plugins.title.text === 'Stock by Category') {
+        currentChart.data.labels = ['Unprocessed', 'Under Process', 'Processed', 'Disputed'];
+        currentChart.data.datasets[0].data = [
+          data.unprocessed || 0,
+          data.under_process || 0,
+          data.processed || 0,
+          data.disputed || 0
+        ];
+        currentChart.update();
+      }
     });
 }
 setInterval(updateDashboardStats, 15000); // 15 seconds

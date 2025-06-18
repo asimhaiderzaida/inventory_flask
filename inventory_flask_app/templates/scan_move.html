@@ -33,31 +33,79 @@
           <tbody>
             {% for instance in instances %}
               <tr>
-                <td>{{ instance.serial_number }}</td>
                 <td>
-                  <span class="badge
-                    {% if instance.status == 'processed' %}bg-success
-                    {% elif instance.status == 'under_process' %}bg-warning text-dark
-                    {% elif instance.status == 'disputed' %}bg-danger
-                    {% else %}bg-secondary{% endif %}">
-                    {{ instance.status.replace('_', ' ').title() }}
-                  </span>
-                </td>
-                <td>{{ instance.product.name if instance.product else '' }}</td>
-                <td>{{ instance.product.model_number if instance.product else '' }}</td>
-                <td>{{ instance.product.vendor.name if instance.product and instance.product.vendor else '' }}</td>
-                <td>{{ instance.location.name if instance.location else '' }}</td>
-                <td>{{ instance.shelf_bin or '' }}</td>
-                <td>
-                  RAM: {{ instance.product.ram if instance.product else '' }},
-                  CPU: {{ instance.product.processor if instance.product else '' }},
-                  Storage: {{ instance.product.storage if instance.product else '' }}
+                  {% if instance %}
+                    {{ instance.serial_number }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
                 </td>
                 <td>
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
-                    <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
-                  </form>
+                  {% if instance %}
+                    <span class="badge
+                      {% if instance.status == 'processed' %}bg-success
+                      {% elif instance.status == 'under_process' %}bg-warning text-dark
+                      {% elif instance.status == 'disputed' %}bg-danger
+                      {% else %}bg-secondary{% endif %}">
+                      {{ instance.status.replace('_', ' ').title() }}
+                    </span>
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    {{ instance.product.name if instance.product else '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    {{ instance.product.model_number if instance.product else '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    {{ instance.product.vendor.name if instance.product and instance.product.vendor else '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    {{ instance.location.name if instance.location else '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    {{ instance.shelf_bin or '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    RAM: {{ instance.product.ram if instance.product else '' }},
+                    CPU: {{ instance.product.processor if instance.product else '' }},
+                    Storage: {{ instance.product.storage if instance.product else '' }}
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
+                </td>
+                <td>
+                  {% if instance %}
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                      <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
+                    </form>
+                  {% else %}
+                    &nbsp;
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}

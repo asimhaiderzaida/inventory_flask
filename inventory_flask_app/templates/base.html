@@ -59,7 +59,7 @@
 
     .main-content {
       margin-left: 240px;
-      margin-top: 60px;
+      margin-top: 0;
       padding: 0 0.9rem 1.1rem 1.2rem;
       min-height: 100vh;
       background: #f8f9fa;
@@ -70,7 +70,10 @@
       }
       .main-content {
         margin-left: 0;
-        padding: 55px 0.5rem 0.7rem 0.5rem;
+        padding: 10px 0.5rem 0.7rem 0.5rem;
+      }
+      .navbar {
+        left: 0 !important;
       }
     }
 
@@ -194,12 +197,6 @@
   </div>
 </div>
 
-<div class="navbar">
-  <button class="btn btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar" aria-controls="offcanvasSidebar" aria-label="Toggle sidebar">
-    <i class="bi bi-list"></i>
-  </button>
-  <a class="navbar-brand" href="{{ url_for('dashboard_bp.main_dashboard') }}">🖥️ PCMart</a>
-</div>
 
 <div class="main-content">
   {% with messages = get_flashed_messages(with_categories=true) %}
