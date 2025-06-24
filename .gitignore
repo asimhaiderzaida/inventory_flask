@@ -16,3 +16,4 @@ instance/*.db
 .vscode/
 .DS_Store
 
+inventory_flask_app/instance/inventory.db
