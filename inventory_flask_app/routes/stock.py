@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required
 from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location
 from inventory_flask_app.models import CustomerOrderTracking
+from flask import jsonify
 from sqlalchemy.orm import aliased
 from datetime import datetime
 import csv
@@ -272,6 +273,24 @@ def stock_receiving_confirm():
     return redirect(url_for('dashboard_bp.main_dashboard'))
 
 
+@stock_bp.route('/api/model_suggestions')
+@login_required
+def model_suggestions():
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+    # Query distinct models that contain the substring, case-insensitive
+    models = (
+        db.session.query(Product.model_number)
+        .filter(Product.model_number.ilike(f"%{q}%"))
+        .distinct()
+        .order_by(Product.model_number)
+        .limit(15)
+        .all()
+    )
+    # Return just the list of model numbers
+    return jsonify([m[0] for m in models if m[0]])
+
 # Batch label printing route
 @stock_bp.route('/print_labels_batch', methods=['POST'])
 @login_required
@@ -318,20 +337,23 @@ def under_process():
     stage_filter = request.args.get('stage')
     team_filter = request.args.get('team')
     location_id = request.args.get('location_id')
+    bin_search = request.args.get('bin_search', '').strip()
 
-    # Enhanced: Support "all" for status
+    # Improved status filter logic: always use .filter(), never .filter_by() for status
     if not status_filter or status_filter == 'all':
         query = ProductInstance.query
     else:
-        # Only show not sold for each inventory status view
+        query = ProductInstance.query
         if status_filter == 'unprocessed':
-            query = ProductInstance.query.filter_by(status='unprocessed', is_sold=False)
+            query = query.filter(ProductInstance.status == 'unprocessed', ProductInstance.is_sold == False)
         elif status_filter == 'under_process':
-            query = ProductInstance.query.filter_by(status='under_process', is_sold=False)
+            query = query.filter(ProductInstance.status == 'under_process', ProductInstance.is_sold == False)
         elif status_filter == 'processed':
-            query = ProductInstance.query.filter_by(status='processed', is_sold=False)
+            query = query.filter(ProductInstance.status == 'processed', ProductInstance.is_sold == False)
+        elif status_filter == 'disputed':
+            query = query.filter(ProductInstance.status == 'disputed', ProductInstance.is_sold == False)
         else:
-            query = ProductInstance.query.filter_by(status=status_filter)
+            query = query.filter(ProductInstance.status == status_filter)
 
     # Low stock filter (for /stock/under_process?low_stock=1)
     low_stock = request.args.get('low_stock')
@@ -342,17 +364,19 @@ def under_process():
     if model_filter or processor_filter:
         query = query.join(Product)
     if model_filter:
-        query = query.filter(Product.model_number == model_filter)
+        query = query.filter(Product.model_number.ilike(f"%{model_filter}%"))
     if processor_filter:
         query = query.filter(Product.processor == processor_filter)
     if serial_search:
         query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_search}%"))
     if stage_filter:
-        query = query.filter_by(process_stage=stage_filter)
+        query = query.filter(ProductInstance.process_stage == stage_filter)
     if team_filter:
         query = query.filter(ProductInstance.team_assigned.ilike(f"%{team_filter}%"))
     if location_id:
         query = query.filter(ProductInstance.location_id == int(location_id))
+    if bin_search:
+        query = query.filter(ProductInstance.shelf_bin.ilike(f"%{bin_search}%"))
 
     # Always exclude sold items for inventory views
     if not status_filter or status_filter == 'all':
@@ -363,7 +387,7 @@ def under_process():
     query = query.outerjoin(
         reserved_order,
         (reserved_order.product_instance_id == ProductInstance.id) &
-        (reserved_order.status == 'reserved')
+        (reserved_order.status.ilike('reserved'))
     ).filter(reserved_order.id == None)
 
     instances = query.all()
@@ -413,10 +437,21 @@ def process_stage_update():
             instance = ProductInstance.query.filter_by(serial_number=serial).first()
             if instance:
                 prev_stage = instance.process_stage or '-'
+                # Check if user is allowed to process this unit
+                if instance.assigned_to_user_id is not None and instance.assigned_to_user_id != current_user.id:
+                    results.append({
+                        'serial': serial,
+                        'instance_id': instance.id,
+                        'model': instance.product.model_number if instance.product else '',
+                        'prev_stage': prev_stage,
+                        'status': 'not_yours'
+                    })
+                    continue
                 if instance.process_stage == process_stage and instance.team_assigned == team:
                     # No change needed
                     results.append({
                         'serial': serial,
+                        'instance_id': instance.id,
                         'model': instance.product.model_number if instance.product else '',
                         'prev_stage': prev_stage,
                         'status': 'no_change'
@@ -425,13 +460,14 @@ def process_stage_update():
                 else:
                     instance.process_stage = process_stage
                     instance.team_assigned = team
-                    # Also set status if needed
                     if instance.status != 'under_process':
                         instance.status = 'under_process'
                     instance.updated_at = datetime.utcnow()
+                    instance.assigned_to_user_id = None  # <-- ensure ready for check-in
                     db.session.commit()
                     results.append({
                         'serial': serial,
+                        'instance_id': instance.id,
                         'model': instance.product.model_number if instance.product else '',
                         'prev_stage': prev_stage,
                         'status': 'updated'
@@ -446,9 +482,12 @@ def process_stage_update():
                 })
                 not_found += 1
         flash(f"{updated} updated, {no_change} already at stage, {not_found} not found.", "info")
-        return render_template('process_stage_update.html', results=results)
+        # Add: Query my_units before rendering template
+        my_units = ProductInstance.query.filter_by(assigned_to_user_id=current_user.id, status='under_process').all()
+        return render_template('process_stage_update.html', results=results, my_units=my_units)
     # GET: just show the empty form
-    return render_template('process_stage_update.html', results=None)
+    my_units = ProductInstance.query.filter_by(assigned_to_user_id=current_user.id, status='under_process').all()
+    return render_template('process_stage_update.html', results=None, my_units=my_units)
 
 @stock_bp.route('/instance/<int:instance_id>/view_edit', methods=['GET', 'POST'])
 @login_required
@@ -469,7 +508,16 @@ def view_edit_instance(instance_id):
         return redirect(url_for('stock_bp.view_edit_instance', instance_id=instance.id))
     return render_template('view_edit_instance.html', instance=instance)
 
+# --- Unit history route ---
+@stock_bp.route('/unit_history/<serial>')
+@login_required
+def unit_history(serial):
+    instance = ProductInstance.query.filter_by(serial_number=serial).first_or_404()
+    logs = ProductProcessLog.query.filter_by(product_instance_id=instance.id).order_by(ProductProcessLog.moved_at).all()
+    return render_template('unit_history.html', instance=instance, logs=logs)
+
 # Delete ProductInstance route
+
 @stock_bp.route('/instance/<int:instance_id>/delete', methods=['POST'])
 @login_required
 def delete_instance(instance_id):
@@ -478,6 +526,79 @@ def delete_instance(instance_id):
     db.session.commit()
     flash(f"Serial {instance.serial_number} deleted successfully.", "success")
     return redirect(url_for('stock_bp.under_process'))
+
+# --- Check-in/Check-out route for processing table ---
+from flask_login import current_user
+from inventory_flask_app.models import ProductProcessLog
+
+
+# --- Improved Check-in/Check-out route with assignment logic ---
+@stock_bp.route('/checkin_checkout', methods=['POST'])
+@login_required
+def checkin_checkout():
+    # Accept multiple IDs for batch processing
+    instance_ids = request.form.getlist('instance_ids')
+    action = request.form.get('action')
+    note = request.form.get('note', '')
+
+    if not instance_ids or not action:
+        flash("Missing information for check-in/out.", "danger")
+        return redirect(request.referrer or url_for('stock_bp.process_stage_update'))
+
+    from inventory_flask_app.models import ProductProcessLog
+
+    updated_count = 0
+    skipped = 0
+    for instance_id in instance_ids:
+        instance = ProductInstance.query.get(instance_id)
+        if not instance:
+            continue
+        if action == "check-in":
+            # Allow check-in if not assigned or already assigned to current user
+            if instance.assigned_to_user_id is None or instance.assigned_to_user_id == current_user.id:
+                instance.status = "under_process"
+                instance.assigned_to_user_id = current_user.id
+                log = ProductProcessLog(
+                    product_instance_id=instance.id,
+                    from_stage=instance.process_stage,
+                    to_stage=instance.process_stage,
+                    from_team=instance.team_assigned,
+                    to_team=instance.team_assigned,
+                    moved_by=current_user.id,
+                    moved_at=datetime.utcnow(),
+                    action=action,
+                    note=note
+                )
+                db.session.add(log)
+                updated_count += 1
+            else:
+                skipped += 1
+        elif action == "check-out":
+            # Only allow check-out for units assigned to the current user
+            if instance.assigned_to_user_id == current_user.id:
+                instance.status = "processed"
+                instance.assigned_to_user_id = None
+                log = ProductProcessLog(
+                    product_instance_id=instance.id,
+                    from_stage=instance.process_stage,
+                    to_stage=instance.process_stage,
+                    from_team=instance.team_assigned,
+                    to_team=instance.team_assigned,
+                    moved_by=current_user.id,
+                    moved_at=datetime.utcnow(),
+                    action=action,
+                    note=note
+                )
+                db.session.add(log)
+                updated_count += 1
+            else:
+                skipped += 1
+    db.session.commit()
+    msg = f"{action.capitalize()} successful for {updated_count} unit(s)."
+    if skipped:
+        msg += f" {skipped} unit(s) skipped (not permitted)."
+    flash(msg, "success" if updated_count else "warning")
+    return redirect(request.referrer or url_for('stock_bp.process_stage_update'))
 
 @stock_bp.route('/export_instances')
 @login_required
@@ -522,7 +643,7 @@ def export_instances():
     query = query.outerjoin(
         reserved_order,
         (reserved_order.product_instance_id == ProductInstance.id) &
-        (reserved_order.status == 'reserved')
+        (reserved_order.status.ilike('reserved'))
     ).filter(reserved_order.id == None)
 
     instances = query.all()
@@ -749,3 +870,17 @@ def add_product_page():
         # Redirect to label printing page for the new instance
         return redirect(url_for('stock_bp.print_label', instance_id=instance.id))
     return render_template('add_product.html')
+@stock_bp.route('/bin_lookup', methods=['GET', 'POST'])
+@login_required
+def bin_lookup():
+    if request.method == 'POST':
+        bin_code = request.form.get('bin_code', '').strip()
+        if bin_code:
+            return redirect(url_for('stock_bp.bin_contents', bin_code=bin_code))
+    return render_template('bin_lookup.html')
+
+@stock_bp.route('/bin_contents/<bin_code>')
+@login_required
+def bin_contents(bin_code):
+    products = ProductInstance.query.filter_by(shelf_bin=bin_code).all()
+    return render_template('bin_contents.html', bin_code=bin_code, products=products)

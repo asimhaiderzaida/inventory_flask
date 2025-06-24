@@ -102,49 +102,49 @@
       </a>
     </div>
     <nav class="nav flex-column">
-      <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="nav-link my-1 {% if request.endpoint == 'dashboard_bp.main_dashboard' %}active{% endif %}">
-        <i class="bi bi-house-door me-2"></i>Home
-      </a>
-      <!-- Stock Intake main link -->
-      <a href="{{ url_for('stock_bp.stock_intake') }}" class="nav-link my-1">
-        <i class="bi bi-box-seam me-2"></i>Stock Intake
-      </a>
-      <!-- Optional: sub-links for Stock Intake, or show as buttons inside Stock Intake page -->
-      <!--
-      <a href="{{ url_for('import_excel_bp.upload_excel') }}" class="nav-link ms-4 my-1"><i class="bi bi-upload me-2"></i>Upload Excel</a>
-      <a href="{{ url_for('stock_bp.add_product_page') }}" class="nav-link ms-4 my-1"><i class="bi bi-plus-square me-2"></i>Add Product</a>
-      <a href="{{ url_for('stock_bp.create_purchase_order') }}" class="nav-link ms-4 my-1"><i class="bi bi-file-earmark-plus me-2"></i>Create PO</a>
-      <a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="nav-link ms-4 my-1"><i class="bi bi-truck me-2"></i>Receive Stock</a>
-      -->
-      <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1">
-        <i class="bi bi-tools me-2"></i>Processing
-      </a>
-      <!-- Sales section -->
-      <a href="{{ url_for('sales_bp.create_sale_form') }}" class="nav-link my-1">
-        <i class="bi bi-cash-coin me-2"></i>Create Sale
-      </a>
-      {# <a href="{{ url_for('sales_bp.sales_history') }}" class="nav-link my-1">
-        <i class="bi bi-clock-history me-2"></i>Sales History
-      </a> #}
-      <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1">
-        <i class="bi bi-pin-angle me-2"></i>Reserve
-      </a>
-      <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1">
-        <i class="bi bi-card-list me-2"></i>Customer Orders
-      </a>
-      <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1">
-        <i class="bi bi-person me-2"></i>Customers
-      </a>
-      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1">
-        <i class="bi bi-shop-window me-2"></i>Vendors
-      </a>
-      <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1">
-        <i class="bi bi-tools me-2"></i>Parts
-      </a>
-      <!-- Optional: Add a Reports link if you have reports/analytics -->
-      {# <a href="{{ url_for('reports_bp.main_report') }}" class="nav-link my-1">
-        <i class="bi bi-bar-chart-line me-2"></i>Reports
-      </a> #}
+      {% if current_user.is_authenticated and current_user.role == 'technician' %}
+        <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1">
+          <i class="bi bi-tools me-2"></i>Processing
+        </a>
+      {% else %}
+        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="nav-link my-1 {% if request.endpoint == 'dashboard_bp.main_dashboard' %}active{% endif %}">
+          <i class="bi bi-house-door me-2"></i>Home
+        </a>
+        <a href="{{ url_for('stock_bp.stock_intake') }}" class="nav-link my-1">
+          <i class="bi bi-box-seam me-2"></i>Stock Intake
+        </a>
+        <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1">
+          <i class="bi bi-tools me-2"></i>Processing
+        </a>
+        <a href="{{ url_for('sales_bp.create_sale_form') }}" class="nav-link my-1">
+          <i class="bi bi-cash-coin me-2"></i>Create Sale
+        </a>
+        <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1">
+          <i class="bi bi-pin-angle me-2"></i>Reserve
+        </a>
+        <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1">
+          <i class="bi bi-card-list me-2"></i>Customer Orders
+        </a>
+        <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1">
+          <i class="bi bi-person me-2"></i>Customers
+        </a>
+        <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1">
+          <i class="bi bi-shop-window me-2"></i>Vendors
+        </a>
+        <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1">
+          <i class="bi bi-tools me-2"></i>Parts
+        </a>
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+          <a href="{{ url_for('auth_bp.register_user') }}" class="nav-link my-1">
+            <i class="bi bi-person-plus me-2"></i>Register User
+          </a>
+        {% endif %}
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
+          <a href="{{ url_for('reports_bp.tech_productivity') }}" class="nav-link my-1">
+            <i class="bi bi-bar-chart-steps me-2"></i>Tech Productivity
+          </a>
+        {% endif %}
+      {% endif %}
     </nav>
   </div>
   <div class="mb-2 text-center">
@@ -161,33 +161,49 @@
   </div>
   <div class="offcanvas-body d-flex flex-column justify-content-between p-0">
     <nav class="nav flex-column px-3">
-      <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="nav-link my-1 {% if request.endpoint == 'dashboard_bp.main_dashboard' %}active{% endif %} text-white">
-        <i class="bi bi-house-door me-2"></i>Home
-      </a>
-      <a href="{{ url_for('stock_bp.stock_intake') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-box-seam me-2"></i>Stock Intake
-      </a>
-      <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-tools me-2"></i>Processing
-      </a>
-      <a href="{{ url_for('sales_bp.create_sale_form') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-cash-coin me-2"></i>Create Sale
-      </a>
-      <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-pin-angle me-2"></i>Reserve
-      </a>
-      <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-card-list me-2"></i>Customer Orders
-      </a>
-      <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-person me-2"></i>Customers
-      </a>
-      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-shop-window me-2"></i>Vendors
-      </a>
-      <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1 text-white">
-        <i class="bi bi-tools me-2"></i>Parts
-      </a>
+      {% if current_user.is_authenticated and current_user.role == 'technician' %}
+        <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-tools me-2"></i>Processing
+        </a>
+      {% else %}
+        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="nav-link my-1 {% if request.endpoint == 'dashboard_bp.main_dashboard' %}active{% endif %} text-white">
+          <i class="bi bi-house-door me-2"></i>Home
+        </a>
+        <a href="{{ url_for('stock_bp.stock_intake') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-box-seam me-2"></i>Stock Intake
+        </a>
+        <a href="{{ url_for('stock_bp.process_stage_update') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-tools me-2"></i>Processing
+        </a>
+        <a href="{{ url_for('sales_bp.create_sale_form') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-cash-coin me-2"></i>Create Sale
+        </a>
+        <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-pin-angle me-2"></i>Reserve
+        </a>
+        <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-card-list me-2"></i>Customer Orders
+        </a>
+        <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-person me-2"></i>Customers
+        </a>
+        <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-shop-window me-2"></i>Vendors
+        </a>
+        <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1 text-white">
+          <i class="bi bi-tools me-2"></i>Parts
+        </a>
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+          <a href="{{ url_for('auth_bp.register_user') }}" class="nav-link my-1 text-white">
+            <i class="bi bi-person-plus me-2"></i>Register User
+          </a>
+        {% endif %}
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
+          <a href="{{ url_for('reports_bp.tech_productivity') }}" class="nav-link my-1 text-white">
+            <i class="bi bi-bar-chart-steps me-2"></i>Tech Productivity
+          </a>
+        {% endif %}
+      {% endif %}
     </nav>
     <div class="mb-2 text-center px-3">
       <a href="{{ url_for('auth_bp.logout') }}" class="btn btn-outline-danger btn-sm rounded-pill w-100 mt-3">
@@ -198,18 +214,29 @@
 </div>
 
 
-<div class="main-content">
+<div class="navbar">
+  <button class="btn btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar" aria-controls="offcanvasSidebar" aria-label="Open menu">
+    <i class="bi bi-list" style="font-size:1.6rem;"></i>
+  </button>
+  <span class="navbar-brand mb-0 h1">
+    {% block titlebar %}Dashboard{% endblock %}
+  </span>
+</div>
+
+<div class="container" style="max-width: 900px; margin-top: 70px;">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert" style="z-index:2000;">
           {{ message }}
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       {% endfor %}
     {% endif %}
   {% endwith %}
+</div>
 
+<div class="main-content">
   {% block content %}{% endblock %}
 </div>
 

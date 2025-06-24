@@ -70,6 +70,10 @@ class ProductInstance(db.Model):
     status = db.Column(db.String(50), default='unprocessed')
     process_stage = db.Column(db.String(50))
     team_assigned = db.Column(db.String(100))
+    idle_reason = db.Column(db.String(255))
+    # --- Add user assignment fields here ---
+    assigned_to_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    assigned_user = db.relationship('User', backref='assigned_instances')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -157,6 +161,8 @@ class ProductProcessLog(db.Model):
     to_team = db.Column(db.String(100))
     moved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     moved_at = db.Column(db.DateTime, default=datetime.utcnow)
+    action = db.Column(db.String(20))  # 'check-in' or 'check-out'
+    note = db.Column(db.String(200))
 
     product_instance = db.relationship('ProductInstance', backref='process_logs')
     user = db.relationship('User')

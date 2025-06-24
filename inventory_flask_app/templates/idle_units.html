@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Idle Units</h2>
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Serial</th>
+        <th>Model</th>
+        <th>Technician</th>
+        <th>Idle Reason</th>
+        <th>History</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in idle_units %}
+      <tr>
+        <td>{{ row.serial }}</td>
+        <td>{{ row.model }}</td>
+        <td>{{ row.technician }}</td>
+        <td>
+          <form method="post" action="{{ url_for('reports_bp.update_idle_reason') }}" class="d-flex gap-1 align-items-center" style="min-width:150px;">
+            <input type="hidden" name="serial" value="{{ row.serial }}">
+            <input type="text" name="idle_reason" value="{{ row.idle_reason or '' }}" class="form-control form-control-sm rounded-pill" style="min-width:100px;">
+            <button class="btn btn-outline-primary btn-sm rounded-pill px-2" type="submit" title="Save">
+              <i class="bi bi-save"></i>
+            </button>
+          </form>
+        </td>
+        <td>
+          <a href="{{ url_for('stock_bp.unit_history', serial=row.serial) }}" class="btn btn-outline-secondary btn-sm rounded-pill">
+            <i class="bi bi-clock-history"></i> History
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

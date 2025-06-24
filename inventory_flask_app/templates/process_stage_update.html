@@ -2,21 +2,26 @@
 {% block content %}
 <div class="container mt-5">
   <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
+    
+
     <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.45rem;">
       <i class="bi bi-tools me-2"></i>Process Stage Management (Batch)
     </h2>
 
     <form method="POST" class="mb-4">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-5 mb-3">
-          <label for="serials" class="form-label fw-semibold">Scan or Paste Serials<br>
-            <small class="text-muted">(One per line, or comma/space separated)</small>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-5 mb-2">
+          <label for="serials" class="form-label fw-semibold">
+            <i class="bi bi-upc-scan me-1"></i>Scan/Paste Serials
+            <small class="text-muted d-block">(One per line, comma, or space)</small>
           </label>
-          <textarea name="serials" id="serials" class="form-control form-control-lg" rows="5" placeholder="Scan or paste serial numbers..." required></textarea>
+          <textarea name="serials" id="serials" class="form-control rounded-3" rows="3" placeholder="Scan or paste serial numbers..." required></textarea>
         </div>
-        <div class="col-md-3 mb-3">
-          <label for="process_stage" class="form-label fw-semibold">Next Stage</label>
-          <select name="process_stage" id="process_stage" class="form-select form-select-lg rounded-pill" required>
+        <div class="col-md-3 mb-2">
+          <label for="process_stage" class="form-label fw-semibold">
+            <i class="bi bi-diagram-3 me-1"></i>Next Stage
+          </label>
+          <select name="process_stage" id="process_stage" class="form-select rounded-pill form-select-sm" required>
             <option value="">Select Stage</option>
             <option value="specs">Specs</option>
             <option value="deployment">Deployment</option>
@@ -27,13 +32,15 @@
             <option value="processed">Processed</option>
           </select>
         </div>
-        <div class="col-md-3 mb-3">
-          <label for="team_assigned" class="form-label fw-semibold">Assign Team</label>
-          <input type="text" name="team_assigned" id="team_assigned" class="form-control form-control-lg rounded-pill" placeholder="Assigned Team" required>
+        <div class="col-md-3 mb-2">
+          <label for="team_assigned" class="form-label fw-semibold">
+            <i class="bi bi-people me-1"></i>Assign Team
+          </label>
+          <input type="text" name="team_assigned" id="team_assigned" class="form-control rounded-pill form-control-sm" placeholder="Assigned Team" required>
         </div>
-        <div class="col-md-1 d-grid mb-3">
-          <button type="submit" class="btn btn-primary rounded-pill fw-semibold py-2 btn-lg w-100 mt-2">
-            <i class="bi bi-arrow-repeat me-1"></i>Process Batch
+        <div class="col-md-1 d-grid mb-2">
+          <button type="submit" class="btn btn-primary btn-sm rounded-pill fw-semibold w-100">
+            <i class="bi bi-arrow-repeat me-1"></i>Process
           </button>
         </div>
       </div>
@@ -48,6 +55,7 @@
             <th>Model</th>
             <th>Previous Stage</th>
             <th>Result</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -67,16 +75,110 @@
                 <span class="badge bg-warning text-dark">{{ row.status }}</span>
               {% endif %}
             </td>
+            <td>
+              <span class="text-muted">-</span>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% set updated_ids = results | selectattr('status', 'equalto', 'updated') | map(attribute='instance_id') | list %}
+    {% if updated_ids %}
+      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}">
+        {% for id in updated_ids %}
+          <input type="hidden" name="instance_ids" value="{{ id }}">
+        {% endfor %}
+        <div class="d-flex gap-3 my-3">
+          <button type="submit" name="action" value="check-in" class="btn btn-success btn-lg rounded-pill flex-fill">
+            <i class="bi bi-box-arrow-in-down me-1"></i> Check In All
+          </button>
+          <button type="submit" name="action" value="check-out" class="btn btn-danger btn-lg rounded-pill flex-fill">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Check Out All
+          </button>
+        </div>
+        <div class="mb-2">
+          <input type="text" name="note" class="form-control rounded-pill" placeholder="Optional note (who, why, etc.)">
+        </div>
+      </form>
+    {% endif %}
     {% endif %}
 
     <div class="mt-3 text-muted">
       <small>Paste or scan serials, choose a stage/team, and process in bulk. Only valid units will be updated.</small>
     </div>
+
+    {% if my_units and my_units|length > 0 %}
+      <div class="card mb-3">
+        <div class="card-header bg-primary text-white">My In-Process Units</div>
+        <div class="card-body p-2">
+          <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
+            <table class="table table-sm table-bordered mb-0">
+              <thead>
+                <tr>
+                  <th>Serial</th>
+                  <th>Model</th>
+                  <th>Process Stage</th>
+                  <th>Team</th>
+                  <th>Last Checked In</th>
+                  <th>Last Checked Out</th>
+                  <th>
+                    <input type="checkbox" id="select-all-inprocess" />
+                    <span class="ms-1">Check Out</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for i in my_units %}
+                  <tr>
+                    <td>{{ i.serial_number }}</td>
+                    <td>{{ i.product.model_number if i.product else '' }}</td>
+                    <td>{{ i.process_stage }}</td>
+                    <td>{{ i.team_assigned }}</td>
+                    <td>
+                      {# Find latest check-in log #}
+                      {% set checkin = (i.process_logs | selectattr('action', 'equalto', 'check-in') | sort(attribute='moved_at', reverse=True) | list | first) %}
+                      {{ checkin.moved_at.strftime('%Y-%m-%d %H:%M') if checkin else '' }}
+                    </td>
+                    <td>
+                      {# Find latest check-out log #}
+                      {% set checkout = (i.process_logs | selectattr('action', 'equalto', 'check-out') | sort(attribute='moved_at', reverse=True) | list | first) %}
+                      {{ checkout.moved_at.strftime('%Y-%m-%d %H:%M') if checkout else '' }}
+                    </td>
+                    <td>
+                      <input type="checkbox" name="instance_ids" value="{{ i.id }}">
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div class="d-flex gap-3 my-2">
+              <button type="submit" name="action" value="check-out" class="btn btn-danger btn-sm rounded-pill">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Check Out Selected
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
   </div>
 </div>
 {% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const form = document.getElementById('my-inprocess-form');
+  if (form) {
+    const selectAll = form.querySelector('#select-all-inprocess');
+    if (selectAll) {
+      selectAll.addEventListener('change', function() {
+        const checkboxes = form.querySelectorAll('input[name="instance_ids"]');
+        for (const cb of checkboxes) {
+          cb.checked = this.checked;
+        }
+      });
+    }
+  }
+});
+</script>

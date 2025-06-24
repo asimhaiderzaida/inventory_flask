@@ -5,6 +5,9 @@ from ..models import Product, ProductInstance
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from collections import defaultdict
+from inventory_flask_app.models import CustomerOrderTracking
+from sqlalchemy.orm import aliased
+reserved_order = aliased(CustomerOrderTracking)
 
 dashboard_bp = Blueprint('dashboard_bp', __name__)
 
@@ -56,11 +59,63 @@ def main_dashboard():
     sold_instances = sum(1 for i in instances if i.is_sold)
     unsold_instances = total_instances - sold_instances
 
-    # Status-based breakdown (optional: add .status check if defined)
-    unprocessed = sum(1 for i in instances if i.status == 'unprocessed')
-    under_process = sum(1 for i in instances if i.status == 'under_process')
-    processed = sum(1 for i in instances if i.status == 'processed')
-    disputed = sum(1 for i in instances if i.status == 'disputed')
+    # Status-based breakdown (exclude sold and reserved, match inventory view logic)
+    unprocessed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'unprocessed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    under_process = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'under_process',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    processed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'processed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    disputed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'disputed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
 
     analytic_overview = {
         "Unprocessed": unprocessed,
@@ -133,10 +188,64 @@ def home_redirect():
 @dashboard_bp.route('/api/dashboard_stats')
 @login_required
 def dashboard_stats():
-    unprocessed = ProductInstance.query.filter_by(status='unprocessed', is_sold=False).count()
-    under_process = ProductInstance.query.filter_by(status='under_process', is_sold=False).count()
-    processed = ProductInstance.query.filter_by(status='processed', is_sold=False).count()
-    disputed = ProductInstance.query.filter_by(status='disputed', is_sold=False).count()
+    reserved_order = aliased(CustomerOrderTracking)
+
+    unprocessed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'unprocessed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    under_process = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'under_process',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    processed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'processed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
+    disputed = (
+        ProductInstance.query
+        .outerjoin(
+            reserved_order,
+            (reserved_order.product_instance_id == ProductInstance.id) &
+            (reserved_order.status.ilike('reserved'))
+        )
+        .filter(
+            ProductInstance.status == 'disputed',
+            ProductInstance.is_sold == False,
+            reserved_order.id == None
+        )
+        .count()
+    )
     sold_instances = ProductInstance.query.filter_by(is_sold=True).count()
     total_products = Product.query.filter_by(is_deleted=False).count()
     # You can adjust/add any other stats you want to update live

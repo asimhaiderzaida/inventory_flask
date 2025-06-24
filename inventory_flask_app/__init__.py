@@ -58,6 +58,9 @@ def create_app():
     app.register_blueprint(import_excel_bp)
     app.register_blueprint(exports_bp)
 
+    from .routes.reports import reports_bp
+    app.register_blueprint(reports_bp)
+
     from .utils.utils import get_instance_id
     app.jinja_env.globals.update(get_instance_id=get_instance_id)
 

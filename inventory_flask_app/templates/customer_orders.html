@@ -380,9 +380,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <script>
-// Patch: Ensure selected serials are sent with Cancel Reservation form
+// Unified batch Cancel Reservation handler
 document.addEventListener('DOMContentLoaded', function() {
-  var cancelBtn = document.querySelector('.order-actions form button[type="submit"].btn-danger');
+  var cancelBtn = document.querySelector('#batch-cancel-form button[type="submit"]');
   var cancelForm = document.getElementById('batch-cancel-form');
   function getOrderCheckboxes() {
     return document.querySelectorAll('.order-select');

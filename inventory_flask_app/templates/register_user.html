@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" style="max-width: 500px;">
+  <h3>Register New User</h3>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <form method="post">
+    <div class="mb-3">
+      <label>Username</label>
+      <input name="username" type="text" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label>Password</label>
+      <input name="password" type="password" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label>Role</label>
+      <select name="role" class="form-select">
+        <option value="technician" selected>Technician</option>
+        <option value="admin">Admin</option>
+        <option value="supervisor">Supervisor</option>
+        <option value="staff">Staff</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Register User</button>
+  </form>
+</div>
+{% endblock %}

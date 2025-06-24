@@ -72,6 +72,9 @@
         <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-warning btn-lg rounded-pill">
           <i class="bi bi-upc-scan me-1"></i>Scan & Assign/Move
         </a>
+        <a href="{{ url_for('stock_bp.bin_lookup') }}" class="btn btn-info btn-lg rounded-pill">
+          <i class="bi bi-upc-scan me-1"></i>Scan/Lookup Bin
+        </a>
       </div>
     </div>
   </div>
@@ -89,12 +92,8 @@
         </select>
       </div>
       <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="model" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="">Filter by Model</option>
-          {% for m in models %}
-            <option value="{{ m }}" {% if request.args.get('model') == m %}selected{% endif %}>{{ m }}</option>
-          {% endfor %}
-        </select>
+        <input type="text" name="model" id="model-search" value="{{ request.args.get('model', '') }}" class="form-control rounded-pill" placeholder="Search Model..." autocomplete="off" list="model-suggestions" />
+        <datalist id="model-suggestions"></datalist>
       </div>
       <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="processor" class="form-select rounded-pill" onchange="this.form.submit()">
@@ -117,11 +116,17 @@
       <div class="col-12 col-md-3 mb-2 mb-md-0">
         <input type="text" name="serial_search" value="{{ request.args.get('serial_search', '') }}" class="form-control rounded-pill" placeholder="Search Serial...">
       </div>
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <input type="text" name="bin_search" value="{{ request.args.get('bin_search', '') }}" class="form-control rounded-pill" placeholder="Search Bin #...">
+      </div>
       <div class="col-12 col-md-auto d-flex gap-2 align-items-end">
         <button class="btn btn-outline-primary rounded-pill btn-lg" type="submit">Apply Filters</button>
         <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-outline-secondary rounded-pill btn-lg">Clear Filters</a>
       </div>
     </form>
+    <div class="mb-3 text-end">
+      <strong>{{ instances|length }} item{{ 's' if instances|length != 1 else '' }} found</strong>
+    </div>
     <form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form">
       <div class="mb-2">
         <button type="submit" class="btn btn-dark rounded-pill batch-action-bar">🖨️ Print Selected Labels</button>
@@ -194,4 +199,34 @@
     </form>
   </div>
 </div>
+<script>
+  const modelInput = document.getElementById('model-search');
+  const modelDatalist = document.getElementById('model-suggestions');
+  let lastFetch = '';
+  let fetchTimeout = null;
+
+  modelInput.addEventListener('input', function(e) {
+    const query = this.value;
+    if (query.length < 2) {
+      modelDatalist.innerHTML = '';
+      return;
+    }
+    if (query === lastFetch) return;
+    lastFetch = query;
+
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(() => {
+      fetch(`/stock/api/model_suggestions?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(models => {
+          modelDatalist.innerHTML = '';
+          for (const m of models) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            modelDatalist.appendChild(opt);
+          }
+        });
+    }, 180);
+  });
+</script>
 {% endblock %}

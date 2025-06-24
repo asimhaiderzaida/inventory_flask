@@ -26,3 +26,31 @@ def logout():
     logout_user()
     return redirect(url_for('auth_bp.login'))
 
+from flask_login import current_user
+from werkzeug.security import generate_password_hash
+
+@auth_bp.route('/register_user', methods=['GET', 'POST'])
+@login_required
+def register_user():
+    if current_user.role != 'admin':
+        flash("Not authorized.", "danger")
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password']
+        role = request.form.get('role', 'technician')
+        if not username or not password:
+            flash("Username and password required.", "warning")
+            return render_template('register_user.html')
+        if User.query.filter_by(username=username).first():
+            flash("Username already exists.", "warning")
+            return render_template('register_user.html')
+        user = User(username=username, role=role)
+        user.password_hash = generate_password_hash(password)
+        db.session.add(user)
+        db.session.commit()
+        flash(f"User {username} created as {role}.", "success")
+        return redirect(url_for('auth_bp.register_user'))
+
+    return render_template('register_user.html')
