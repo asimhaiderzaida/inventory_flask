@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container mt-4">
+  <form method="get" class="d-flex align-items-center gap-2 mb-3">
+    <input type="text" name="q" class="form-control" placeholder="Search parts..." value="{{ request.args.get('q', '') }}">
+    <button type="submit" class="btn btn-outline-primary">Search</button>
+  </form>
   <h2>Parts Inventory</h2>
   <a href="{{ url_for('parts_bp.stock_in') }}" class="btn btn-success mb-3">
     <i class="bi bi-box-arrow-in-down"></i> Stock In
@@ -33,6 +37,11 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="mt-3">
+      <h6>Summary Totals</h6>
+      <p>Total Parts: {{ parts|length }}</p>
+      <p>Total Inventory Value: {{ parts | sum(attribute='price') }}</p>
+    </div>
   </div>
 </div>
 {% endblock %}

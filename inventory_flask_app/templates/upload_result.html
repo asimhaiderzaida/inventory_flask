@@ -2,79 +2,123 @@
 {% block title %}Upload Result{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">✅ Excel Upload: New Inventory Added for Vendor {{ vendor.name }}</h2>
+<div class="container-fluid py-4 px-4">
+  <style>
+    th { white-space: nowrap; background-color: #f8f9fa; }
+    .table-responsive-sm { border-radius: 0.5rem; overflow-x: auto; }
+    .form-select-sm, .btn-sm, .form-control-sm { font-size: 0.87rem; }
+  </style>
 
-<form method="post" action="{{ url_for('stock_bp.batch_update_status') }}">
-  <div class="mb-2 mb-3">
-    <button type="submit" class="btn btn-success btn-lg w-100 mt-2">Assign Status to Selected</button>
-    <select name="status" required class="form-select form-select-lg d-inline w-auto mx-2">
-      <option value="">-- Select Status --</option>
-      <option value="unprocessed">Unprocessed</option>
-      <option value="under_process">Under Process</option>
-      <option value="processed">Processed</option>
-    </select>
-    <button type="button" onclick="batchPrint()" class="btn btn-dark btn-lg w-100 mt-2 mx-2">🖨️ Print Selected Labels</button>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-semibold text-primary mb-0">
+      <i class="bi bi-upload me-2"></i>Inventory Uploaded for {{ vendor.name }}
+    </h4>
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
+    </a>
   </div>
-  <div style="overflow-x:auto;">
-    <table class="table table-striped comfortable-table">
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="select-all" onclick="for(let cb of document.querySelectorAll('.batch-checkbox')) cb.checked=this.checked;"></th>
-          <th>Serial</th>
-          <th>Product</th>
-          <th>Model</th>
-          <th>CPU</th>
-          <th>RAM</th>
-          <th>Storage</th>
-          <th>GPU</th>
-          <th>Grade</th>
-          <th>Screen</th>
-          <th>Status</th>
-          <th>Label</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in instances %}
-        <tr>
-          <td>
-            <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ i.id }}">
-          </td>
-          <td>{{ i.serial_number }}</td>
-          <td>{{ i.product.name if i.product else '' }}</td>
-          <td>{{ i.product.model_number if i.product else '' }}</td>
-          <td>{{ i.product.processor if i.product else '' }}</td>
-          <td>{{ i.product.ram if i.product else '' }}</td>
-          <td>{{ i.product.storage if i.product else '' }}</td>
-          <td>{{ i.product.video_card if i.product else '' }}</td>
-          <td>{{ i.product.grade if i.product else '' }}</td>
-          <td>{{ i.product.screen_size if i.product else '' }}</td>
-          <td>{{ i.status }}</td>
-          <td>
-            <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
-               class="btn btn-sm btn-outline-dark" target="_blank">
-              🖨️ Print Label
-            </a>
-          </td>
-        </tr>
+
+  <form method="post" action="{{ url_for('stock_bp.batch_update_status') }}">
+    <div class="d-flex flex-wrap gap-2 mb-3 justify-content-start align-items-center">
+      <button type="submit" class="btn btn-success btn-sm rounded-pill px-4 fw-semibold">
+        <i class="bi bi-check-circle me-1"></i>Assign Status
+      </button>
+      <button type="button" onclick="batchPrint()" class="btn btn-outline-dark btn-sm rounded-pill px-4 fw-semibold">
+        <i class="bi bi-printer me-1"></i>Print Labels
+      </button>
+      <select name="status" class="form-select form-select-sm d-inline w-auto mx-2 rounded-pill">
+        <option value="">-- Select Status --</option>
+        <option value="unprocessed">Unprocessed</option>
+        <option value="under_process">Under Process</option>
+        <option value="processed">Processed</option>
+      </select>
+      <select name="location_id" class="form-select form-select-sm d-inline w-auto mx-2 rounded-pill">
+        <option value="">-- Select Location --</option>
+        {% for loc in locations %}
+        <option value="{{ loc.id }}">{{ loc.name }}</option>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</form>
-<form id="batchPrintForm" method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" style="display:none;">
-  <input type="hidden" name="instance_ids" id="batchPrintIds">
-</form>
+      </select>
+    </div>
+    <div class="table-responsive-sm">
+      <table class="table table-striped table-sm align-middle rounded-4 overflow-hidden shadow-sm bg-white">
+        <thead>
+          <tr>
+            <th class="text-nowrap"><input type="checkbox" id="select-all" onclick="for(let cb of document.querySelectorAll('.batch-checkbox')) cb.checked=this.checked;"></th>
+            <th class="text-nowrap">Serial</th>
+            <th class="text-nowrap">Asset</th>
+            <th class="text-nowrap">Item Name</th>
+            <th class="text-nowrap">Make</th>
+            <th class="text-nowrap">Model</th>
+            <th class="text-nowrap">CPU</th>
+            <th class="text-nowrap">RAM</th>
+            <th class="text-nowrap">Disk 1 Size</th>
+            <th class="text-nowrap">Location</th>
+            <th class="text-nowrap">Display</th>
+            <th class="text-nowrap">GPU 1</th>
+            <th class="text-nowrap">GPU 2</th>
+            <th class="text-nowrap">Grade</th>
+            <th class="text-nowrap">Status</th>
+            <th class="text-nowrap">Label</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in instances %}
+          <tr>
+            <td class="text-nowrap">
+              <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ i.id }}">
+            </td>
+            <td class="text-nowrap">{{ i.serial }}</td>
+            <td class="text-nowrap">{{ i.asset }}</td>
+            <td class="text-nowrap">{{ i.product.item_name if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.make if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.model if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.cpu if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.ram if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.disk1size if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.location.name if i.location else '' }}</td>
+            <td class="text-nowrap">{{ i.product.display if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.gpu1 if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.gpu2 if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.product.grade if i.product else '' }}</td>
+            <td class="text-nowrap">{{ i.status }}</td>
+            <td class="text-nowrap">
+              <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
+                 class="btn btn-sm btn-outline-dark" target="_blank">
+                🖨️ Print Label
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  <form id="batchPrintForm" method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" style="display:none;">
+    <input type="hidden" name="instance_ids" id="batchPrintIds">
+  </form>
 
-<script>
-function batchPrint() {
-  let ids = [];
-  document.querySelectorAll('.batch-checkbox:checked').forEach(cb => ids.push(cb.value));
-  if (ids.length === 0) {
-    alert("Select at least one item to print.");
-    return;
+  <script>
+  function batchPrint() {
+    let ids = [];
+    document.querySelectorAll('.batch-checkbox:checked').forEach(cb => ids.push(cb.value));
+    if (ids.length === 0) {
+      alert("Select at least one item to print.");
+      return;
+    }
+    document.getElementById('batchPrintIds').value = ids.join(',');
+    document.getElementById('batchPrintForm').submit();
   }
-  document.getElementById('batchPrintIds').value = ids.join(',');
-  document.getElementById('batchPrintForm').submit();
-}
-</script>
+  </script>
+
+  <!-- jQuery (needed for DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      $('.table').DataTable({ pageLength: 50 });
+    });
+  </script>
+</div>
 {% endblock %}

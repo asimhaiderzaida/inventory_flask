@@ -91,10 +91,12 @@
   <div class="label-qr">
     <img src="data:image/png;base64,{{ label.qr_b64 }}" alt="QR Code" width="80" height="80">
     <div class="label-serial">
-      SN: <b>{{ label.instance.serial_number }}</b>
+      SN: <code>{{ label.instance.serial_number }}</code><br>
+      AT: <b>{{ label.instance.asset_tag }}</b>
     </div>
   </div>
   <div class="label-main">
+    <div class="label-field">{{ label.instance.product.item_name or '' }}</div>
     <div class="label-model">
       {{ label.instance.product.model_number or '' }}
     </div>
@@ -102,7 +104,8 @@
       {{ label.instance.product.processor or '' }} | {{ label.instance.product.ram or '' }} | {{ label.instance.product.storage or '' }}
     </div>
     <div class="label-specs">
-      GPU: {{ label.instance.product.video_card or '' }} | Screen: {{ label.instance.product.screen_size or '' }} | Grade: {{ label.instance.product.grade or '' }}
+      GPU: {{ label.instance.product.video_card or '' }} | Screen: {{ label.instance.product.screen_size or '' }}<br>
+      Grade: {{ label.instance.product.grade or '' }}
     </div>
     <div class="label-small">
       Printed: {{ label.printed_time.strftime('%d-%b-%Y %H:%M') }}

@@ -6,10 +6,11 @@
   top: 0;
   left: 240px; /* sidebar width */
   right: 0;
-  background: #fff;
+  background: transparent;
+  backdrop-filter: blur(6px);
   z-index: 1051;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  border-bottom: 1px solid #eee;
+  box-shadow: none;
+  border-bottom: none;
   padding: 24px 0 12px 0;
 }
 @media (max-width: 991px) {
@@ -30,7 +31,7 @@
   min-width: 220px;
 }
 .profile-main-content {
-  margin-top: 200px;
+  margin-top: 260px;
   padding: 0 16px;
   max-width: 1200px;
   margin-left: auto;
@@ -64,9 +65,9 @@
 </style>
 
 <div class="fixed-profile-header">
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col d-flex flex-column justify-content-start">
+  <div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-start w-100 flex-wrap">
+      <div class="d-flex flex-column me-auto">
         <h2 class="mb-2">Customer Profile</h2>
         <div class="card shadow-sm mb-0" style="max-width:400px;">
           <div class="card-body py-2 px-3">
@@ -76,24 +77,27 @@
           </div>
         </div>
       </div>
-      <div class="col-auto profile-actions align-items-center">
-        <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-success btn-lg">Export Sales History (Excel)</a>
-        <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-secondary btn-lg">Back to Customer Center</a>
-      </div>
     </div>
-    <div class="row mt-2">
-      <div class="col d-flex gap-2">
-        <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}"
-           class="btn btn-outline-primary {% if view == 'orders' %}active{% endif %}">View Orders</a>
-        <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='units') }}"
-           class="btn btn-outline-secondary {% if view != 'orders' %}active{% endif %}">View All Units</a>
-      </div>
+    <div class="mt-3 d-flex gap-2">
+      <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}"
+         class="btn btn-outline-dark rounded-pill shadow-sm {% if view == 'orders' %}active{% endif %}" style="min-height: 38px; min-width: 160px;">View Orders</a>
+      <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='units') }}"
+         class="btn btn-outline-dark rounded-pill shadow-sm {% if view != 'orders' %}active{% endif %}" style="min-height: 38px; min-width: 160px;">View All Units</a>
     </div>
   </div>
 </div>
 
-<div class="profile-main-content">
+<div class="profile-main-content" style="max-width: 100%; padding-left: 24px; padding-right: 24px; margin-top: 260px;">
+  <div class="card shadow-sm border-0 rounded-4 p-4">
   {% if view == "orders" %}
+    <form method="get" class="mb-3 row g-2">
+      <div class="col-md-4">
+        <input type="text" name="order_search" value="{{ request.args.get('order_search', '') }}" class="form-control rounded-pill" placeholder="Search by serial or model...">
+      </div>
+      <div class="col-md-auto">
+        <button class="btn btn-outline-primary rounded-pill fw-semibold" type="submit">Search</button>
+      </div>
+    </form>
     <h4>Order List</h4>
     <div style="overflow-x:auto;">
     <table class="table table-bordered table-striped">
@@ -116,6 +120,9 @@
           <td class="align-middle">{{ "%.2f"|format(order.total_amount) if order.total_amount else "0.00" }}</td>
           <td class="align-middle">
             <a href="{{ url_for('exports_bp.export_customer_orders', invoice_id=order.invoice_id) }}" class="btn btn-outline-success btn-sm">Export</a>
+            <a href="{{ url_for('invoices_bp.download_invoice', invoice_id=order.invoice_id) }}"
+               class="btn btn-outline-dark btn-sm ms-1"
+               target="_blank">Invoice</a>
           </td>
           <td class="align-middle">
             <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#order-details-{{ order.invoice_id }}">View Details</button>
@@ -127,16 +134,17 @@
               <table class="table table-sm table-bordered mb-0">
                 <thead>
                   <tr>
-                    <th class="align-middle">Serial Number</th>
-                    <th class="align-middle">Product Name</th>
-                    <th class="align-middle">Model Number</th>
-                    <th class="align-middle">Grade</th>
-                    <th class="align-middle">RAM</th>
-                    <th class="align-middle">Processor</th>
-                    <th class="align-middle">Storage</th>
-                    <th class="align-middle">Screen Size</th>
-                    <th class="align-middle">Resolution</th>
-                    <th class="align-middle">Video Card</th>
+                    <th class="align-middle">serial</th>
+                    <th class="align-middle">asset</th>
+                    <th class="align-middle">item_name</th>
+                    <th class="align-middle">model</th>
+                    <th class="align-middle">grade</th>
+                    <th class="align-middle">ram</th>
+                    <th class="align-middle">cpu</th>
+                    <th class="align-middle">disk1size</th>
+                    <th class="align-middle">display</th>
+                    <th class="align-middle">gpu1</th>
+                    <th class="align-middle">gpu2</th>
                     <th class="align-middle">Status</th>
                     <th class="align-middle">Price</th>
                     <th class="align-middle d-none d-md-table-cell">Notes</th>
@@ -145,16 +153,17 @@
                 <tbody>
                   {% for unit in order_details_map[order.invoice_id] %}
                   <tr>
-                    <td class="align-middle">{{ unit.serial_number }}</td>
-                    <td class="align-middle">{{ unit.name }}</td>
-                    <td class="align-middle">{{ unit.model_number }}</td>
+                    <td class="align-middle">{{ unit.serial }}</td>
+                    <td class="align-middle">{{ unit.asset }}</td>
+                    <td class="align-middle">{{ unit.item_name }}</td>
+                    <td class="align-middle">{{ unit.model }}</td>
                     <td class="align-middle">{{ unit.grade }}</td>
                     <td class="align-middle">{{ unit.ram }}</td>
-                    <td class="align-middle">{{ unit.processor }}</td>
-                    <td class="align-middle">{{ unit.storage }}</td>
-                    <td class="align-middle">{{ unit.screen_size }}</td>
-                    <td class="align-middle">{{ unit.resolution }}</td>
-                    <td class="align-middle">{{ unit.video_card }}</td>
+                    <td class="align-middle">{{ unit.cpu }}</td>
+                    <td class="align-middle">{{ unit.disk1size }}</td>
+                    <td class="align-middle">{{ unit.display }}</td>
+                    <td class="align-middle">{{ unit.gpu1 }}</td>
+                    <td class="align-middle">{{ unit.gpu2 }}</td>
                     <td class="align-middle">{{ unit.status }}</td>
                     <td class="align-middle">{{ "%.2f"|format(unit.price_at_sale) if unit.price_at_sale else "" }}</td>
                     <td class="align-middle d-none d-md-table-cell">{{ unit.notes or "" }}</td>
@@ -173,23 +182,45 @@
       </tbody>
     </table>
     </div>
+    <div class="card mt-4 shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-2">📦 Order Summary</h6>
+        <ul class="list-unstyled mb-0">
+          <li><strong>Total Orders:</strong> {{ orders_list|length }}</li>
+          <li><strong>Total Units:</strong> {{ orders_list | sum(attribute='total_units') }}</li>
+          <li><strong>Total Amount:</strong> AED {{ "%.2f"|format(orders_list | sum(attribute='total_amount')) }}</li>
+        </ul>
+      </div>
+    </div>
   {% else %}
-    <h4>Sales History</h4>
+    <div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+      <a href="{{ url_for('customers_bp.export_customer_sales', customer_id=customer.id) }}" class="btn btn-outline-dark rounded-pill px-4 shadow-sm" style="min-height: 42px;">Export Sales History (Excel)</a>
+      <a href="{{ url_for('customers_bp.customer_center') }}" class="btn btn-outline-dark rounded-pill px-4 shadow-sm" style="min-height: 42px;">Back to Customer Center</a>
+    </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+      <h4 class="mb-0">Sales History</h4>
+      <form method="get" class="d-flex align-items-end gap-2 flex-wrap flex-md-nowrap">
+        <input type="text" name="sales_search" value="{{ request.args.get('sales_search', '') }}" class="form-control rounded-pill" placeholder="Search by serial, model, or notes..." style="min-width: 280px;">
+        <button class="btn btn-outline-primary rounded-pill px-4" type="submit">Search</button>
+      </form>
+    </div>
+    <div class="card shadow-sm border-0 rounded-4 p-4" style="max-width: 100%;">
     <div style="overflow-x:auto;">
-    <table class="table table-bordered table-striped">
+    <table class="table table-striped table-hover align-middle shadow-sm w-100" style="min-width: 960px;">
       <thead>
         <tr>
           <th class="align-middle">Date Sold</th>
-          <th class="align-middle">Serial Number</th>
-          <th class="align-middle">Product Name</th>
-          <th class="align-middle">Model Number</th>
-          <th class="align-middle">Grade</th>
-          <th class="align-middle">RAM</th>
-          <th class="align-middle">Processor</th>
-          <th class="align-middle">Storage</th>
-          <th class="align-middle">Screen Size</th>
-          <th class="align-middle">Resolution</th>
-          <th class="align-middle">Video Card</th>
+          <th class="align-middle">serial</th>
+          <th class="align-middle">asset</th>
+          <th class="align-middle">item_name</th>
+          <th class="align-middle">model</th>
+          <th class="align-middle">grade</th>
+          <th class="align-middle">ram</th>
+          <th class="align-middle">cpu</th>
+          <th class="align-middle">disk1size</th>
+          <th class="align-middle">display</th>
+          <th class="align-middle">gpu1</th>
+          <th class="align-middle">gpu2</th>
           <th class="align-middle">Status</th>
           <th class="align-middle">Price</th>
           <th class="align-middle d-none d-md-table-cell">Notes</th>
@@ -199,16 +230,17 @@
         {% for sale in sales_data %}
         <tr>
           <td class="align-middle">{{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '' }}</td>
-          <td class="align-middle">{{ sale.serial_number }}</td>
-          <td class="align-middle">{{ sale.name }}</td>
-          <td class="align-middle">{{ sale.model_number }}</td>
+          <td class="align-middle">{{ sale.serial }}</td>
+          <td class="align-middle">{{ sale.asset }}</td>
+          <td class="align-middle">{{ sale.item_name }}</td>
+          <td class="align-middle">{{ sale.model }}</td>
           <td class="align-middle">{{ sale.grade }}</td>
           <td class="align-middle">{{ sale.ram }}</td>
-          <td class="align-middle">{{ sale.processor }}</td>
-          <td class="align-middle">{{ sale.storage }}</td>
-          <td class="align-middle">{{ sale.screen_size }}</td>
-          <td class="align-middle">{{ sale.resolution }}</td>
-          <td class="align-middle">{{ sale.video_card }}</td>
+          <td class="align-middle">{{ sale.cpu  }}</td>
+          <td class="align-middle">{{ sale.disk1size }}</td>
+          <td class="align-middle">{{ sale.display }}</td>
+          <td class="align-middle">{{ sale.gpu1 or '' }}</td>
+          <td class="align-middle">{{ sale.gpu2 }}</td>
           <td class="align-middle">{{ sale.status }}</td>
           <td class="align-middle">{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else "" }}</td>
           <td class="align-middle d-none d-md-table-cell">{{ sale.notes or "" }}</td>
@@ -219,6 +251,19 @@
       </tbody>
     </table>
     </div>
+    <div class="mt-4">
+      <div class="card mt-0 shadow-sm">
+        <div class="card-body">
+          <h6 class="fw-semibold mb-2">💰 Sales Summary</h6>
+          <ul class="list-unstyled mb-0">
+            <li><strong>Total Sales:</strong> {{ sales_data|length }}</li>
+            <li><strong>Total Amount:</strong> AED {{ "%.2f"|format(sales_data | sum(attribute='price_at_sale')) }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    </div> <!-- end card -->
   {% endif %}
-</div>
+  </div> <!-- end card -->
+</div> <!-- end profile-main-content -->
 {% endblock %}

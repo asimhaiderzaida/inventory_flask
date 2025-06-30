@@ -5,8 +5,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         label { font-weight: bold; display: block; margin-top: 10px; }
-        input, textarea { width: 300px; padding: 6px; margin-top: 4px; }
-        button { margin-top: 15px; padding: 10px 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -15,36 +13,45 @@
     </nav>
 
     <div class="container mt-4">
-        <h2>📤 Export Inventory</h2>
-        <form method="POST" action="/inventory/export">
-            <div class="mb-3">
-                <label>Model Number:</label>
-                <input type="text" name="model_number" class="form-control form-control-lg">
-            </div>
-            <div class="mb-3">
-                <label>Processor:</label>
-                <input type="text" name="processor" class="form-control form-control-lg">
-            </div>
-            <div class="mb-3">
-                <label>Video Card:</label>
-                <input type="text" name="video_card" class="form-control form-control-lg">
-            </div>
-            <div class="mb-3">
-                <label>Start Date:</label>
-                <input type="date" name="start_date" class="form-control form-control-lg">
-            </div>
-            <div class="mb-3">
-                <label>End Date:</label>
-                <input type="date" name="end_date" class="form-control form-control-lg">
-            </div>
-            <div class="mb-3">
-                <label>Serial Numbers (scan, paste, or type):</label>
-                <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..." class="form-control form-control-lg"></textarea>
-            </div>
-            <button type="submit" name="action" value="preview" class="btn btn-primary btn-lg w-100 mt-2">🔍 Preview</button>
-            <button type="submit" name="action" value="download" class="btn btn-success btn-lg w-100 mt-2">📥 Download Excel</button>
-        </form>
+        <div class="card p-4 shadow rounded-4">
+            <h2 class="mb-4">📤 Export Inventory</h2>
+            <form method="POST" action="/inventory/export">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label>Model:</label>
+                        <input type="text" name="model" class="form-control form-control-lg">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label>Processor:</label>
+                        <input type="text" name="processor" class="form-control form-control-lg">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label>GPU 1:</label>
+                        <input type="text" name="gpu1" class="form-control form-control-lg">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label>Start Date:</label>
+                        <input type="date" name="start_date" class="form-control form-control-lg">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label>End Date:</label>
+                        <input type="date" name="end_date" class="form-control form-control-lg">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label>Serial Numbers (scan, paste, or type):</label>
+                        <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..." class="form-control form-control-lg"></textarea>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label>Asset Tags (scan, paste, or type):</label>
+                        <textarea name="asset_tags" rows="4" placeholder="AT001, AT002, AT003..." class="form-control form-control-lg"></textarea>
+                    </div>
+                </div>
+                <div class="d-flex flex-column flex-md-row gap-3 mt-4">
+                    <button type="submit" name="action" value="preview" class="btn btn-primary btn-lg flex-fill">🔍 Preview</button>
+                    <button type="submit" name="action" value="download" class="btn btn-success btn-lg flex-fill">📥 Download Excel</button>
+                </div>
+            </form>
+        </div>
     </div>
 </body>
 </html>
-

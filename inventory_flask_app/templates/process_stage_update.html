@@ -39,7 +39,7 @@
           <input type="text" name="team_assigned" id="team_assigned" class="form-control rounded-pill form-control-sm" placeholder="Assigned Team" required>
         </div>
         <div class="col-md-1 d-grid mb-2">
-          <button type="submit" class="btn btn-primary btn-sm rounded-pill fw-semibold w-100">
+          <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill fw-semibold w-100" style="min-height: 38px;">
             <i class="bi bi-arrow-repeat me-1"></i>Process
           </button>
         </div>
@@ -47,113 +47,168 @@
     </form>
 
     {% if results %}
-    <div style="overflow-x:auto;">
-      <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
-        <thead class="table-light">
-          <tr>
-            <th>Serial</th>
-            <th>Model</th>
-            <th>Previous Stage</th>
-            <th>Result</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in results %}
-          <tr>
-            <td>{{ row.serial }}</td>
-            <td>{{ row.model }}</td>
-            <td>{{ row.prev_stage }}</td>
-            <td>
-              {% if row.status == 'updated' %}
-                <span class="badge bg-success">Updated</span>
-              {% elif row.status == 'not_found' %}
-                <span class="badge bg-danger">Not Found</span>
-              {% elif row.status == 'no_change' %}
-                <span class="badge bg-secondary">Already at Stage</span>
-              {% else %}
-                <span class="badge bg-warning text-dark">{{ row.status }}</span>
-              {% endif %}
-            </td>
-            <td>
-              <span class="text-muted">-</span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="d-flex justify-content-between align-items-center my-3">
+      <h5 class="fw-semibold mb-0 text-primary">✅ {{ results|length }} Units Processed</h5>
+      <form method="post" action="{{ url_for('stock_bp.export_instances') }}">
+        <input type="hidden" name="export_scope" value="processed_stage_batch">
+        <input type="hidden" name="instance_ids" value="{{ updated_ids | join(',') }}">
+        <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill" style="min-height: 38px;">
+          <i class="bi bi-download me-1"></i>Export Updated
+        </button>
+      </form>
     </div>
+    <table class="table table-hover align-middle rounded-4 overflow-hidden bg-white">
+      <thead class="table-light">
+        <tr>
+          <th>Serial</th>
+          <th>Asset</th>
+          <th>Item Name</th>
+          <th>Make</th>
+          <th>Model</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th>Grade</th>
+          <th>Display</th>
+          <th>GPU 1</th>
+          <th>GPU 2</th>
+          <th>Disk Size</th>
+          <th>Previous Stage</th>
+          <th>Result</th>
+          <th>Action</th>
+        </tr>
+        <tr>
+          <th colspan="14" class="pt-0">
+            <select id="filter-stage" class="form-select form-select-sm rounded-pill" aria-label="Filter by stage">
+              <option value="">Filter by Previous Stage</option>
+              <option value="specs">Specs</option>
+              <option value="deployment">Deployment</option>
+              <option value="screen_spot">Screen Spot</option>
+              <option value="parts_change">Parts Change</option>
+              <option value="paint">Paint</option>
+              <option value="qc">QC</option>
+              <option value="processed">Processed</option>
+            </select>
+          </th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        <tr>
+          <td>{{ row.serial or row.instance.serial if row.instance else '' }}</td>
+          <td>{{ row.asset or row.instance.asset if row.instance else '' }}</td>
+          <td>{{ row.item_name }}</td>
+          <td>{{ row.make }}</td>
+          <td>{{ row.model }}</td>
+          <td>{{ row.cpu }}</td>
+          <td>{{ row.ram }}</td>
+          <td>{{ row.grade }}</td>
+          <td>{{ row.display }}</td>
+          <td>{{ row.gpu1 }}</td>
+          <td>{{ row.gpu2 }}</td>
+          <td>{{ row.disk1size }}</td>
+          <td>{{ row.prev_stage }}</td>
+          <td>
+            {% if row.status == 'updated' %}
+              <span class="badge bg-success">Updated</span>
+            {% elif row.status == 'not_found' %}
+              <span class="badge bg-danger">Not Found</span>
+            {% elif row.status == 'no_change' %}
+              <span class="badge bg-secondary">Already at Stage</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">{{ row.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.status == 'updated' and row.instance_id %}
+              <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance_id) }}" class="btn btn-sm btn-outline-dark" target="_blank">🖨️ Print</a>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     {% set updated_ids = results | selectattr('status', 'equalto', 'updated') | map(attribute='instance_id') | list %}
     {% if updated_ids %}
-      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}">
+      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" class="mb-3">
         {% for id in updated_ids %}
           <input type="hidden" name="instance_ids" value="{{ id }}">
         {% endfor %}
         <div class="d-flex gap-3 my-3">
-          <button type="submit" name="action" value="check-in" class="btn btn-success btn-lg rounded-pill flex-fill">
+          <button type="submit" name="action" value="check-in" class="btn btn-outline-success btn-lg rounded-pill flex-fill" style="min-height: 42px;">
             <i class="bi bi-box-arrow-in-down me-1"></i> Check In All
           </button>
-          <button type="submit" name="action" value="check-out" class="btn btn-danger btn-lg rounded-pill flex-fill">
+          <button type="submit" name="action" value="check-out" class="btn btn-outline-danger btn-lg rounded-pill flex-fill" style="min-height: 42px;">
             <i class="bi bi-box-arrow-up-right me-1"></i> Check Out All
           </button>
         </div>
-        <div class="mb-2">
+        <div class="mb-3">
           <input type="text" name="note" class="form-control rounded-pill" placeholder="Optional note (who, why, etc.)">
         </div>
       </form>
     {% endif %}
     {% endif %}
 
-    <div class="mt-3 text-muted">
-      <small>Paste or scan serials, choose a stage/team, and process in bulk. Only valid units will be updated.</small>
-    </div>
-
     {% if my_units and my_units|length > 0 %}
       <div class="card mb-3">
-        <div class="card-header bg-primary text-white">My In-Process Units</div>
+        <div class="card-header bg-primary text-white">My Assigned Units</div>
         <div class="card-body p-2">
           <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
             <table class="table table-sm table-bordered mb-0">
               <thead>
                 <tr>
                   <th>Serial</th>
+                  <th>Asset</th>
+                  <th>Item Name</th>
                   <th>Model</th>
-                  <th>Process Stage</th>
+                  <th>CPU</th>
+                  <th>RAM</th>
+                  <th>Stage</th>
                   <th>Team</th>
-                  <th>Last Checked In</th>
-                  <th>Last Checked Out</th>
+                  <th>Checked In</th>
+                  <th>Updated At</th>
+                  <th>Note</th>
+                  <th>Idle</th>
                   <th>
-                    <input type="checkbox" id="select-all-inprocess" />
-                    <span class="ms-1">Check Out</span>
+                    <input type="checkbox" id="select-all-inprocess">
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {% for i in my_units %}
-                  <tr>
-                    <td>{{ i.serial_number }}</td>
-                    <td>{{ i.product.model_number if i.product else '' }}</td>
-                    <td>{{ i.process_stage }}</td>
-                    <td>{{ i.team_assigned }}</td>
-                    <td>
-                      {# Find latest check-in log #}
-                      {% set checkin = (i.process_logs | selectattr('action', 'equalto', 'check-in') | sort(attribute='moved_at', reverse=True) | list | first) %}
-                      {{ checkin.moved_at.strftime('%Y-%m-%d %H:%M') if checkin else '' }}
-                    </td>
-                    <td>
-                      {# Find latest check-out log #}
-                      {% set checkout = (i.process_logs | selectattr('action', 'equalto', 'check-out') | sort(attribute='moved_at', reverse=True) | list | first) %}
-                      {{ checkout.moved_at.strftime('%Y-%m-%d %H:%M') if checkout else '' }}
-                    </td>
-                    <td>
-                      <input type="checkbox" name="instance_ids" value="{{ i.id }}">
-                    </td>
-                  </tr>
+                  {% if i.assigned_to_user_id == current_user.id %}
+                    <tr>
+                      <td>{{ i.serial }}</td>
+                      <td>{{ i.asset }}</td>
+                      <td>{{ i.product.item_name if i.product else '' }}</td>
+                      <td>{{ i.product.model if i.product else '' }}</td>
+                      <td>{{ i.product.cpu if i.product else '' }}</td>
+                      <td>{{ i.product.ram if i.product else '' }}</td>
+                      <td>{{ i.process_stage }}</td>
+                      <td>{{ i.team_assigned }}</td>
+                      <td>{{ i.checkin_timestamp.strftime('%Y-%m-%d %H:%M') if i.checkin_timestamp else '-' }}</td>
+                      <td>{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '-' }}</td>
+                      <td>
+                        <input type="text" name="notes[{{ i.id }}]" class="form-control form-control-sm" placeholder="Optional note">
+                      </td>
+                      <td>
+                        <input type="checkbox" name="mark_idle_ids" value="{{ i.id }}">
+                      </td>
+                      <td>
+                        <input type="checkbox" name="instance_ids" value="{{ i.id }}" class="unit-checkbox">
+                      </td>
+                    </tr>
+                  {% endif %}
                 {% endfor %}
               </tbody>
             </table>
-            <div class="d-flex gap-3 my-2">
-              <button type="submit" name="action" value="check-out" class="btn btn-danger btn-sm rounded-pill">
+            <div class="d-flex gap-2 my-2">
+              <button type="submit" name="action" value="check-in" class="btn btn-outline-success btn-sm rounded-pill" style="min-height: 36px;">
+                <i class="bi bi-box-arrow-in-down me-1"></i>Check In Selected
+              </button>
+              <button type="submit" name="action" value="check-out" class="btn btn-outline-danger btn-sm rounded-pill" style="min-height: 36px;">
                 <i class="bi bi-box-arrow-up-right me-1"></i>Check Out Selected
               </button>
             </div>
@@ -167,18 +222,16 @@
 {% endblock %}
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  const form = document.getElementById('my-inprocess-form');
-  if (form) {
-    const selectAll = form.querySelector('#select-all-inprocess');
-    if (selectAll) {
-      selectAll.addEventListener('change', function() {
-        const checkboxes = form.querySelectorAll('input[name="instance_ids"]');
-        for (const cb of checkboxes) {
-          cb.checked = this.checked;
-        }
+document.addEventListener("DOMContentLoaded", function () {
+  const selectAll = document.getElementById('select-all-inprocess');
+  const checkboxes = document.querySelectorAll('.unit-checkbox');
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
       });
-    }
+    });
   }
 });
 </script>

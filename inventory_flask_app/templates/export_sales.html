@@ -13,31 +13,33 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <h2>📤 Export Sales Data</h2>
+    <div class="container py-5 d-flex justify-content-center">
+      <div class="card shadow-sm rounded-4 p-4" style="width: 100%; max-width: 520px;">
+        <h4 class="mb-3 text-primary fw-bold"><i class="bi bi-download me-2"></i>Export Sales Report</h4>
+        <p class="text-muted small mb-3">Use filters below to refine the export. Includes Serial, Asset, Product, and more.</p>
         <form action="/sales/export" method="GET">
-            <div class="mb-3">
-                <label>Filter by Customer:</label>
-                <select name="customer_id" class="form-control form-control-lg">
-                    <option value="">-- All Customers --</option>
-                    {% for customer in customers %}
-                        <option value="{{ customer.id }}">{{ customer.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <label>From Date:</label>
-                <input type="date" name="start_date" class="form-control form-control-lg">
-            </div>
-
-            <div class="mb-3">
-                <label>To Date:</label>
-                <input type="date" name="end_date" class="form-control form-control-lg">
-            </div>
-
-            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">Download Sales Excel</button>
+          <div class="mb-3">
+            <label class="form-label">Filter by Customer:</label>
+            <select name="customer_id" class="form-select form-select-lg rounded-pill px-3">
+              <option value="">-- All Customers --</option>
+              {% for customer in customers %}
+                <option value="{{ customer.id }}">{{ customer.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">From Date:</label>
+            <input type="date" name="start_date" class="form-control form-control-lg rounded-pill px-3">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">To Date:</label>
+            <input type="date" name="end_date" class="form-control form-control-lg rounded-pill px-3">
+          </div>
+          <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill mt-2">
+            <i class="bi bi-download me-1"></i> Download Excel
+          </button>
         </form>
+      </div>
     </div>
 </body>
 </html>

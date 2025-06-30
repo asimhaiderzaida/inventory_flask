@@ -25,19 +25,58 @@
 }
 .inventory-actions .btn {
   min-width: 200px;
+  width: 100%;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.55rem 1.25rem;
+  border-radius: 2rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+@media (max-width: 767px) {
+  .inventory-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .inventory-actions .btn {
+    min-width: 100% !important;
+    margin-bottom: 8px;
+  }
 }
 .inventory-main-content {
-  margin-top: 165px;
+  margin-top: 120px;
   padding: 0 16px;
   width: 100%;
 }
-.comfortable-table th, .comfortable-table td {
-  font-size: 13px;
-  padding: 6px 12px;
+.comfortable-table {
+  border-collapse: separate;
+  border-spacing: 0 6px;
 }
+
+.comfortable-table th {
+  font-size: 13px;
+  font-weight: 600;
+  background: #f0f2f5;
+  border: none;
+  color: #333;
+}
+
+.comfortable-table td {
+  background: #fff;
+  vertical-align: middle;
+  border: none;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.comfortable-table tbody tr:hover td {
+  background-color: #f1f2f5;
+}
+
 .comfortable-table .btn {
   font-size: 12px;
   padding: 4px 10px;
+  border-radius: 0.5rem;
 }
 .comfortable-table thead th {
   position: sticky;
@@ -58,6 +97,17 @@
   font-weight: 500;
   font-size: 0.97rem;
 }
+.btn {
+  color: #222 !important;
+}
+.btn:hover {
+  color: #000 !important;
+}
+.btn-outline-dark:hover {
+  background-color: #e4e6e9;
+  color: #111;
+  border-color: #bbb;
+}
 </style>
 <div class="fixed-inventory-header">
   <div class="container-fluid">
@@ -68,11 +118,11 @@
         </h2>
       </div>
       <div class="col-auto inventory-actions align-items-center">
-        <a href="{{ url_for('stock_bp.export_instances', **request.args) }}" class="btn btn-success btn-lg rounded-pill">Export to Excel</a>
-        <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-warning btn-lg rounded-pill">
-          <i class="bi bi-upc-scan me-1"></i>Scan & Assign/Move
+        <a href="{{ url_for('stock_bp.export_instances', **request.args) }}" class="btn btn-outline-dark btn-lg rounded-pill">Export to Excel</a>
+        <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-outline-primary btn-lg rounded-pill">
+          Move Units
         </a>
-        <a href="{{ url_for('stock_bp.bin_lookup') }}" class="btn btn-info btn-lg rounded-pill">
+        <a href="{{ url_for('stock_bp.bin_lookup') }}" class="btn btn-outline-secondary btn-lg rounded-pill">
           <i class="bi bi-upc-scan me-1"></i>Scan/Lookup Bin
         </a>
       </div>
@@ -80,8 +130,9 @@
   </div>
 </div>
 <div class="inventory-main-content">
-  <div class="instances-card">
-    <form method="get" class="row g-2 mb-4">
+  <div class="instances-card mt-4">
+    <p class="text-muted small mb-3">    
+  <form method="get" class="row g-2 mb-4">
       <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="status" class="form-select rounded-pill" onchange="this.form.submit()">
           <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
@@ -120,77 +171,83 @@
         <input type="text" name="bin_search" value="{{ request.args.get('bin_search', '') }}" class="form-control rounded-pill" placeholder="Search Bin #...">
       </div>
       <div class="col-12 col-md-auto d-flex gap-2 align-items-end">
-        <button class="btn btn-outline-primary rounded-pill btn-lg" type="submit">Apply Filters</button>
-        <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-outline-secondary rounded-pill btn-lg">Clear Filters</a>
+        <button class="btn btn-outline-primary rounded-pill shadow-sm" type="submit" style="min-height: 42px;">Apply Filters</button>
+        <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-outline-secondary rounded-pill shadow-sm" style="min-height: 42px;">Clear Filters</a>
       </div>
     </form>
-    <div class="mb-3 text-end">
+    <div class="mb-2 text-start">
       <strong>{{ instances|length }} item{{ 's' if instances|length != 1 else '' }} found</strong>
     </div>
     <form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form">
-      <div class="mb-2">
-        <button type="submit" class="btn btn-dark rounded-pill batch-action-bar">🖨️ Print Selected Labels</button>
+      <div class="mb-2 w-100">
+        <button type="submit" class="btn btn-outline-dark rounded-pill batch-action-bar">🖨️ Print Selected Labels</button>
       </div>
       <div style="overflow-x:auto;">
+        {% set column_order = (settings.column_order_instance_table or '').split(',') %}
         <table class="table table-striped comfortable-table">
           <thead>
             <tr>
-              <th>
-                <input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked;">
-              </th>
-              <th>Serial</th>
-              <th>Product</th>
-              <th>Model</th>
-              <th class="d-none d-md-table-cell">Vendor</th>
-              <th>Status</th>
-              <th>Process Stage</th>
-              <th>Team</th>
-              <th>Location</th>
-              <th>Shelf/Bin</th>
-              <th class="d-none d-md-table-cell">RAM</th>
-              <th class="d-none d-md-table-cell">Processor</th>
-              <th class="d-none d-md-table-cell">Storage</th>
-              <th class="d-none d-md-table-cell">Screen Size</th>
-              <th class="d-none d-md-table-cell">Resolution</th>
-              <th class="d-none d-md-table-cell">Grade</th>
-              <th class="d-none d-md-table-cell">Video Card</th>
-              <th class="d-none d-md-table-cell">Is Sold</th>
-              <th class="d-none d-md-table-cell" style="width:100px;">Label</th>
-              <th>Action</th>
+              <th><input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked;"></th>
+              {% for key in column_order %}
+                {% if settings['show_column_' ~ key] == 'true' %}
+                  <th>{{ settings['label_' ~ key]|default(key|replace('_', ' ')|title) }}</th>
+                {% endif %}
+              {% endfor %}
             </tr>
           </thead>
           <tbody>
             {% for i in instances %}
               <tr>
-                <td>
-                  <input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}">
-                </td>
-                <td>{{ i.serial_number }}</td>
-                <td>{{ i.product.name if i.product else '' }}</td>
-                <td>{{ i.product.model_number if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
-                <td>{{ i.status }}</td>
-                <td>{{ i.process_stage or '' }}</td>
-                <td>{{ i.team_assigned or '' }}</td>
-                <td>{{ i.location.name if i.location else '' }}</td>
-                <td>{{ i.shelf_bin or '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.ram if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.processor if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.storage if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.screen_size if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.resolution if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.grade if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ i.product.video_card if i.product else '' }}</td>
-                <td class="d-none d-md-table-cell">{{ 'Yes' if i.is_sold else 'No' }}</td>
-                <td class="d-none d-md-table-cell">
-                  <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
-                    class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">
-                    🖨️ Print Label
-                  </a>
-                </td>
-                <td>
-                  <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
-                </td>
+                <td><input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}"></td>
+                {% for key in column_order %}
+                  {% if settings['show_column_' ~ key] == 'true' %}
+                    {% if key == 'asset' %}
+                      <td>{{ i.asset }}</td>
+                    {% elif key == 'serial' %}
+                      <td>{{ i.serial }}</td>
+                    {% elif key == 'item_name' %}
+                      <td>{{ i.product.item_name if i.product else '' }}</td>
+                    {% elif key == 'make' %}
+                      <td>{{ i.product.make if i.product else '' }}</td>
+                    {% elif key == 'model' %}
+                      <td>{{ i.product.model if i.product else '' }}</td>
+                    {% elif key == 'cpu' %}
+                      <td>{{ i.product.cpu if i.product else '' }}</td>
+                    {% elif key == 'ram' %}
+                      <td>{{ i.product.ram if i.product else '' }}</td>
+                    {% elif key == 'gpu1' %}
+                      <td>{{ i.product.gpu1 if i.product else '' }}</td>
+                    {% elif key == 'gpu2' %}
+                      <td>{{ i.product.gpu2 if i.product else '' }}</td>
+                    {% elif key == 'display' %}
+                      <td>{{ i.product.display if i.product else '' }}</td>
+                    {% elif key == 'disk1size' %}
+                      <td>{{ i.product.disk1size if i.product else '' }}</td>
+                    {% elif key == 'grade' %}
+                      <td>{{ i.product.grade if i.product else '' }}</td>
+                    {% elif key == 'location' %}
+                      <td>{{ i.location.name if i.location else '' }}</td>
+                    {% elif key == 'status' %}
+                      <td>{{ i.status }}</td>
+                    {% elif key == 'process_stage' %}
+                      <td>{{ i.process_stage or '' }}</td>
+                    {% elif key == 'team_assigned' %}
+                      <td>{{ i.team_assigned or '' }}</td>
+                    {% elif key == 'shelf_bin' %}
+                      <td>{{ i.shelf_bin or '' }}</td>
+                    {% elif key == 'is_sold' %}
+                      <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
+                    {% elif key == 'label' %}
+                      <td>
+                        <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">🖨️ Print Label</a>
+                      </td>
+                    {% elif key == 'action' %}
+                      <td>
+                        <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
+                      </td>
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
               </tr>
             {% endfor %}
           </tbody>
@@ -230,3 +287,7 @@
   });
 </script>
 {% endblock %}
+.sidebar .nav-link:hover {
+  background-color: #f1f2f5;
+  color: #000;
+}

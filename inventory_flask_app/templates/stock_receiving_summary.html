@@ -2,6 +2,7 @@
 {% block title %}Receiving Summary{% endblock %}
 
 {% block content %}
+<div class="container my-4">
 <h3 class="mb-4">
   📋 Receiving Summary for PO: {{ po.po_number }}
   <small class="text-muted ms-2">(Internal ID: {{ po.id }})</small>
@@ -16,32 +17,50 @@
   </div>
 </div>
 
-<div style="overflow-x:auto;">
-<table class="table table-bordered table-hover">
+<div class="table-responsive">
+<table class="table table-bordered table-hover table-sm align-middle">
   <thead class="table-light">
     <tr>
-      <th>#</th>
-      <th>Serial</th>
-      <th>Model</th>
-      <th>Processor</th>
-      <th>RAM</th>
-      <th>Grade</th>
-      <th>Storage</th>
-      <th>Status</th>
-      <th>Label</th>
+      <th class="text-center text-nowrap">#</th>
+      <th class="text-nowrap">Asset</th>
+      <th class="text-nowrap">Serial</th>
+      <th class="text-nowrap">Item Name</th>
+      <th class="text-nowrap">Make</th>
+      <th class="text-nowrap">Model</th>
+      <th class="text-nowrap">CPU</th>
+      <th class="text-nowrap">RAM</th>
+      <th class="text-nowrap">Grade</th>
+      <th class="text-nowrap">Display</th>
+      <th class="text-nowrap">GPU 1</th>
+      <th class="text-nowrap">GPU 2</th>
+      <th class="text-nowrap">Location</th>
+      <th class="text-nowrap">Status</th>
+      <th class="text-nowrap">Label</th>
     </tr>
   </thead>
   <tbody>
     {% for item in serials %}
     <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ item.serial_number }}</td>
-      <td>{{ item.model_number }}</td>
-      <td>{{ item.processor }}</td>
-      <td>{{ item.ram }}</td>
-      <td>{{ item.grade }}</td>
-      <td>{{ item.storage }}</td>
-      <td>
+      <td class="text-center text-nowrap">{{ loop.index }}</td>
+      <td class="text-nowrap">{{ item.asset }}</td>
+      <td class="text-nowrap">{{ item.serial }}</td>
+      <td class="text-nowrap">{{ item.item_name }}</td>
+      <td class="text-nowrap">{{ item.make }}</td>
+      <td class="text-nowrap">{{ item.model }}</td>
+      <td class="text-nowrap">{{ item.cpu }}</td>
+      <td class="text-nowrap">{{ item.ram }}</td>
+      <td class="text-nowrap">{{ item.grade }}</td>
+      <td class="text-nowrap">{{ item.display }}</td>
+      <td class="text-nowrap">{{ item.gpu1 }}</td>
+      <td class="text-nowrap">{{ item.gpu2 }}</td>
+      <td class="text-nowrap">
+        {% if item.location_id %}
+          <a href="{{ url_for('stock_bp.add_location') }}" class="text-decoration-underline">{{ item.location }}</a>
+        {% else %}
+          {{ item.location or '' }}
+        {% endif %}
+      </td>
+      <td class="text-nowrap">
         {% if item.match_status == 'Matched' %}
           <span class="badge bg-success">Matched</span>
         {% elif item.match_status == 'Extra' %}
@@ -52,12 +71,10 @@
           <span class="badge bg-secondary">Unknown</span>
         {% endif %}
       </td>
-      <td>
+      <td class="text-nowrap">
         {% if item.match_status == 'Matched' and item.instance_id %}
           <a href="{{ url_for('stock_bp.print_label', instance_id=item.instance_id) }}"
-             class="btn btn-sm btn-outline-dark" target="_blank">
-            🖨️ Print Label
-          </a>
+             class="btn btn-sm btn-outline-dark" target="_blank">🖨️ Print Label</a>
         {% endif %}
       </td>
     </tr>
@@ -66,7 +83,11 @@
 </table>
 </div>
 
-<a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary btn-lg w-100 mt-2">⬅ Back to Scan</a>
+
+<div class="d-grid gap-2 d-md-flex justify-content-md-between mt-3">
+  <a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary btn-lg w-100">⬅ Back to Scan</a>
+</div>
+
 
 <form method="POST" action="{{ url_for('stock_bp.stock_receiving_confirm') }}">
   <div class="mb-3 mt-4">
@@ -79,6 +100,16 @@
       <option value="sold">Sold</option>
     </select>
   </div>
+  <div class="mb-3 mt-3">
+    <label for="location_choice" class="form-label fw-bold">Place imported items in location:</label>
+    <select name="location_choice" id="location_choice" class="form-select form-select-lg" required>
+      <option value="">-- Select Location --</option>
+      {% for location in locations %}
+        <option value="{{ location.id }}">{{ location.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <button type="submit" class="btn btn-success btn-lg w-100 mt-2">✅ Import Matched Items</button>
 </form>
+</div>
 {% endblock %}

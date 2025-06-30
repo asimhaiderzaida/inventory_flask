@@ -1,41 +1,52 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Export Inventory</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <title>Export Inventory</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-4">
-        <h2>📦 Export Inventory</h2>
-        <form method="POST" action="/inventory/export_excel">
-            <div class="mb-3">
-                <label>Filter by Model:</label>
-                <input type="text" name="model_number" class="form-control form-control-lg">
-            </div>
-
-            <div class="mb-3">
-                <label>Filter by Processor:</label>
-                <input type="text" name="processor" class="form-control form-control-lg">
-            </div>
-
-            <div class="mb-3">
-                <label>Filter by Video Card:</label>
-                <input type="text" name="video_card" class="form-control form-control-lg">
-            </div>
-
-            <div class="mb-3">
-                <label>From Date:</label>
-                <input type="date" name="from_date" class="form-control form-control-lg">
-            </div>
-
-            <div class="mb-3">
-                <label>To Date:</label>
-                <input type="date" name="to_date" class="form-control form-control-lg">
-            </div>
-
-            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">Export Excel</button>
-        </form>
-        <a href="/main_dashboard" class="btn btn-outline-secondary btn-lg w-100 mt-2">← Back to Dashboard</a>
+  <div class="container py-5">
+    <div class="card shadow-sm rounded-4 p-4" style="max-width: 640px; margin: 0 auto;">
+      <h2 class="mb-3 fw-bold text-primary">
+        <i class="bi bi-box-arrow-up-right me-2"></i>Export Inventory
+      </h2>
+      <p class="text-muted mb-4">Use the filters below to export specific inventory records to Excel.</p>
+      <form method="POST" action="/inventory/export_excel">
+        <div class="mb-3">
+          <label class="form-label">Filter by Model:</label>
+          <input type="text" name="model" class="form-control form-control-lg rounded-pill">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Filter by Asset Tag:</label>
+          <input type="text" name="asset_tag" class="form-control form-control-lg rounded-pill">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Filter by Processor:</label>
+          <input type="text" name="processor" class="form-control form-control-lg rounded-pill">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Filter by GPU 1:</label>
+          <input type="text" name="gpu1" class="form-control form-control-lg rounded-pill">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">From Date:</label>
+          <input type="date" name="from_date" class="form-control form-control-lg rounded-pill">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">To Date:</label>
+          <input type="date" name="to_date" class="form-control form-control-lg rounded-pill">
+        </div>
+        <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill mt-2">
+          <i class="bi bi-download me-1"></i>Export Excel
+        </button>
+      </form>
+      <a href="/main_dashboard" class="btn btn-outline-secondary btn-lg w-100 rounded-pill mt-3">
+        ← Back to Dashboard
+      </a>
     </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

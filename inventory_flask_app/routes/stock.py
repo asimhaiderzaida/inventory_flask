@@ -1,26 +1,30 @@
+from datetime import timedelta
 import qrcode
 from io import BytesIO
 import base64
 from inventory_flask_app.utils.utils import get_instance_id
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, make_response
-from flask_login import login_required
+from flask_login import login_required, current_user
 from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location
 from inventory_flask_app.models import CustomerOrderTracking
 from flask import jsonify
 from sqlalchemy.orm import aliased
 from datetime import datetime
+from inventory_flask_app.utils import get_now_for_tenant
 import csv
 from io import StringIO
-
+from inventory_flask_app import csrf
 
 stock_bp = Blueprint('stock_bp', __name__, url_prefix='/stock')
 
 # Simple stock_intake page route
+@csrf.exempt
 @stock_bp.route('/stock_intake')
 @login_required
 def stock_intake():
     return render_template('stock_intake.html')
 
+@csrf.exempt
 @stock_bp.route('/purchase_order/create', methods=['GET', 'POST'])
 @login_required
 def create_purchase_order():
@@ -32,7 +36,7 @@ def create_purchase_order():
             flash("PO Number, Vendor and Excel file are required.", "danger")
             return redirect(url_for('stock_bp.create_purchase_order'))
 
-        existing_po = PurchaseOrder.query.filter_by(po_number=po_number).first()
+        existing_po = PurchaseOrder.query.filter_by(po_number=po_number, tenant_id=current_user.tenant_id).first()
         if existing_po:
             flash(f"PO Number '{po_number}' already exists. Please use a unique PO Number.", "danger")
             return redirect(url_for('stock_bp.create_purchase_order'))
@@ -44,38 +48,50 @@ def create_purchase_order():
             flash(f"❌ Could not read Excel file: {e}", "danger")
             return redirect(url_for('stock_bp.create_purchase_order'))
 
-        required_columns = ['serial_number', 'model_number']
+        # Use unified product structure columns
+        required_columns = ['serial', 'asset', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'grade']
+        # Clean columns before checking
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+        # Drop any unexpected/legacy fields (e.g., screen_size)
+        df = df.drop(columns=['screen_size'], errors='ignore')
+        # Keep only required columns (ignore extra columns)
+        df = df[[col for col in df.columns if col in required_columns]]
+        # Ensure all required columns are present
         if not all(col in df.columns for col in required_columns):
-            flash("Excel must include 'serial_number' and 'model_number'", "danger")
+            flash("Excel must include columns: 'serial', 'asset', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'grade'", "danger")
             return redirect(url_for('stock_bp.create_purchase_order'))
 
-        serials = [str(s).strip() for s in df['serial_number'].dropna()]
+        serials = [str(s).strip() for s in df['serial'].dropna()]
         if not serials:
-            flash("No valid serial numbers found in Excel.", "warning")
+            flash("No valid serial found in Excel.", "warning")
             return redirect(url_for('stock_bp.create_purchase_order'))
 
         po = PurchaseOrder(po_number=po_number, vendor_id=int(vendor_id), expected_serials=",".join(serials))
+        # --- Tenant scoping ---
+        po.tenant_id = current_user.tenant_id
+        # ----------------------
         db.session.add(po)
         db.session.commit()
         session['po_id'] = po.id
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         session['po_spec_data'] = df.to_dict(orient='records')
         flash(f"✅ PO {po.po_number} (ID #{po.id}) created with {len(serials)} serials.", "success")
         return redirect(url_for('stock_bp.create_purchase_order'))
     vendors = Vendor.query.all()
-    print("Vendors in PO:", [v.name for v in vendors])
-    return render_template('create_purchase_order.html', vendors=vendors)
+    locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
+    return render_template('create_purchase_order.html', vendors=vendors, locations=locations)
 
+@csrf.exempt
 @stock_bp.route('/stock_receiving/select', methods=['GET', 'POST'])
 @login_required
 def stock_receiving_select():
     po_list = PurchaseOrder.query.filter(
         PurchaseOrder.po_number.isnot(None),
-        PurchaseOrder.status == "pending"
+        PurchaseOrder.status == "pending",
+        PurchaseOrder.tenant_id == current_user.tenant_id
     ).all()
     if request.method == 'POST':
         po_number = request.form.get('po_number')
-        po = PurchaseOrder.query.filter_by(po_number=po_number).first()
+        po = PurchaseOrder.query.filter_by(po_number=po_number, tenant_id=current_user.tenant_id).first()
         if not po:
             flash("Purchase Order not found.", "danger")
             return redirect(url_for('stock_bp.stock_receiving_select'))
@@ -85,6 +101,7 @@ def stock_receiving_select():
         return redirect(url_for('stock_bp.stock_receiving_scan'))
     return render_template('stock_receiving_select.html', po_list=po_list)
 
+@csrf.exempt
 @stock_bp.route('/stock_receiving/scan', methods=['GET', 'POST'])
 @login_required
 def stock_receiving_scan():
@@ -92,27 +109,73 @@ def stock_receiving_scan():
     if not po_id:
         flash("PO not found in session.", "danger")
         return redirect(url_for('dashboard_bp.main_dashboard'))
-    po = PurchaseOrder.query.get(po_id)
+    po = PurchaseOrder.query.filter_by(id=po_id, tenant_id=current_user.tenant_id).first_or_404()
     expected_serials = [s.strip() for s in po.expected_serials.split(',') if s.strip()]
-    scanned = session.get('scanned', [])
+    scanned = list(set(session.get('scanned', [])))  # Ensure uniqueness
+
     if request.method == 'POST':
-        serial = request.form.get('serial_input', '').strip()
-        if serial:
-            scanned.append(serial)
+        # Support resetting scanned items
+        if request.form.get("reset_scanned") == "1":
+            session['scanned'] = []
+            flash("Scanned list has been cleared.", "info")
+            return redirect(url_for('stock_bp.stock_receiving_scan'))
+        serial_input = request.form.get('serial_input', '').strip()
+        if serial_input and serial_input not in scanned:
+            scanned.append(serial_input)
             session['scanned'] = scanned
-    matched = list(set(expected_serials) & set(scanned))
-    extra = list(set(scanned) - set(expected_serials))
-    missing = list(set(expected_serials) - set(scanned))
+
+    # Matching logic: allow scanning serial or asset, and map asset to correct serial for PO logic
+    po_spec_data = session.get('po_spec_data', [])
+    asset_to_serial = {
+        str(row.get('asset')).strip(): str(row.get('serial')).strip()
+        for row in po_spec_data
+    }
+
+    matched_serials = set()
+    # The following block is refactored to ensure full row data is passed for all scanned items:
+    po_spec_data = session.get('po_spec_data', [])
+    scanned_rows = []
+
+    for s in scanned:
+        s_clean = s.strip()
+        matched_serial = None
+        if s_clean in expected_serials:
+            matched_serial = s_clean
+        elif s_clean in asset_to_serial:
+            matched_serial = asset_to_serial[s_clean]
+
+        if matched_serial:
+            row = next((r for r in po_spec_data if str(r.get('serial')).strip() == matched_serial), None)
+            if row:
+                row['serial'] = row.get('serial', '')
+                row['asset'] = row.get('asset', '')
+                scanned_rows.append(row)
+        else:
+            scanned_rows.append({'serial': s_clean, 'asset': '', 'status': 'extra'})
+
+    # Compute matched, extra, missing using the original logic:
+    matched = []
+    for s in scanned:
+        s_clean = s.strip()
+        if s_clean in expected_serials:
+            matched.append(s_clean)
+        elif s_clean in asset_to_serial:
+            matched.append(asset_to_serial[s_clean])
+    matched = list(set(matched))
+    extra = [s for s in scanned if s not in expected_serials and s not in asset_to_serial]
+    missing = list(set(expected_serials) - set(matched))
+
     return render_template(
         'stock_receiving_scan.html',
         po=po,
         matched=matched,
         extra=extra,
         missing=missing,
-        scanned=scanned,
+        scanned=scanned_rows,
         total_expected=len(expected_serials)
     )
 
+@csrf.exempt
 @stock_bp.route('/stock_receiving/summary')
 @login_required
 def stock_receiving_summary():
@@ -120,17 +183,26 @@ def stock_receiving_summary():
     if not po_id:
         flash("PO session missing.", "danger")
         return redirect(url_for('dashboard_bp.main_dashboard'))
-    po = PurchaseOrder.query.get(po_id)
+    po = PurchaseOrder.query.filter_by(id=po_id, tenant_id=current_user.tenant_id).first_or_404()
     expected_serials = [s.strip() for s in po.expected_serials.split(',') if s.strip()]
     scanned = session.get('scanned', [])
-    matched = list(set(expected_serials) & set(scanned))
-    extra = list(set(scanned) - set(expected_serials))
-    missing = list(set(expected_serials) - set(scanned))
     spec_data = session.get('po_spec_data', [])
-    print("spec_data in session:", spec_data)
+    asset_to_serial = {
+        str(row.get('asset')).strip(): str(row.get('serial')).strip()
+        for row in spec_data
+    }
+    scanned_serials = set()
+    for s in scanned:
+        if s in expected_serials:
+            scanned_serials.add(s)
+        elif s in asset_to_serial:
+            scanned_serials.add(asset_to_serial[s])
+    matched = list(scanned_serials & set(expected_serials))
+    extra = [s for s in scanned if s not in expected_serials and s not in asset_to_serial]
+    missing = list(set(expected_serials) - scanned_serials)
     full_table = []
     for row in spec_data:
-        serial = str(row.get('serial_number')).strip()
+        serial = str(row.get('serial')).strip()
         status = (
             "Matched" if serial in matched else
             "Extra" if serial in extra else
@@ -138,17 +210,24 @@ def stock_receiving_summary():
         )
         row['match_status'] = status
         instance_id = get_instance_id(serial)
-        print(f"Serial: {serial}  -->  Instance ID: {instance_id}")
         row['instance_id'] = instance_id
         full_table.append(row)
     matched_count = len([s for s in full_table if s['match_status'] == 'Matched'])
     extra_count = len([s for s in full_table if s['match_status'] == 'Extra'])
     missing_count = len([s for s in full_table if s['match_status'] == 'Missing'])
     total_count = len(full_table)
-    return render_template('stock_receiving_summary.html', po=po, serials=full_table,
-                           matched_count=matched_count, extra_count=extra_count,
-                           missing_count=missing_count, total_count=total_count,
-                           get_instance_id=get_instance_id)
+    locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
+    return render_template(
+        'stock_receiving_summary.html',
+        po=po,
+        serials=full_table,
+        matched_count=matched_count,
+        extra_count=extra_count,
+        missing_count=missing_count,
+        total_count=total_count,
+        get_instance_id=get_instance_id,
+        locations=locations
+    )
 
 def export_csv(data, columns, filename):
     output = StringIO()
@@ -161,6 +240,7 @@ def export_csv(data, columns, filename):
     response.headers['Content-Type'] = 'text/csv'
     return response
 
+@csrf.exempt
 @stock_bp.route('/stock_receiving/export/<category>')
 @login_required
 def stock_receiving_export(category):
@@ -176,86 +256,102 @@ def stock_receiving_export(category):
     if not export_rows:
         flash(f"No rows found for category '{category}'", "info")
         return redirect(url_for('stock_bp.stock_receiving_summary'))
-    columns = list(export_rows[0].keys())
+    columns = ['serial', 'asset', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'grade', 'match_status']
     filename = f'{category}_serials_export.csv'
     return export_csv(export_rows, columns, filename)
 
+@csrf.exempt
 @stock_bp.route('/stock_receiving/confirm', methods=['POST'])
 @login_required
 def stock_receiving_confirm():
     po_id = session.get('po_id')
-    matched = session.get('scanned', [])
+    scanned = session.get('scanned', [])
     spec_data = session.get('po_spec_data', [])
     status_choice = request.form.get('status_choice')
-    if not po_id or not matched:
+    location_id = request.form.get('location_choice')
+
+    if not po_id or not scanned:
         flash("Session expired or invalid.", "error")
         return redirect(url_for('dashboard_bp.main_dashboard'))
     if not status_choice:
         flash("Please select a status before importing.", "danger")
         return redirect(url_for('stock_bp.stock_receiving_summary'))
+
     allowed_statuses = ['unprocessed', 'under_process', 'processed', 'sold']
     if status_choice not in allowed_statuses:
         flash("Invalid status selected.", "danger")
         return redirect(url_for('stock_bp.stock_receiving_summary'))
-    po = PurchaseOrder.query.get(po_id)
+
+    po = PurchaseOrder.query.filter_by(id=po_id, tenant_id=current_user.tenant_id).first_or_404()
+    if po.tenant_id != current_user.tenant_id:
+        flash("Unauthorized PO access.", "danger")
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    matched_serials = set()
+    asset_to_serial = {str(row.get('asset')).strip(): str(row.get('serial')).strip() for row in spec_data}
+    expected_serials = [str(row.get('serial')).strip() for row in spec_data]
+
+    for s in scanned:
+        if s in expected_serials:
+            matched_serials.add(s)
+        elif s in asset_to_serial:
+            matched_serials.add(asset_to_serial[s])
+
     imported = 0
-    for serial in matched:
+    for serial in matched_serials:
         serial = serial.strip()
-        if ProductInstance.query.filter_by(serial_number=serial).first():
+        if ProductInstance.query.filter_by(serial=serial).first():
             flash(f"⚠️ Serial {serial} already exists in inventory and was skipped.", "warning")
             continue
-        row = next((item for item in spec_data if str(item.get('serial_number')).strip() == serial), None)
+        row = next((item for item in spec_data if str(item.get('serial')).strip() == serial), None)
         if not row:
             continue
         product = Product.query.filter_by(
-            model_number=row.get('model_number'),
-            vendor_id=po.vendor_id,
-            processor=row.get('processor'),
+            model=row.get('model'),
+            make=row.get('make'),
+            cpu=row.get('cpu'),
             ram=row.get('ram'),
-            storage=row.get('storage'),
-            screen_size=row.get('screen_size'),
-            resolution=row.get('resolution'),
+            disk1size=row.get('disk1size'),
+            display=row.get('display'),
+            gpu1=row.get('gpu1'),
+            gpu2=row.get('gpu2'),
             grade=row.get('grade'),
-            video_card=row.get('video_card')
+            tenant_id=current_user.tenant_id,
+            vendor_id=po.vendor_id
         ).first()
         if not product:
             product = Product(
-                name=row.get('product_name') or "Imported Product",
-                model_number=row.get('model_number'),
-                barcode=serial,
-                vendor_id=po.vendor_id,
-                processor=row.get('processor'),
+                item_name=row.get('item_name') or "Imported Product",
+                model=row.get('model'),
+                make=row.get('make'),
+                cpu=row.get('cpu'),
                 ram=row.get('ram'),
-                storage=row.get('storage'),
-                screen_size=row.get('screen_size'),
-                resolution=row.get('resolution'),
+                disk1size=row.get('disk1size'),
+                display=row.get('display'),
+                gpu1=row.get('gpu1'),
+                gpu2=row.get('gpu2'),
                 grade=row.get('grade'),
-                video_card=row.get('video_card'),
-                purchase_price=row.get('purchase_price') or 0,
-                selling_price=row.get('selling_price') or 0,
+                vendor_id=po.vendor_id,
+                tenant_id=current_user.tenant_id,
                 stock=0,
-                location_id=None,
-                is_damaged=False
+                created_at=get_now_for_tenant()
             )
             db.session.add(product)
             db.session.flush()
-        else:
-            # Update product name if it's still the default and new import has a name
-            if product.name == "Imported Product" and row.get('product_name'):
-                product.name = row.get('product_name')
-                db.session.add(product)
-                db.session.flush()
+
         instance = ProductInstance(
             product_id=product.id,
             serial_number=serial,
+            asset_tag=row.get('asset'),
             status=status_choice,
-            location_id=product.location_id,
+            location_id=int(location_id) if location_id else product.location_id,
+            tenant_id=current_user.tenant_id,
             po_id=po.id
         )
         db.session.add(instance)
         imported += 1
+
     from inventory_flask_app.models import POImportLog
-    from flask_login import current_user
     log = POImportLog(
         po_id=po_id,
         user_id=current_user.id,
@@ -263,7 +359,6 @@ def stock_receiving_confirm():
         quantity=imported
     )
     db.session.add(log)
-    # Set PO status to "received" before committing
     po.status = "received"
     db.session.commit()
     flash(f"✅ {imported} matched units imported as '{status_choice}'.", "success")
@@ -273,6 +368,7 @@ def stock_receiving_confirm():
     return redirect(url_for('dashboard_bp.main_dashboard'))
 
 
+@csrf.exempt
 @stock_bp.route('/api/model_suggestions')
 @login_required
 def model_suggestions():
@@ -281,21 +377,22 @@ def model_suggestions():
         return jsonify([])
     # Query distinct models that contain the substring, case-insensitive
     models = (
-        db.session.query(Product.model_number)
-        .filter(Product.model_number.ilike(f"%{q}%"))
+        db.session.query(Product.model)
+        .filter(Product.model.ilike(f"%{q}%"))
         .distinct()
-        .order_by(Product.model_number)
+        .order_by(Product.model)
         .limit(15)
         .all()
     )
-    # Return just the list of model numbers
+    # Return just the list of model names
     return jsonify([m[0] for m in models if m[0]])
 
 # Batch label printing route
+@csrf.exempt
 @stock_bp.route('/print_labels_batch', methods=['POST'])
 @login_required
 def print_labels_batch():
-    from datetime import datetime
+    # from datetime import datetime
     ids = request.form.getlist('instance_ids')
     if not ids:
         flash("No items selected for label printing.", "warning")
@@ -306,12 +403,18 @@ def print_labels_batch():
     batch_labels = []
     for instance in instances:
         qr_data = {
-            "serial": instance.serial_number,
-            "model": instance.product.model_number if instance.product else "",
-            "cpu": instance.product.processor if instance.product else "",
+            "asset": instance.asset if instance else "",
+            "serial": instance.serial if instance else "",
+            "item_name": instance.product.item_name if instance.product else "",
+            "make": instance.product.make if instance.product else "",
+            "model": instance.product.model if instance.product else "",
+            "display": instance.product.display if instance.product else "",
+            "cpu": instance.product.cpu if instance.product else "",
             "ram": instance.product.ram if instance.product else "",
-            "storage": instance.product.storage if instance.product else "",
-            "vendor": instance.product.vendor.name if instance.product and instance.product.vendor else "",
+            "gpu1": instance.product.gpu1 if instance.product else "",
+            "gpu2": instance.product.gpu2 if instance.product else "",
+            "grade": instance.product.grade if instance.product else "",
+            "disk1size": instance.product.disk1size if instance.product else "",
         }
         qr = qrcode.QRCode(version=1, box_size=10, border=2)
         qr.add_data(qr_data)
@@ -323,10 +426,11 @@ def print_labels_batch():
         batch_labels.append({
             "instance": instance,
             "qr_b64": qr_b64,
-            "printed_time": datetime.now(),
+            "printed_time": get_now_for_tenant(),
         })
     return render_template("batch_print_labels.html", batch_labels=batch_labels)
 
+@csrf.exempt
 @stock_bp.route('/under_process', methods=['GET', 'POST'])
 @login_required
 def under_process():
@@ -368,7 +472,11 @@ def under_process():
     if processor_filter:
         query = query.filter(Product.processor == processor_filter)
     if serial_search:
-        query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_search}%"))
+        from sqlalchemy import or_
+        query = query.filter(or_(
+            ProductInstance.serial.ilike(f"%{serial_search}%"),
+            ProductInstance.asset.ilike(f"%{serial_search}%")
+        ))
     if stage_filter:
         query = query.filter(ProductInstance.process_stage == stage_filter)
     if team_filter:
@@ -390,18 +498,54 @@ def under_process():
         (reserved_order.status.ilike('reserved'))
     ).filter(reserved_order.id == None)
 
+    # --- Tenant scoping: only show ProductInstances for current tenant ---
+    query = query.join(Product).filter(Product.tenant_id == current_user.tenant_id)
+    # --------------------------------------------------------------------
+
     instances = query.all()
-    all_models = list({i.product.model_number for i in instances if i.product and i.product.model_number})
-    all_processors = list({i.product.processor for i in instances if i.product and i.product.processor})
+    all_models = list({i.product.model for i in instances if i.product and i.product.model})
+    all_processors = list({i.product.cpu for i in instances if i.product and i.product.cpu})
     distinct_stages = db.session.query(ProductInstance.process_stage).distinct().all()
     distinct_teams = db.session.query(ProductInstance.team_assigned).distinct().all()
 
-    print("INSTANCES:", instances)
-    if instances:
-        print("First instance:", instances[0], "ID:", instances[0].id)
-    # Debug output for locations passed to template
-    locations_debug = Location.query.all()
-    print("DEBUG - locations passed to template:", [loc.name for loc in locations_debug])
+    # Debug output removed: no print statements for production
+
+    # --- Unified column structure logic ---
+    from inventory_flask_app.models import TenantSettings
+    # Load and correct column order
+    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings_dict = {s.key: s.value for s in tenant_settings}
+    column_order = settings_dict.get("column_order_instance_table")
+
+    # Unified structure
+    default_columns = [
+        "asset", "serial", "Item Name", "make", "model", "display", "cpu", "ram",
+        "gpu1", "gpu2", "Grade", "location", "status", "process_stage",
+        "team_assigned", "shelf_bin", "is_sold", "label", "action"
+    ]
+
+    # Replace outdated column names
+    if column_order:
+        for old, new in {
+            "model_number": "model",
+            "product": "Item Name",
+            "processor": "cpu",
+            "video_card": "gpu1",
+            "resolution": "display"
+        }.items():
+            column_order = column_order.replace(old, new)
+
+        existing = column_order.split(",")
+        for col in default_columns:
+            if col not in existing:
+                existing.append(col)
+        column_order = ",".join(existing)
+    else:
+        column_order = ",".join(default_columns)
+
+    settings_dict["column_order_instance_table"] = column_order
+    # --- END Unified column structure logic ---
+
     return render_template(
         'instance_table.html',
         instances=instances,
@@ -420,8 +564,10 @@ def under_process():
             else "Inventory"
         ),
         locations=Location.query.all(),
+        settings=settings_dict
     )
 
+@csrf.exempt
 @stock_bp.route('/process_stage/update', methods=['GET', 'POST'])
 @login_required
 def process_stage_update():
@@ -433,29 +579,44 @@ def process_stage_update():
         # Split serials by newline, comma, or space
         serials = [s.strip() for s in serials_raw.replace(',', ' ').replace('\n', ' ').split() if s.strip()]
         updated, not_found, no_change = 0, 0, 0
+        from sqlalchemy import or_
         for serial in serials:
-            instance = ProductInstance.query.filter_by(serial_number=serial).first()
+            # --- Tenant scoping: allow lookup by serial_number OR asset_tag for current tenant ---
+            instance = ProductInstance.query.join(Product).filter(
+                or_(
+                    ProductInstance.serial == serial,
+                    ProductInstance.asset == serial
+                ),
+                Product.tenant_id == current_user.tenant_id
+            ).first()
+            # -------------------------------------------------------------------------------
+            def _unified_product_dict(instance, prev_stage, serial, status_val):
+                return {
+                    "asset": instance.asset or (instance.product.asset if instance.product else ""),
+                    "serial": instance.serial or (instance.product.serial if instance.product else ""),
+                    "Item Name": instance.product.item_name if instance.product else "",
+                    "make": instance.product.make if instance.product else "",
+                    "model": instance.product.model if instance.product else "",
+                    "display": instance.product.display if instance.product else "",
+                    "cpu": instance.product.cpu if instance.product else "",
+                    "ram": instance.product.ram if instance.product else "",
+                    "gpu1": instance.product.gpu1 if instance.product else "",
+                    "gpu2": instance.product.gpu2 if instance.product else "",
+                    "Grade": instance.product.grade if instance.product else "",
+                    "disk1size": instance.product.disk1size if instance.product else "",
+                    "prev_stage": prev_stage,
+                    "instance_id": instance.id,
+                    "status": status_val
+                }
             if instance:
                 prev_stage = instance.process_stage or '-'
                 # Check if user is allowed to process this unit
                 if instance.assigned_to_user_id is not None and instance.assigned_to_user_id != current_user.id:
-                    results.append({
-                        'serial': serial,
-                        'instance_id': instance.id,
-                        'model': instance.product.model_number if instance.product else '',
-                        'prev_stage': prev_stage,
-                        'status': 'not_yours'
-                    })
+                    results.append(_unified_product_dict(instance, prev_stage, serial, "not_yours"))
                     continue
                 if instance.process_stage == process_stage and instance.team_assigned == team:
                     # No change needed
-                    results.append({
-                        'serial': serial,
-                        'instance_id': instance.id,
-                        'model': instance.product.model_number if instance.product else '',
-                        'prev_stage': prev_stage,
-                        'status': 'no_change'
-                    })
+                    results.append(_unified_product_dict(instance, prev_stage, serial, "no_change"))
                     no_change += 1
                 else:
                     instance.process_stage = process_stage
@@ -465,34 +626,52 @@ def process_stage_update():
                     instance.updated_at = datetime.utcnow()
                     instance.assigned_to_user_id = None  # <-- ensure ready for check-in
                     db.session.commit()
-                    results.append({
-                        'serial': serial,
-                        'instance_id': instance.id,
-                        'model': instance.product.model_number if instance.product else '',
-                        'prev_stage': prev_stage,
-                        'status': 'updated'
-                    })
+                    results.append(_unified_product_dict(instance, prev_stage, serial, "updated"))
                     updated += 1
             else:
+                # For not_found, no instance or product
                 results.append({
-                    'serial': serial,
-                    'model': '',
-                    'prev_stage': '-',
-                    'status': 'not_found'
+                    "asset": "",
+                    "serial": "",
+                    "Item Name": "",
+                    "make": "",
+                    "model": "",
+                    "display": "",
+                    "cpu": "",
+                    "ram": "",
+                    "gpu1": "",
+                    "gpu2": "",
+                    "Grade": "",
+                    "disk1size": "",
+                    "prev_stage": "-",
+                    "instance_id": "",
+                    "status": "not_found"
                 })
                 not_found += 1
         flash(f"{updated} updated, {no_change} already at stage, {not_found} not found.", "info")
-        # Add: Query my_units before rendering template
-        my_units = ProductInstance.query.filter_by(assigned_to_user_id=current_user.id, status='under_process').all()
+        # Add: Query my_units before rendering template (include all processing stages)
+        my_units = ProductInstance.query.filter(
+            ProductInstance.assigned_to_user_id == current_user.id,
+            ProductInstance.status.in_(['under_process', 'specs', 'qc', 'deployment', 'paint', 'processed'])
+        ).all()
         return render_template('process_stage_update.html', results=results, my_units=my_units)
     # GET: just show the empty form
-    my_units = ProductInstance.query.filter_by(assigned_to_user_id=current_user.id, status='under_process').all()
+    my_units = ProductInstance.query.filter(
+        ProductInstance.assigned_to_user_id == current_user.id,
+        ProductInstance.status.in_(['under_process', 'specs', 'qc', 'deployment', 'paint', 'processed'])
+    ).all()
     return render_template('process_stage_update.html', results=None, my_units=my_units)
 
+@csrf.exempt
 @stock_bp.route('/instance/<int:instance_id>/view_edit', methods=['GET', 'POST'])
 @login_required
 def view_edit_instance(instance_id):
-    instance = ProductInstance.query.get_or_404(instance_id)
+    # --- Tenant scoping: only allow view/edit of ProductInstances for current tenant ---
+    instance = ProductInstance.query.join(Product).filter(
+        ProductInstance.id == instance_id,
+        Product.tenant_id == current_user.tenant_id
+    ).first_or_404()
+    # --------------------------------------------------------------------
     allowed_statuses = ['unprocessed', 'under_process', 'processed', 'sold']
     if request.method == 'POST':
         # Allow editing status, team, and process stage
@@ -509,22 +688,37 @@ def view_edit_instance(instance_id):
     return render_template('view_edit_instance.html', instance=instance)
 
 # --- Unit history route ---
+@csrf.exempt
 @stock_bp.route('/unit_history/<serial>')
 @login_required
 def unit_history(serial):
-    instance = ProductInstance.query.filter_by(serial_number=serial).first_or_404()
+    from sqlalchemy import or_
+    instance = ProductInstance.query.join(Product).filter(
+        or_(
+            ProductInstance.serial == serial,
+            ProductInstance.asset == serial
+        ),
+        Product.tenant_id == current_user.tenant_id
+    ).first_or_404()
+    from inventory_flask_app.models import SaleTransaction, Customer
+    sale = SaleTransaction.query.filter_by(product_instance_id=instance.id).join(Customer).first()
     logs = ProductProcessLog.query.filter_by(product_instance_id=instance.id).order_by(ProductProcessLog.moved_at).all()
-    return render_template('unit_history.html', instance=instance, logs=logs)
+    return render_template('unit_history.html', instance=instance, logs=logs, sale=sale)
 
 # Delete ProductInstance route
-
+@csrf.exempt
 @stock_bp.route('/instance/<int:instance_id>/delete', methods=['POST'])
 @login_required
 def delete_instance(instance_id):
-    instance = ProductInstance.query.get_or_404(instance_id)
+    # --- Tenant scoping: only allow delete of ProductInstances for current tenant ---
+    instance = ProductInstance.query.join(Product).filter(
+        ProductInstance.id == instance_id,
+        Product.tenant_id == current_user.tenant_id
+    ).first_or_404()
+    # --------------------------------------------------------------------
     db.session.delete(instance)
     db.session.commit()
-    flash(f"Serial {instance.serial_number} deleted successfully.", "success")
+    flash(f"✅ Unit with serial '{instance.serial}' deleted successfully.", "success")
     return redirect(url_for('stock_bp.under_process'))
 
 # --- Check-in/Check-out route for processing table ---
@@ -533,15 +727,20 @@ from inventory_flask_app.models import ProductProcessLog
 
 
 # --- Improved Check-in/Check-out route with assignment logic ---
+@csrf.exempt
 @stock_bp.route('/checkin_checkout', methods=['POST'])
 @login_required
 def checkin_checkout():
     # Accept multiple IDs for batch processing
     instance_ids = request.form.getlist('instance_ids')
     action = request.form.get('action')
-    note = request.form.get('note', '')
+    # Per-instance notes: expect notes[<id>] in form
+    # Also support mark_idle_ids for moving to idle
+    notes_dict = request.form.to_dict(flat=False)
+    idle_ids = set(request.form.getlist('mark_idle_ids'))
 
-    if not instance_ids or not action:
+    # Also allow mark_idle_ids without action
+    if not instance_ids and not idle_ids:
         flash("Missing information for check-in/out.", "danger")
         return redirect(request.referrer or url_for('stock_bp.process_stage_update'))
 
@@ -549,30 +748,60 @@ def checkin_checkout():
 
     updated_count = 0
     skipped = 0
-    for instance_id in instance_ids:
-        instance = ProductInstance.query.get(instance_id)
+    # Combine all ids to process: those checked for instance selection or idle checkbox
+    all_ids = set(instance_ids).union(idle_ids)
+    for instance_id in all_ids:
+        # --- Tenant scoping: only allow update of ProductInstances for current tenant ---
+        instance = ProductInstance.query.join(Product).filter(
+            ProductInstance.id == instance_id,
+            Product.tenant_id == current_user.tenant_id
+        ).first()
+        # --------------------------------------------------------------------
         if not instance:
             continue
+        # Get per-instance note if present
+        note = request.form.get(f'notes[{instance_id}]', '')
+        # Move to idle if flagged (this check must come before anything else)
+        if str(instance_id) in idle_ids:
+            instance.status = "idle"
+            instance.assigned_to_user_id = None
+            instance.updated_at = get_now_for_tenant()
+            db.session.add(ProductProcessLog(
+                product_instance_id=instance.id,
+                from_stage=instance.process_stage,
+                to_stage="idle",
+                from_team=instance.team_assigned,
+                to_team=instance.team_assigned,
+                moved_by=current_user.id,
+                moved_at=get_now_for_tenant(),
+                action="moved_to_idle",
+                note=note
+            ))
+            updated_count += 1
+            flash(f"Unit '{instance.serial}' moved to idle.", "info")
+            continue
         if action == "check-in":
-            # Allow check-in if not assigned or already assigned to current user
-            if instance.assigned_to_user_id is None or instance.assigned_to_user_id == current_user.id:
-                instance.status = "under_process"
-                instance.assigned_to_user_id = current_user.id
-                log = ProductProcessLog(
-                    product_instance_id=instance.id,
-                    from_stage=instance.process_stage,
-                    to_stage=instance.process_stage,
-                    from_team=instance.team_assigned,
-                    to_team=instance.team_assigned,
-                    moved_by=current_user.id,
-                    moved_at=datetime.utcnow(),
-                    action=action,
-                    note=note
-                )
-                db.session.add(log)
-                updated_count += 1
-            else:
+            # Only allow check-in if not already checked in (assigned)
+            if instance.assigned_to_user_id:
+                # Already checked in, must be checked out first
                 skipped += 1
+                continue
+            instance.status = "under_process"
+            instance.assigned_to_user_id = current_user.id
+            log = ProductProcessLog(
+                product_instance_id=instance.id,
+                from_stage=instance.process_stage,
+                to_stage=instance.process_stage,
+                from_team=instance.team_assigned,
+                to_team=instance.team_assigned,
+                moved_by=current_user.id,
+                moved_at=get_now_for_tenant(),
+                action=action,
+                note=note
+            )
+            db.session.add(log)
+            updated_count += 1
+            flash(f"Unit '{instance.serial}' checked in.", "info")
         elif action == "check-out":
             # Only allow check-out for units assigned to the current user
             if instance.assigned_to_user_id == current_user.id:
@@ -585,25 +814,37 @@ def checkin_checkout():
                     from_team=instance.team_assigned,
                     to_team=instance.team_assigned,
                     moved_by=current_user.id,
-                    moved_at=datetime.utcnow(),
+                    moved_at=get_now_for_tenant(),
                     action=action,
                     note=note
                 )
                 db.session.add(log)
                 updated_count += 1
+                flash(f"Unit '{instance.serial}' checked out.", "info")
             else:
                 skipped += 1
     db.session.commit()
-    msg = f"{action.capitalize()} successful for {updated_count} unit(s)."
+    msg = f"✅ {action.capitalize()} complete: {updated_count} unit(s) updated."
     if skipped:
-        msg += f" {skipped} unit(s) skipped (not permitted)."
+        msg += f" {skipped} skipped (not permitted)."
     flash(msg, "success" if updated_count else "warning")
+    # After check-in/out, reload my_units so the checked-in unit appears right away
+    if action == "check-in":
+        # Query my assigned units after check-in
+        my_units = ProductInstance.query.filter_by(assigned_to_user_id=current_user.id, status='under_process').all()
+        # Optionally, you can render the process_stage_update template directly:
+        return render_template('process_stage_update.html', results=None, my_units=my_units)
     return redirect(request.referrer or url_for('stock_bp.process_stage_update'))
 
+@csrf.exempt
 @stock_bp.route('/export_instances')
 @login_required
 def export_instances():
-    # Use the same filter/query logic as under_process route
+    from openpyxl import Workbook
+    from io import BytesIO
+    from flask import send_file
+    from sqlalchemy import or_
+
     status = request.args.get('status')
     model = request.args.get('model')
     processor = request.args.get('processor')
@@ -611,6 +852,7 @@ def export_instances():
     stage_filter = request.args.get('stage')
     team_filter = request.args.get('team')
     location_id = request.args.get('location_id')
+    bin_search = request.args.get('bin_search', '').strip()
 
     if not status or status == 'all':
         query = ProductInstance.query
@@ -623,54 +865,71 @@ def export_instances():
             query = ProductInstance.query.filter_by(status='processed', is_sold=False)
         else:
             query = ProductInstance.query.filter_by(status=status)
+
+    query = query.join(Product).filter(Product.tenant_id == current_user.tenant_id)
+
     if model:
-        query = query.join(Product).filter(Product.model_number == model)
+        query = query.filter(Product.model.ilike(f"%{model}%"))
     if processor:
-        query = query.join(Product).filter(Product.processor == processor)
+        query = query.filter(Product.cpu.ilike(f"%{processor}%"))
     if serial_search:
-        query = query.filter(ProductInstance.serial_number.ilike(f"%{serial_search}%"))
+        query = query.filter(or_(
+            ProductInstance.serial.ilike(f"%{serial_search}%"),
+            ProductInstance.asset.ilike(f"%{serial_search}%")
+        ))
     if stage_filter:
-        query = query.filter_by(process_stage=stage_filter)
+        query = query.filter(ProductInstance.process_stage == stage_filter)
     if team_filter:
         query = query.filter(ProductInstance.team_assigned.ilike(f"%{team_filter}%"))
     if location_id:
         query = query.filter(ProductInstance.location_id == int(location_id))
-
-    if not status or status == 'all':
-        query = query.filter(ProductInstance.is_sold == False)
-
-    reserved_order = aliased(CustomerOrderTracking)
-    query = query.outerjoin(
-        reserved_order,
-        (reserved_order.product_instance_id == ProductInstance.id) &
-        (reserved_order.status.ilike('reserved'))
-    ).filter(reserved_order.id == None)
+    if bin_search:
+        query = query.filter(ProductInstance.shelf_bin.ilike(f"%{bin_search}%"))
 
     instances = query.all()
-    data = []
-    for i in instances:
-        data.append({
-            "Serial Number": i.serial_number,
-            "Product": i.product.name if i.product else '',
-            "Model Number": i.product.model_number if i.product else '',
-            "Grade": i.product.grade if i.product else '',
-            "RAM": i.product.ram if i.product else '',
-            "Processor": i.product.processor if i.product else '',
-            "Storage": i.product.storage if i.product else '',
-            "Screen Size": i.product.screen_size if i.product else '',
-            "Resolution": i.product.resolution if i.product else '',
-            "Video Card": i.product.video_card if i.product else ''
-        })
-    import pandas as pd
-    from io import BytesIO
-    output = BytesIO()
-    df = pd.DataFrame(data)
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Instances')
-    output.seek(0)
-    from flask import send_file
-    return send_file(output, as_attachment=True, download_name='instances_export.xlsx')
 
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventory Export"
+    ws.append([
+        "Serial", "Asset", "Item Name", "Make", "Model", "CPU", "RAM", "Disk", "Display",
+        "GPU1", "GPU2", "Grade", "Location", "Status", "Process Stage", "Shelf Bin", "Team", "Sold"
+    ])
+
+    for i in instances:
+        p = i.product
+        ws.append([
+            i.serial,
+            i.asset,
+            p.item_name if p else '',
+            p.make if p else '',
+            p.model if p else '',
+            p.cpu if p else '',
+            p.ram if p else '',
+            p.disk1size if p else '',
+            p.display if p else '',
+            p.gpu1 if p else '',
+            p.gpu2 if p else '',
+            p.grade if p else '',
+            i.location.name if i.location else '',
+            i.status,
+            i.process_stage or '',
+            i.shelf_bin or '',
+            i.team_assigned or '',
+            'Yes' if i.is_sold else 'No'
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="inventory_export.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@csrf.exempt
 @stock_bp.route('/scan_move', methods=['GET', 'POST'])
 @login_required
 def scan_move():
@@ -682,6 +941,9 @@ def scan_move():
     instances = []
     serial_number = ""
 
+    # Ensure serial is always defined
+    serial = None
+
     # Handle serial scan
     if request.method == 'POST':
         # Remove serial (if user clicked 'remove')
@@ -691,10 +953,10 @@ def scan_move():
             session['batch_serials'] = batch_serials
             session.modified = True
         # Add serial (on scan/submit)
-        elif 'serial_number' in request.form and request.form.get('serial_number').strip():
-            serial_number = request.form.get('serial_number').strip()
-            if serial_number not in batch_serials:
-                batch_serials.append(serial_number)
+        elif 'serial' in request.form and request.form.get('serial').strip():
+            serial = request.form.get('serial').strip()
+            if serial not in batch_serials:
+                batch_serials.append(serial)
                 session['batch_serials'] = batch_serials
                 session.modified = True
         # Handle "Move/Assign All"
@@ -709,15 +971,29 @@ def scan_move():
                 if status not in ['unprocessed', 'under_process', 'processed', 'sold']:
                     flash("Invalid status selected.", "danger")
                     break
-                instance = ProductInstance.query.filter_by(serial_number=serial).first()
+                from sqlalchemy import or_
+                # --- Tenant scoping: only allow update of ProductInstances for current tenant ---
+                instance = ProductInstance.query.join(Product).filter(
+                    or_(
+                        ProductInstance.serial == serial,
+                        ProductInstance.asset == serial
+                    ),
+                    Product.tenant_id == current_user.tenant_id
+                ).first()
+                # --------------------------------------------------------------------
                 if instance:
-                    instance.status = status
-                    instance.process_stage = process_stage
-                    instance.team_assigned = team_assigned
+                    if status:
+                        instance.status = status
+                    if process_stage:
+                        instance.process_stage = process_stage
+                    if team_assigned:
+                        instance.team_assigned = team_assigned
                     if location_id:
                         instance.location_id = int(location_id)
                     if shelf_bin:
                         instance.shelf_bin = shelf_bin
+                    from datetime import datetime
+                    instance.updated_at = datetime.utcnow()
                     updated += 1
             db.session.commit()
             flash(f"{updated} serial(s) updated successfully.", "success")
@@ -726,22 +1002,48 @@ def scan_move():
             session.modified = True
 
     # Build instances list for display (show info for each scanned serial)
+    from sqlalchemy import or_
+    unified_instances = []
     for s in batch_serials:
         clean_serial = s.strip().upper()
-        instance = ProductInstance.query.filter(
-            db.func.upper(ProductInstance.serial_number) == clean_serial
+        instance = ProductInstance.query.join(Product).filter(
+            or_(
+                db.func.upper(ProductInstance.serial) == clean_serial,
+                db.func.upper(ProductInstance.asset) == clean_serial
+            ),
+            Product.tenant_id == current_user.tenant_id
         ).first()
-        instances.append(instance)
+        unified_instances.append({
+            "serial": instance.serial if instance else s,
+            "asset": instance.asset if instance else "",
+            "item_name": instance.product.item_name if instance and instance.product else "",
+            "make": instance.product.make if instance and instance.product else "",
+            "model": instance.product.model if instance and instance.product else "",
+            "display": instance.product.display if instance and instance.product else "",
+            "cpu": instance.product.cpu if instance and instance.product else "",
+            "ram": instance.product.ram if instance and instance.product else "",
+            "gpu1": instance.product.gpu1 if instance and instance.product else "",
+            "gpu2": instance.product.gpu2 if instance and instance.product else "",
+            "grade": instance.product.grade if instance and instance.product else "",
+            "disk1size": instance.product.disk1size if instance and instance.product else "",
+            "instance_id": instance.id if instance else "",
+            "status": instance.status if instance else "",
+            "location_id": instance.location_id if instance else "",
+            "process_stage": instance.process_stage if instance else "",
+            "team_assigned": instance.team_assigned if instance else "",
+            "shelf_bin": instance.shelf_bin if instance else "",
+        })
 
     return render_template(
         'scan_move.html',
-        instances=instances,
-        serial_number=serial_number,
+        instances=unified_instances,
+        serial=serial or "",
         locations=Location.query.all()
     )
 
 
 # QR code label printing route
+@csrf.exempt
 @stock_bp.route('/print_label/<int:instance_id>')
 @login_required
 def print_label(instance_id):
@@ -751,14 +1053,19 @@ def print_label(instance_id):
         flash("No product linked to this instance.", "danger")
         return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
 
-    # Encode key info as QR code
+    # Encode key info as QR code using unified product structure
     qr_data = {
-        "serial": instance.serial_number,
-        "model": instance.product.model_number,
-        "cpu": instance.product.processor,
-        "ram": instance.product.ram,
-        "storage": instance.product.storage,
-        "vendor": instance.product.vendor.name if instance.product.vendor else "",
+        "serial": instance.serial if instance else "",
+        "asset": instance.asset if instance else "",
+        "item_name": instance.product.item_name if instance.product else "",
+        "make": instance.product.make if instance.product else "",
+        "model": instance.product.model if instance.product else "",
+        "display": instance.product.display if instance.product else "",
+        "cpu": instance.product.cpu if instance.product else "",
+        "ram": instance.product.ram if instance.product else "",
+        "gpu1": instance.product.gpu1 if instance.product else "",
+        "gpu2": instance.product.gpu2 if instance.product else "",
+        "grade": instance.product.grade if instance.product else ""
     }
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(qr_data)
@@ -777,11 +1084,13 @@ def print_label(instance_id):
         printed_time=datetime.now()
     )
 
+@csrf.exempt
 @stock_bp.route('/batch_update_status', methods=['POST'])
 @login_required
 def batch_update_status():
     ids = request.form.getlist('instance_ids')
     status = request.form.get('status')
+    location_id = request.form.get('location_id')
     if not ids or not status:
         flash("Please select at least one item and a status.", "danger")
         return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
@@ -792,25 +1101,37 @@ def batch_update_status():
         flash("Invalid status selected.", "danger")
         return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
 
+    # Enforce tenant scoping: only update ProductInstances for current tenant
     updated_count = 0
-    for instance in ProductInstance.query.filter(ProductInstance.id.in_(ids)).all():
+    # Join Product to ensure tenant filtering
+    for instance in ProductInstance.query.join(Product).filter(
+        ProductInstance.id.in_(ids),
+        Product.tenant_id == current_user.tenant_id
+    ).all():
         instance.status = status
+        if location_id:
+            instance.location_id = int(location_id)
         updated_count += 1
     db.session.commit()
 
-    flash(f"Updated {updated_count} item(s) to status: {status.replace('_', ' ').title()}.", "success")
+    flash(f"✅ {updated_count} item(s) updated to '{status.replace('_', ' ').title()}' status.", "success")
     return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
 
+@csrf.exempt
 @stock_bp.route('/sold')
 @login_required
 def sold_items():
     from inventory_flask_app.models import SaleTransaction, Customer
+    from inventory_flask_app.models import TenantSettings
     # Get filter params
     customer_id = request.args.get('customer')
     sale_date = request.args.get('sale_date')
 
-    # Find all sold product instances
-    sold_instances = ProductInstance.query.filter_by(is_sold=True).all()
+    # Find all sold product instances (tenant scoped)
+    sold_instances = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.is_sold == True
+    ).all()
 
     # For each, get related sale transaction (most recent, if more than one)
     sold_data = []
@@ -822,16 +1143,18 @@ def sold_items():
         if sale_date and (not sale or not sale.date_sold or sale.date_sold.strftime('%Y-%m-%d') != sale_date):
             continue
         sold_data.append({
-            "serial_number": instance.serial_number,
-            "product_name": instance.product.name if instance.product else "",
-            "model_number": instance.product.model_number if instance.product else "",
-            "cpu": instance.product.processor if instance.product else "",
+            "serial": instance.serial,
+            "asset": instance.asset,
+            "item_name": instance.product.item_name if instance.product else "",
+            "make": instance.product.make if instance.product else "",
+            "model": instance.product.model if instance.product else "",
+            "display": instance.product.display if instance.product else "",
+            "cpu": instance.product.cpu if instance.product else "",
             "ram": instance.product.ram if instance.product else "",
-            "storage": instance.product.storage if instance.product else "",
-            "screen_size": instance.product.screen_size if instance.product else "",
-            "resolution": instance.product.resolution if instance.product else "",
+            "gpu1": instance.product.gpu1 if instance.product else "",
+            "gpu2": instance.product.gpu2 if instance.product else "",
             "grade": instance.product.grade if instance.product else "",
-            "video_card": instance.product.video_card if instance.product else "",
+            "disk1size": instance.product.disk1size if instance.product else "",
             "customer": sale.customer.name if sale and sale.customer else "",
             "customer_id": sale.customer_id if sale else "",
             "sale_date": sale.date_sold.strftime('%Y-%m-%d') if sale and sale.date_sold else "",
@@ -840,47 +1163,129 @@ def sold_items():
 
     # Get all customers for filter dropdown
     customers = Customer.query.order_by(Customer.name).all()
-    return render_template("sold_items.html", sold_data=sold_data, customers=customers, selected_customer=customer_id, selected_date=sale_date)
+    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings = {s.key: s.value for s in tenant_settings}
+    return render_template("sold_items.html", sold_data=sold_data, customers=customers, selected_customer=customer_id, selected_date=sale_date, settings=settings)
 
 
 
 # Add product page route
+@csrf.exempt
 @stock_bp.route('/products/add', methods=['GET', 'POST'])
 @login_required
 def add_product_page():
+    from inventory_flask_app.models import TenantSettings
+    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings = {s.key: s.value for s in tenant_settings}
+
     if request.method == 'POST':
         from inventory_flask_app.models import add_product_and_instance
         data = request.form.to_dict()
+        # Use unified field names consistent with the rest of the system
         data = {
-            "name": data.get("name"),
-            "model_number": data.get("model_number"),
-            "serial_number": data.get("serial_number"),
-            "processor": data.get("processor"),
+            "item_name": data.get("item_name"),
+            "model": data.get("model"),
+            "serial": data.get("serial"),
+            "cpu": data.get("cpu"),
             "ram": data.get("ram"),
-            "storage": data.get("storage"),
-            "screen_size": data.get("screen_size"),
-            "resolution": data.get("resolution"),
+            "disk1size": data.get("disk1size"),
+            "display": data.get("display"),
+            "gpu1": data.get("gpu1"),
+            "gpu2": data.get("gpu2"),
             "grade": data.get("grade"),
-            "video_card": data.get("video_card"),
             "status": data.get("status", "unprocessed")
         }
         product, instance = add_product_and_instance(db, data)
         db.session.commit()
         flash("✅ Product and instance added successfully!", "success")
-        # Redirect to label printing page for the new instance
         return redirect(url_for('stock_bp.print_label', instance_id=instance.id))
-    return render_template('add_product.html')
+
+    return render_template('add_product.html', settings=settings)
+
+@csrf.exempt
 @stock_bp.route('/bin_lookup', methods=['GET', 'POST'])
 @login_required
 def bin_lookup():
     if request.method == 'POST':
-        bin_code = request.form.get('bin_code', '').strip()
+        bin_code = request.form.get('bin_code', '').strip().upper()
         if bin_code:
             return redirect(url_for('stock_bp.bin_contents', bin_code=bin_code))
     return render_template('bin_lookup.html')
 
+@csrf.exempt
 @stock_bp.route('/bin_contents/<bin_code>')
 @login_required
 def bin_contents(bin_code):
-    products = ProductInstance.query.filter_by(shelf_bin=bin_code).all()
+    # Enforce tenant scoping: only show ProductInstances for current tenant
+    products = ProductInstance.query.join(Product).filter(
+        ProductInstance.shelf_bin == bin_code,
+        Product.tenant_id == current_user.tenant_id
+    ).all()
     return render_template('bin_contents.html', bin_code=bin_code, products=products)
+# --- Add Location Route ---
+# --- Add Location Route ---
+@stock_bp.route('/location/add', methods=['GET', 'POST'])
+@login_required
+def add_location():
+    from flask_wtf.csrf import validate_csrf
+    from wtforms.validators import ValidationError
+
+    if request.method == 'GET':
+        locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
+        return render_template("add_location.html", locations=locations)
+
+    next_url = request.args.get('next') or request.form.get('next') or request.referrer or url_for('dashboard_bp.main_dashboard')
+
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        flash("Invalid or missing CSRF token.", "danger")
+        return redirect(next_url)
+
+    name = request.form.get('name', '').strip().upper()
+    if not name:
+        flash("Location name is required.", "warning")
+        return redirect(next_url)
+
+    existing = Location.query.filter_by(name=name, tenant_id=current_user.tenant_id).first()
+    if existing:
+        flash("A location with this name already exists.", "warning")
+        return redirect(next_url)
+
+    location = Location(name=name, tenant_id=current_user.tenant_id)
+    db.session.add(location)
+    db.session.commit()
+    flash(f"✅ Location '{name}' added successfully.", "success")
+    # Conditional redirect logic based on next_url content
+    if "upload_excel" in next_url:
+        return redirect(url_for('import_excel_bp.upload_excel'))
+    elif "purchase_order" in next_url:
+        return redirect(url_for('stock_bp.create_purchase_order'))
+    else:
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+
+# --- Aged Inventory Route ---
+@csrf.exempt
+@stock_bp.route('/inventory/aged')
+@login_required
+def aged_inventory_view():
+    from inventory_flask_app.models import TenantSettings
+    settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings_dict = {s.key: s.value for s in settings}
+    aged_days = int(settings_dict.get("aged_threshold_days", 60))
+
+    now = get_now_for_tenant()
+    threshold_date = now - timedelta(days=aged_days)
+
+    instances = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.created_at < threshold_date,
+        ProductInstance.is_sold == False
+    ).all()
+
+    return render_template(
+        "aged_inventory.html",
+        instances=instances,
+        threshold_days=aged_days
+    )

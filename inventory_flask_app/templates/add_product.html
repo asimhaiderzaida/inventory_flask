@@ -11,6 +11,7 @@
       <div class="text-muted" style="font-size:0.98rem;">Enter details to add a product</div>
     </div>
     <form method="POST" action="/stock/products/add" class="row g-3">
+      {{ csrf_token() }}
       <div class="col-12 col-md-6 mb-3">
         <label class="form-label">Product Name</label>
         <input type="text" name="name" class="form-control form-control-lg rounded-pill px-3" required>
@@ -22,6 +23,10 @@
       <div class="col-12 col-md-6 mb-3">
         <label class="form-label">Serial Number</label>
         <input type="text" name="serial_number" class="form-control form-control-lg rounded-pill px-3" required>
+      </div>
+      <div class="col-12 col-md-6 mb-3">
+        <label class="form-label">Asset Tag</label>
+        <input type="text" name="asset_tag" class="form-control form-control-lg rounded-pill px-3">
       </div>
       <div class="col-12 col-md-6 mb-3">
         <label class="form-label">RAM</label>

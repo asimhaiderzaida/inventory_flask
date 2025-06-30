@@ -8,6 +8,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_cors import CORS
 from .models import db, User  # ✅ Relative import
+from flask_wtf import CSRFProtect
+from .utils.utils import get_now_for_tenant
+
+csrf = CSRFProtect()
 
 login_manager = LoginManager()
 
@@ -19,10 +23,28 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'inventory.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    CORS(app, supports_credentials=True)
     db.init_app(app)
     from flask_migrate import Migrate
     migrate = Migrate(app, db)
+
+    # --- CSRF protection logic based on DB setting ---
+    from inventory_flask_app.models import TenantSettings
+    enable_csrf = True
+    try:
+        from flask_login import current_user
+        with app.app_context():
+            tenant_settings = TenantSettings.query.all()
+            setting_map = {s.key: s.value for s in tenant_settings}
+            enable_csrf = setting_map.get("enable_csrf_protection", "true") == "true"
+    except Exception as e:
+        print("Could not determine CSRF setting:", e)
+    if enable_csrf:
+        csrf.init_app(app)
+        print("✅ CSRF Protection is ENABLED")
+    else:
+        print("⚠️ CSRF Protection is DISABLED")
+
+    CORS(app, supports_credentials=True)
 
     login_manager.login_view = 'auth_bp.login'
     login_manager.init_app(app)
@@ -61,8 +83,32 @@ def create_app():
     from .routes.reports import reports_bp
     app.register_blueprint(reports_bp)
 
-    from .utils.utils import get_instance_id
-    app.jinja_env.globals.update(get_instance_id=get_instance_id)
+    from .routes.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
+    from .utils.utils import get_instance_id, get_now_for_tenant
+    app.jinja_env.globals.update(get_instance_id=get_instance_id, get_now_for_tenant=get_now_for_tenant)
+
+    @app.context_processor
+    def inject_settings():
+        from flask_login import current_user
+        from inventory_flask_app.models import TenantSettings
+        if not current_user.is_authenticated:
+            return {}
+        try:
+            tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+            settings = {s.key: s.value for s in tenant_settings}
+            if not settings.get("column_order_instance_table"):
+                settings["column_order_instance_table"] = "asset_tag,serial_number,model_number,product,vendor,status,process_stage,team,shelf_bin,screen_size,resolution,video_card,ram,processor,storage,is_sold,label,action"
+            print("LOADED COLUMN ORDER:", settings.get("column_order_instance_table"))
+            return {'settings': settings}
+        except:
+            return {}
 
     print("Flask app is using DB:", app.config['SQLALCHEMY_DATABASE_URI'])
+    @app.context_processor
+    def inject_csrf_token():
+        from flask_wtf.csrf import generate_csrf
+        return dict(csrf_token=generate_csrf)
+
     return app

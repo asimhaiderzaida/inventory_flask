@@ -1,44 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-  <h2>Customer Center</h2>
-  <form method="get" class="d-flex justify-content-center align-items-center gap-3 mb-4 flex-wrap">
-    <input type="text" name="search" class="form-control form-control-lg" style="max-width:340px;" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
-    <button type="submit" class="btn btn-primary btn-lg">Search</button>
-    <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-success btn-lg">Add Customer</a>
-  </form>
-  <div class="card mt-2">
-    <div class="card-body p-0">
-      <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th class="d-none d-md-table-cell">Email</th>
-            <th class="d-none d-md-table-cell">Company</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for customer in customers %}
-          <tr>
-            <td>{{ customer.name }}</td>
-            <td>{{ customer.phone }}</td>
-            <td class="d-none d-md-table-cell">{{ customer.email }}</td>
-            <td class="d-none d-md-table-cell">{{ customer.company or '' }}</td>
-            <td>
-              <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary">View</a>
-              <a href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5" class="text-center">No customers found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+<div class="container-fluid px-4 mt-4">
+  <div class="d-flex align-items-center mb-3">
+    <h2 class="fw-bold text-primary"><i class="bi bi-people me-2"></i>Customer Center</h2>
+  </div>
+  <section class="card shadow-sm p-4 rounded-4 border-0">
+    <form method="get" class="d-flex justify-content-center align-items-center gap-3 mb-4 flex-wrap">
+      <input type="text" name="search" class="form-control form-control-lg rounded-pill" style="max-width:340px;" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
+      <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+        <i class="bi bi-search"></i> Search
+      </button>
+      <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-outline-success btn-sm rounded-pill px-3">
+        <i class="bi bi-person-plus"></i> Add
+      </a>
+    </form>
+    <div class="card mt-2 shadow-sm border-0 rounded-4 w-100">
+      <div class="card-body p-0">
+        <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th class="d-none d-md-table-cell">Email</th>
+              <th class="d-none d-md-table-cell">Company</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for customer in customers %}
+            <tr>
+              <td>{{ customer.name }}</td>
+              <td>{{ customer.phone }}</td>
+              <td class="d-none d-md-table-cell">{{ customer.email }}</td>
+              <td class="d-none d-md-table-cell">{{ customer.company or '' }}</td>
+              <td>
+                <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">View</a>
+                <a href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Edit</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center">No customers found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 </div>
 {% endblock %}

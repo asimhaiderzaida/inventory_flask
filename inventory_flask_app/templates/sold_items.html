@@ -27,16 +27,15 @@
       <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
         <thead class="table-light">
           <tr>
-            <th>Serial Number</th>
-            <th>Product Name</th>
-            <th>Model Number</th>
-            <th>CPU</th>
-            <th>RAM</th>
-            <th>Storage</th>
-            <th>Screen Size</th>
-            <th class="d-none d-md-table-cell">Resolution</th>
-            <th class="d-none d-md-table-cell">Grade</th>
-            <th class="d-none d-md-table-cell">Video Card</th>
+            {% if settings.show_serial_number == 'true' %}<th>{{ settings.label_serial_number or 'Serial Number' }}</th>{% endif %}
+            {% if settings.show_column_asset_tag == 'true' %}<th>{{ settings.label_asset_tag or 'Asset Tag' }}</th>{% endif %}
+            {% if settings.show_item_name == 'true' %}<th>{{ settings.label_item_name or 'Item Name' }}</th>{% endif %}
+            {% if settings.show_model_number == 'true' %}<th>{{ settings.label_model_number or 'Model' }}</th>{% endif %}
+            {% if settings.show_processor == 'true' %}<th>{{ settings.label_processor or 'CPU' }}</th>{% endif %}
+            {% if settings.show_ram == 'true' %}<th>{{ settings.label_ram or 'RAM' }}</th>{% endif %}
+            {% if settings.show_storage == 'true' %}<th>{{ settings.label_storage or 'Storage' }}</th>{% endif %}
+            {% if settings.show_grade == 'true' %}<th class="d-none d-md-table-cell">{{ settings.label_grade or 'Grade' }}</th>{% endif %}
+            {% if settings.show_video_card == 'true' %}<th class="d-none d-md-table-cell">{{ settings.label_video_card or 'GPU1' }}</th>{% endif %}
             <th>Customer</th>
             <th>Sale Date</th>
             <th>Sale Price (AED)</th>
@@ -45,16 +44,15 @@
         <tbody>
           {% for item in sold_data %}
           <tr>
-            <td>{{ item.serial_number }}</td>
-            <td>{{ item.product_name }}</td>
-            <td>{{ item.model_number }}</td>
-            <td>{{ item.cpu }}</td>
-            <td>{{ item.ram }}</td>
-            <td>{{ item.storage }}</td>
-            <td>{{ item.screen_size }}</td>
-            <td class="d-none d-md-table-cell">{{ item.resolution }}</td>
-            <td class="d-none d-md-table-cell">{{ item.grade }}</td>
-            <td class="d-none d-md-table-cell">{{ item.video_card }}</td>
+            {% if settings.show_serial_number == 'true' %}<td>{{ item.serial }}</td>{% endif %}
+            {% if settings.show_column_asset_tag == 'true' %}<td>{{ item.asset }}</td>{% endif %}
+            {% if settings.show_item_name == 'true' %}<td>{{ item.item_name }}</td>{% endif %}
+            {% if settings.show_model_number == 'true' %}<td>{{ item.model }}</td>{% endif %}
+            {% if settings.show_processor == 'true' %}<td>{{ item.cpu }}</td>{% endif %}
+            {% if settings.show_ram == 'true' %}<td>{{ item.ram }}</td>{% endif %}
+            {% if settings.show_storage == 'true' %}<td>{{ item.disk1size }}</td>{% endif %}
+            {% if settings.show_grade == 'true' %}<td class="d-none d-md-table-cell">{{ item.grade }}</td>{% endif %}
+            {% if settings.show_video_card == 'true' %}<td class="d-none d-md-table-cell">{{ item.gpu1 }}</td>{% endif %}
             <td>{{ item.customer }}</td>
             <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ item.sale_date }}</span></td>
             <td><span class="badge bg-success bg-opacity-10 text-success">{{ "%.2f"|format(item.price) if item.price else "" }}</span></td>

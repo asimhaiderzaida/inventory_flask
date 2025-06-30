@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% block title %}Admin Settings{% endblock %}
+
+{% block content %}
+<div class="container py-4 px-4" style="max-width: 720px;">
+  <div class="accordion" id="adminSettingsAccordion">
+  <h4 class="mb-3 fw-semibold"><i class="bi bi-gear-fill me-2"></i> Admin Settings</h4>
+
+  {% set seen = [] %}
+  {% for category, message in get_flashed_messages(with_categories=true) %}
+    {% if message not in seen %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% set _ = seen.append(message) %}
+    {% endif %}
+  {% endfor %}
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingGeneral">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeneral" aria-expanded="true" aria-controls="collapseGeneral">
+          General Settings
+        </button>
+      </h2>
+      <div id="collapseGeneral" class="accordion-collapse collapse" aria-labelledby="headingGeneral" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="mb-3">
+            <label for="dashboard_name" class="form-label">Dashboard Name</label>
+            <input type="text" name="dashboard_name" id="dashboard_name" class="form-control" value="{{ settings.dashboard_name or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="dashboard_logo" class="form-label">Logo URL</label>
+            <input type="text" name="dashboard_logo" id="dashboard_logo" class="form-control" value="{{ settings.dashboard_logo or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="support_email" class="form-label">Support Email</label>
+            <input type="email" name="support_email" id="support_email" class="form-control" value="{{ settings.support_email or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="primary_color" class="form-label">Brand Primary Color (Hex)</label>
+            <input type="text" name="primary_color" id="primary_color" class="form-control" placeholder="#007bff" value="{{ settings.primary_color or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="company_website" class="form-label">Company Website</label>
+            <input type="url" name="company_website" id="company_website" class="form-control" value="{{ settings.company_website or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="default_terms" class="form-label">Default Terms (footer / invoice)</label>
+            <textarea name="default_terms" id="default_terms" rows="3" class="form-control">{{ settings.default_terms or '' }}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label for="sidebar_color" class="form-label">Sidebar Color (Hex)</label>
+            <input type="text" name="sidebar_color" id="sidebar_color" class="form-control" placeholder="#0d1b2a" value="{{ settings.sidebar_color or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="text_color" class="form-label">Sidebar Text Color (Hex)</label>
+            <input type="text" name="text_color" id="text_color" class="form-control" placeholder="#ffffff" value="{{ settings.text_color or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="button_radius" class="form-label">Button Radius (e.g. 4px, 30px)</label>
+            <input type="text" name="button_radius" id="button_radius" class="form-control" placeholder="30px" value="{{ settings.button_radius or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="timezone" class="form-label">Tenant Timezone</label>
+            <select name="timezone" id="timezone" class="form-select">
+              {% for tz in [
+                'UTC', 'Asia/Dubai', 'Asia/Kolkata', 'Europe/London', 'Europe/Berlin',
+                'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'
+              ] %}
+                <option value="{{ tz }}" {% if tenant_timezone == tz %}selected{% endif %}>{{ tz }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Notification Thresholds Accordion Item (moved outside General Settings) -->
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingThresholds">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThresholds" aria-expanded="false" aria-controls="collapseThresholds">
+          Inventory Notification Thresholds
+        </button>
+      </h2>
+      <div id="collapseThresholds" class="accordion-collapse collapse" aria-labelledby="headingThresholds" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="idle_threshold_days" class="form-label">Idle Inventory Threshold (days)</label>
+              <input type="number" name="idle_threshold_days" id="idle_threshold_days" class="form-control" value="{{ settings.idle_threshold_days or '7' }}">
+            </div>
+
+            <div class="col-md-6">
+              <label for="aged_threshold_days" class="form-label">Aged Inventory Threshold (days)</label>
+              <input type="number" name="aged_threshold_days" id="aged_threshold_days" class="form-control" value="{{ settings.aged_threshold_days or '60' }}">
+            </div>
+
+            <div class="col-md-6">
+              <label for="tech_delay_threshold_days" class="form-label">Technician Delay Threshold (days)</label>
+              <input type="number" name="tech_delay_threshold_days" id="tech_delay_threshold_days" class="form-control" value="{{ settings.tech_delay_threshold_days or '3' }}">
+            </div>
+
+            <div class="col-md-6">
+              <label for="order_delay_threshold_days" class="form-label">Order Delay Threshold (days)</label>
+              <input type="number" name="order_delay_threshold_days" id="order_delay_threshold_days" class="form-control" value="{{ settings.order_delay_threshold_days or '3' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingInvoice">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInvoice" aria-expanded="false" aria-controls="collapseInvoice">
+          Invoice Branding
+        </button>
+      </h2>
+      <div id="collapseInvoice" class="accordion-collapse collapse" aria-labelledby="headingInvoice" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="mb-3">
+            <label for="invoice_logo" class="form-label">Invoice Logo URL</label>
+            <input type="text" name="invoice_logo" id="invoice_logo" class="form-control" value="{{ settings.invoice_logo or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="invoice_title" class="form-label">Invoice Title</label>
+            <input type="text" name="invoice_title" id="invoice_title" class="form-control" placeholder="e.g. Sales Invoice" value="{{ settings.invoice_title or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="invoice_footer" class="form-label">Invoice Footer Message</label>
+            <textarea name="invoice_footer" id="invoice_footer" rows="3" class="form-control" placeholder="Thank you for your business!">{{ settings.invoice_footer or '' }}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label for="invoice_terms" class="form-label">Invoice Payment Terms</label>
+            <textarea name="invoice_terms" id="invoice_terms" rows="2" class="form-control" placeholder="Payment due within 14 days.">{{ settings.invoice_terms or '' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingModules">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModules" aria-expanded="false" aria-controls="collapseModules">
+          Module Access
+        </button>
+      </h2>
+      <div id="collapseModules" class="accordion-collapse collapse" aria-labelledby="headingModules" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="enable_parts_module" name="enable_parts_module" value="true" {% if settings.enable_parts_module == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="enable_parts_module">Enable Parts Module</label>
+          </div>
+
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="enable_reports_module" name="enable_reports_module" value="true" {% if settings.enable_reports_module == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="enable_reports_module">Enable Reports Module</label>
+          </div>
+
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="enable_order_module" name="enable_order_module" value="true" {% if settings.enable_order_module == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="enable_order_module">Enable Customer Orders</label>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="enable_export_module" name="enable_export_module" value="true" {% if settings.enable_export_module == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="enable_export_module">Enable Export Tools</label>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="enable_csrf_protection" name="enable_csrf_protection" value="true" {% if settings.enable_csrf_protection == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="enable_csrf_protection">Enable CSRF Protection</label>
+          </div>
+
+          <input type="hidden" name="csrf_setting_key" value="enable_csrf_protection">
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme Settings Accordion Item -->
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingTheme">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTheme" aria-expanded="false" aria-controls="collapseTheme">
+          Theme Settings
+        </button>
+      </h2>
+      <div id="collapseTheme" class="accordion-collapse collapse" aria-labelledby="headingTheme" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="mb-3">
+            <label for="theme_color" class="form-label">Theme Mode</label>
+            <select name="theme_mode" id="theme_mode" class="form-select">
+              <option value="light" {% if settings.theme_mode == 'light' %}selected{% endif %}>Light</option>
+              <option value="dark" {% if settings.theme_mode == 'dark' %}selected{% endif %}>Dark</option>
+              <option value="auto" {% if settings.theme_mode == 'auto' %}selected{% endif %}>Auto</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="theme_preset" class="form-label">Theme Preset</label>
+            <select name="theme_preset" id="theme_preset" class="form-select">
+              <option value="default" {% if settings.theme_preset == 'default' %}selected{% endif %}>Default</option>
+              <option value="flatly" {% if settings.theme_preset == 'flatly' %}selected{% endif %}>Flatly</option>
+              <option value="darkly" {% if settings.theme_preset == 'darkly' %}selected{% endif %}>Darkly</option>
+              <option value="cyborg" {% if settings.theme_preset == 'cyborg' %}selected{% endif %}>Cyborg</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="font_size" class="form-label">Global Font Size</label>
+            <select name="font_size" id="font_size" class="form-select">
+              <option value="small" {% if settings.font_size == 'small' %}selected{% endif %}>Small</option>
+              <option value="default" {% if settings.font_size == 'default' %}selected{% endif %}>Default</option>
+              <option value="large" {% if settings.font_size == 'large' %}selected{% endif %}>Large</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="custom_css_url" class="form-label">Custom CSS URL (optional)</label>
+            <input type="text" name="custom_css_url" id="custom_css_url" class="form-control" value="{{ settings.custom_css_url or '' }}" placeholder="https://example.com/styles.css">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingLabels">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLabels" aria-expanded="false" aria-controls="collapseLabels">
+          Instance Table Column Labels
+        </button>
+      </h2>
+      <div id="collapseLabels" class="accordion-collapse collapse" aria-labelledby="headingLabels" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="mb-3">
+            <label for="label_serial_number" class="form-label">Serial Number Label</label>
+            <input type="text" name="label_serial_number" id="label_serial_number" class="form-control" value="{{ settings.label_serial_number or 'Serial' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_asset" class="form-label">Asset Tag Label</label>
+            <input type="text" name="label_asset" id="label_asset" class="form-control" value="{{ settings.label_asset or 'Asset' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_item_name" class="form-label">Item Name Label</label>
+            <input type="text" name="label_item_name" id="label_item_name" class="form-control" value="{{ settings.label_item_name or 'Item Name' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_make" class="form-label">Make Label</label>
+            <input type="text" name="label_make" id="label_make" class="form-control" value="{{ settings.label_make or 'Make' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_model" class="form-label">Model Label</label>
+            <input type="text" name="label_model" id="label_model" class="form-control" value="{{ settings.label_model or 'Model' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_display" class="form-label">Display Label</label>
+            <input type="text" name="label_display" id="label_display" class="form-control" value="{{ settings.label_display or 'Display' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_cpu" class="form-label">CPU Label</label>
+            <input type="text" name="label_cpu" id="label_cpu" class="form-control" value="{{ settings.label_cpu or 'Processor' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_ram" class="form-label">RAM Label</label>
+            <input type="text" name="label_ram" id="label_ram" class="form-control" value="{{ settings.label_ram or 'RAM' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_gpu1" class="form-label">GPU 1 Label</label>
+            <input type="text" name="label_gpu1" id="label_gpu1" class="form-control" value="{{ settings.label_gpu1 or 'GPU 1' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_gpu2" class="form-label">GPU 2 Label</label>
+            <input type="text" name="label_gpu2" id="label_gpu2" class="form-control" value="{{ settings.label_gpu2 or 'GPU 2' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_grade" class="form-label">Grade Label</label>
+            <input type="text" name="label_grade" id="label_grade" class="form-control" value="{{ settings.label_grade or 'Grade' }}">
+          </div>
+
+          <div class="mb-3">
+            <label for="label_location" class="form-label">Location Label</label>
+            <input type="text" name="label_location" id="label_location" class="form-control" value="{{ settings.label_location or 'Location' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingVisibility">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVisibility" aria-expanded="false" aria-controls="collapseVisibility">
+          Instance Table Column Visibility
+        </button>
+      </h2>
+      <div id="collapseVisibility" class="accordion-collapse collapse" aria-labelledby="headingVisibility" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <!-- Unified product structure columns only -->
+          {% set unified_fields = [
+            ('show_column_asset', 'Asset'),
+            ('show_column_serial', 'Serial'),
+            ('show_column_item_name', 'Item Name'),
+            ('show_column_make', 'Make'),
+            ('show_column_model', 'Model'),
+            ('show_column_display', 'Display'),
+            ('show_column_cpu', 'CPU'),
+            ('show_column_ram', 'RAM'),
+            ('show_column_gpu1', 'GPU 1'),
+            ('show_column_gpu2', 'GPU 2'),
+            ('show_column_grade', 'Grade'),
+            ('show_column_location', 'Location'),
+            ('show_column_disk1size', 'Disk 1 Size'),
+            ('show_column_status', 'Status'),
+            ('show_column_process_stage', 'Process Stage'),
+            ('show_column_team', 'Team'),
+            ('show_column_shelf_bin', 'Shelf/Bin'),
+            ('show_column_is_sold', 'Is Sold'),
+            ('show_column_label', 'Label Button'),
+            ('show_column_action', 'Action Buttons')
+          ] %}
+
+          {% for key, label in unified_fields %}
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="{{ key }}" name="{{ key }}" value="true" {% if settings[key] == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="{{ key }}">Show {{ label }}</label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingOrder">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrder" aria-expanded="false" aria-controls="collapseOrder">
+          Instance Table Column Order
+        </button>
+      </h2>
+      <div id="collapseOrder" class="accordion-collapse collapse" aria-labelledby="headingOrder" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <p class="text-muted small">Drag to reorder how columns appear in the inventory table:</p>
+
+          <ul id="columnOrderList" class="list-group mb-3">
+            {% set all_columns = [
+              'asset', 'serial', 'item_name', 'make', 'model', 'display',
+              'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location',
+              'status', 'process_stage', 'team', 'shelf_bin',
+              'is_sold', 'label', 'action'
+            ] %}
+            {% set saved_order = (settings.column_order_instance_table or '').split(',') %}
+            {% set final_order = (saved_order + all_columns)|unique %}
+            {% for col in final_order %}
+              {% if col in all_columns %}
+                <li class="list-group-item" data-key="{{ col }}">{{ col.replace('_', ' ')|title }}</li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+
+          <input type="hidden" id="column_order_instance_table" name="column_order_instance_table" value="{{ settings.column_order_instance_table or '' }}">
+          <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+          <script>
+          document.addEventListener("DOMContentLoaded", function () {
+            const list = document.getElementById("columnOrderList");
+            const input = document.getElementById("column_order_instance_table");
+
+            function updateColumnOrderInput() {
+              const order = Array.from(list.children).map(li => li.dataset.key);
+              input.value = order.join(",");
+            }
+
+            updateColumnOrderInput();
+
+            new Sortable(list, {
+              animation: 150,
+              onEnd: updateColumnOrderInput
+            });
+          });
+          </script>
+
+          {# Removed duplicate Save Settings button here #}
+        </div>
+      </div>
+    </div>
+    <div class="text-end mt-4">
+      <button type="submit" class="btn btn-primary btn-lg rounded-pill px-4">
+        <i class="bi bi-save me-1"></i> Save Settings
+      </button>
+    </div>
+  </form>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headingUsers">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseUsers" aria-expanded="false" aria-controls="collapseUsers">
+          Registered Users
+        </button>
+      </h2>
+      <div id="collapseUsers" class="accordion-collapse collapse" aria-labelledby="headingUsers" data-bs-parent="#adminSettingsAccordion">
+        <div class="accordion-body">
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Username</th>
+                  <th>Full Name</th>
+                  <th>Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for user in users %}
+                <tr>
+                  <td>{{ user.username }}</td>
+                  <td>{{ user.full_name or user.username }}</td>
+                  <td>{{ user.role }}</td>
+                  <td>
+                    <a href="{{ url_for('auth_bp.edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="POST" action="{{ url_for('auth_bp.delete_user', user_id=user.id) }}" style="display:inline;">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this user?');">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div> <!-- end accordion -->
+</div>
+{% endblock %}

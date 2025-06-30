@@ -10,9 +10,27 @@ parts_bp = Blueprint('parts_bp', __name__, url_prefix='/parts')
 @parts_bp.route('/')
 @login_required
 def parts_list():
-    parts = Part.query.all()
-    # For now, just list parts (expand with location/stock info soon)
-    return render_template('parts/parts_list.html', parts=parts)
+    search = request.args.get('search', '').strip()
+    query = Part.query.filter_by(tenant_id=current_user.tenant_id)
+
+    if search:
+        query = query.filter(
+            (Part.part_number.ilike(f"%{search}%")) |
+            (Part.name.ilike(f"%{search}%")) |
+            (Part.vendor.ilike(f"%{search}%"))
+        )
+
+    parts = query.all()
+    total_parts = len(parts)
+    total_quantity = sum(sum(stock.quantity for stock in p.stocks) for p in parts)
+
+    return render_template(
+        'parts/parts_list.html',
+        parts=parts,
+        total_parts=total_parts,
+        total_quantity=total_quantity,
+        search=search
+    )
 
 @parts_bp.route('/add', methods=['GET', 'POST'])
 @login_required
@@ -27,7 +45,7 @@ def add_part():
         description = request.form.get('description', '')
 
         # Prevent duplicate part number
-        if Part.query.filter_by(part_number=part_number).first():
+        if Part.query.filter_by(part_number=part_number, tenant_id=current_user.tenant_id).first():
             flash('Part number already exists. Please use a unique part number.', 'danger')
             return redirect(url_for('parts_bp.add_part'))
 
@@ -38,7 +56,8 @@ def add_part():
             vendor=vendor,
             min_stock=int(min_stock),
             price=float(price),
-            description=description
+            description=description,
+            tenant_id=current_user.tenant_id,
         )
         db.session.add(part)
         try:
@@ -48,7 +67,12 @@ def add_part():
             db.session.rollback()
             flash('Database error: Part number already exists.', 'danger')
         return redirect(url_for('parts_bp.parts_list'))
-    return render_template('parts/add_part.html')
+    vendors = db.session.query(Part.vendor).filter(
+        Part.vendor.isnot(None),
+        Part.vendor != '',
+        Part.tenant_id == current_user.tenant_id
+    ).distinct().all()
+    return render_template('parts/add_part.html', vendors=[v[0] for v in vendors])
 
 @parts_bp.route('/stock_in', methods=['GET', 'POST'])
 @login_required
@@ -57,12 +81,12 @@ def stock_in():
     if search_query:
         # Simple search: by part number or name
         parts = Part.query.filter(
-            (Part.part_number.ilike(f"%{search_query}%")) |
-            (Part.name.ilike(f"%{search_query}%"))
+            (Part.tenant_id == current_user.tenant_id) &
+            ((Part.part_number.ilike(f"%{search_query}%")) | (Part.name.ilike(f"%{search_query}%")))
         ).all()
     else:
-        parts = Part.query.all()
-    locations = Location.query.all()
+        parts = Part.query.filter_by(tenant_id=current_user.tenant_id).all()
+    locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
     if request.method == 'POST':
         part_id = request.form['part_id']
         location_id = request.form['location_id']
@@ -70,7 +94,11 @@ def stock_in():
         note = request.form.get('note', '')
 
         # Find or create PartStock entry
-        part_stock = PartStock.query.filter_by(part_id=part_id, location_id=location_id).first()
+        part_stock = PartStock.query.join(Part).filter(
+            PartStock.part_id == part_id,
+            Part.tenant_id == current_user.tenant_id,
+            PartStock.location_id == location_id
+        ).first()
         if not part_stock:
             part_stock = PartStock(part_id=part_id, location_id=location_id, quantity=0)
             db.session.add(part_stock)
@@ -89,7 +117,16 @@ def stock_in():
         db.session.commit()
         flash('Stock updated successfully!', 'success')
         return redirect(url_for('parts_bp.parts_list'))
-    return render_template('parts/stock_in.html', parts=parts, locations=locations, search_query=search_query)
+    part_summaries = []
+    for part in parts:
+        total_qty = sum(s.quantity for s in part.stocks)
+        part_summaries.append({
+            'id': part.id,
+            'part_number': part.part_number,
+            'name': part.name,
+            'total_quantity': total_qty
+        })
+    return render_template('parts/stock_in.html', parts=parts, part_summaries=part_summaries, locations=locations, search_query=search_query)
 
 @parts_bp.route('/ajax_add', methods=['POST'])
 @login_required
@@ -103,7 +140,7 @@ def ajax_add_part():
     description = request.form.get('description', '')
 
     # Check for duplicate
-    if Part.query.filter_by(part_number=part_number).first():
+    if Part.query.filter_by(part_number=part_number, tenant_id=current_user.tenant_id).first():
         return jsonify(success=False, message='Part number already exists.')
 
     part = Part(
@@ -113,7 +150,8 @@ def ajax_add_part():
         vendor=vendor,
         min_stock=int(min_stock),
         price=float(price),
-        description=description
+        description=description,
+        tenant_id=current_user.tenant_id,
     )
     db.session.add(part)
     try:

@@ -10,6 +10,7 @@
 .table thead th {
   background: #f8f9fa;
   border-top: none;
+  font-weight: 600;
 }
 .table-hover tbody tr:hover {
   background: #f1f5f9;
@@ -20,40 +21,46 @@
   font-size: 0.99rem;
 }
 </style>
-<div class="container mt-4">
-  <h2>Vendor Center</h2>
-  <form method="get" class="d-flex justify-content-center align-items-center gap-3 mb-4 flex-wrap">
-    <input type="text" name="search" class="form-control form-control-lg rounded-pill px-3" style="max-width:340px;" placeholder="Search by vendor name" value="{{ search or '' }}">
-    <button type="submit" class="btn btn-primary btn-modern btn-lg">Search</button>
-    <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-success btn-modern btn-lg">Add Vendor</a>
-  </form>
-  <div class="card vendor-center-card mt-2">
+<div class="container-fluid px-4 mt-4">
+  <div class="d-flex align-items-center flex-wrap gap-3 mb-4">
+    <h2 class="mb-0">Vendor Center</h2>
+    <form method="get" class="d-flex align-items-end flex-wrap gap-2 w-100">
+      <input type="text" name="search" class="form-control form-control-lg rounded-pill px-3" style="min-width:260px; max-width:340px; height: 48px;" placeholder="Search by vendor name" value="{{ search or '' }}">
+      <button type="submit" class="btn btn-outline-primary rounded-pill px-4" style="height: 48px;">Search</button>
+      <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success rounded-pill px-4" style="height: 48px;">Add Vendor</a>
+    </form>
+  </div>
+  <div class="card vendor-center-card mt-2 w-100">
     <div class="card-body p-0">
-      <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0">
+      <div class="table-responsive">
+      <table class="table table-hover table-bordered text-nowrap mb-0">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>Company</th>
-            <th>Actions</th>
+            <th class="fw-semibold">Name</th>
+            <th class="fw-semibold">Phone</th>
+            <th class="fw-semibold">Email</th>
+            <th class="fw-semibold">Company</th>
+            <th class="fw-semibold">Assets</th>
+            <th class="fw-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for vendor in vendors %}
           <tr>
-            <td>{{ vendor.name }}</td>
-            <td>{{ vendor.phone or '' }}</td>
-            <td>{{ vendor.email or '' }}</td>
-            <td>{{ vendor.company or '' }}</td>
+            <td class="text-nowrap">{{ vendor.name }}</td>
+            <td class="text-nowrap">{{ vendor.phone or '' }}</td>
+            <td class="text-nowrap">{{ vendor.email or '' }}</td>
+            <td class="text-nowrap">{{ vendor.company or '' }}</td>
+            <td class="text-nowrap">{{ vendor.asset_count or 0 }}</td>
             <td>
-              <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-primary btn-modern">View</a>
-              <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-secondary btn-modern">Edit</a>
+              <div class="d-grid gap-2 d-sm-flex">
+                <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-primary btn-modern w-100 w-sm-auto">View</a>
+                <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-secondary btn-modern w-100 w-sm-auto">Edit</a>
+              </div>
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-center">No vendors found.</td></tr>
+          <tr><td colspan="6" class="text-center">No vendors found.</td></tr>
           {% endfor %}
         </tbody>
       </table>

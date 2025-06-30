@@ -6,12 +6,15 @@
     <h2 class="mb-4 text-primary">🔍 Preview Products to Import</h2>
 
     {% if data and columns|length > 0 %}
+    <p class="text-muted small mb-2">
+      The preview below includes all uploaded fields such as Serial, Asset, Item Name, and more.
+    </p>
     <div style="overflow-x:auto;">
         <table class="table table-bordered table-striped table-hover align-middle">
             <thead class="table-primary">
                 <tr>
                     {% for col in columns %}
-                    <th>{{ col|capitalize }}</th>
+                    <th class="text-nowrap">{{ col|capitalize }}</th>
                     {% endfor %}
                 </tr>
             </thead>

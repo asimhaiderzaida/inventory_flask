@@ -8,24 +8,25 @@
       </h3>
       <div class="text-muted" style="font-size:0.98rem;">Add or register a new vendor for PCMart</div>
     </div>
-    <form method="POST" action="{{ url_for('vendors_bp.add_vendor') }}">
-      <div class="mb-3 mb-3">
+    <form method="POST" action="{{ url_for('vendors_bp.add_vendor', next=request.args.get('next')) }}">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
         <label for="name" class="form-label">Vendor Name</label>
         <input type="text" class="form-control form-control-lg rounded-pill px-3" id="name" name="name" placeholder="Enter vendor name" required>
       </div>
-      <div class="mb-3 mb-3">
+      <div class="mb-3">
         <label for="email" class="form-label">Vendor Email</label>
         <input type="email" class="form-control form-control-lg rounded-pill px-3" id="email" name="email" placeholder="Enter vendor email">
       </div>
-      <div class="mb-3 mb-3">
+      <div class="mb-3">
         <label for="phone" class="form-label">Vendor Phone</label>
         <input type="text" class="form-control form-control-lg rounded-pill px-3" id="phone" name="phone" placeholder="Enter vendor phone">
       </div>
-      <div class="mb-3 mb-3">
+      <div class="mb-3">
         <label for="address" class="form-label">Vendor Address</label>
         <input type="text" class="form-control form-control-lg rounded-pill px-3" id="address" name="address" placeholder="Enter vendor address">
       </div>
-      <div class="mb-3 mb-3">
+      <div class="mb-3">
         <label for="contact" class="form-label">Contact Person</label>
         <input type="text" class="form-control form-control-lg rounded-pill px-3" id="contact" name="contact" placeholder="Enter contact person name">
       </div>

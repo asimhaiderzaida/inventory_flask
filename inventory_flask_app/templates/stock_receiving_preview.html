@@ -7,47 +7,77 @@
     </h2>
 
     <div class="mb-4">
-      <h5 class="text-success fw-semibold">✅ Matched Serials <span class="badge bg-success rounded-pill">{{ matched|length }}</span></h5>
+      <h5 class="text-success fw-semibold">
+        ✅ {{ settings.label_serial_number or 'Matched Serials' }}
+        <span class="badge bg-success rounded-pill">{{ matched|length }}</span>
+      </h5>
       <ul class="list-group mb-3">
-        {% for s in matched %}
-          <li class="list-group-item py-1">{{ s }}</li>
-        {% endfor %}
+        {% if settings.show_serial_number == 'true' %}
+          {% for s in matched %}
+            <li class="list-group-item py-1">
+              SN: {{ s.serial }}<br>
+              Asset: {{ s.asset }}
+            </li>
+          {% endfor %}
+        {% endif %}
         {% if matched|length == 0 %}
           <li class="list-group-item text-muted py-1">None</li>
         {% endif %}
       </ul>
 
-      <h5 class="text-danger fw-semibold">❌ Missing Serials <span class="badge bg-danger rounded-pill">{{ missing|length }}</span></h5>
+      <h5 class="text-danger fw-semibold">
+        ❌ {{ settings.label_serial_number or 'Missing Serials' }}
+        <span class="badge bg-danger rounded-pill">{{ missing|length }}</span>
+      </h5>
       <ul class="list-group mb-3">
-        {% for s in missing %}
-          <li class="list-group-item py-1">{{ s }}</li>
-        {% endfor %}
+        {% if settings.show_serial_number == 'true' %}
+          {% for s in missing %}
+            <li class="list-group-item py-1">
+              SN: {{ s.serial }}<br>
+              Asset: {{ s.asset }}
+            </li>
+          {% endfor %}
+        {% endif %}
         {% if missing|length == 0 %}
           <li class="list-group-item text-muted py-1">None</li>
         {% endif %}
       </ul>
 
-      <h5 class="text-warning fw-semibold">⚠️ Extra Serials <span class="badge bg-warning text-dark rounded-pill">{{ extra|length }}</span></h5>
+      <h5 class="text-warning fw-semibold">
+        ⚠️ {{ settings.label_serial_number or 'Extra Serials' }}
+        <span class="badge bg-warning text-dark rounded-pill">{{ extra|length }}</span>
+      </h5>
       <ul class="list-group mb-3">
-        {% for s in extra %}
-          <li class="list-group-item py-1">{{ s }}</li>
-        {% endfor %}
+        {% if settings.show_serial_number == 'true' %}
+          {% for s in extra %}
+            <li class="list-group-item py-1">
+              SN: {{ s.serial }}<br>
+              Asset: {{ s.asset }}
+            </li>
+          {% endfor %}
+        {% endif %}
         {% if extra|length == 0 %}
           <li class="list-group-item text-muted py-1">None</li>
         {% endif %}
       </ul>
     </div>
 
-    <form method="POST" action="{{ url_for('confirm_receiving') }}">
-      <div class="d-flex justify-content-end mt-4 gap-2">
-        <a href="{{ url_for('stock_bp.stock_receiving') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i>Back
-        </a>
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
+    <div class="d-grid gap-3 mt-3">
+      <form method="POST">
+        <input type="hidden" name="reset_scanned" value="1">
+        <button type="submit" class="btn btn-outline-danger rounded-pill fw-semibold btn-lg w-100">
+          <i class="bi bi-x-circle me-1"></i>Reset Scanned
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('confirm_receiving') }}">
+        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100">
           <i class="bi bi-check2-circle me-1"></i>Confirm Received
         </button>
-      </div>
-    </form>
+      </form>
+      <a href="{{ url_for('stock_bp.stock_receiving') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100">
+        <i class="bi bi-arrow-left-circle me-1"></i>Back
+      </a>
+    </div>
   </div>
 </div>
 {% endblock %}

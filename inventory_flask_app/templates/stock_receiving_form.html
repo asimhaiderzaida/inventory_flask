@@ -1,53 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 90vh;">
-  <div class="receiving-box">
-    <h2 class="text-center mb-4 text-primary" style="font-size: 1.5rem; font-weight: 700;">
-      <i class="bi bi-inboxes me-2"></i>Stock Receiving
-    </h2>
+<div class="container py-5">
+  <div class="card shadow-lg rounded-4 mx-auto" style="max-width: 720px;">
+    <div class="card-body px-4 py-5">
+      <h2 class="mb-4 text-center text-primary fw-bold">
+        <i class="bi bi-inboxes me-2"></i>
+        {{ settings.label_stock_receiving_form_header or 'Stock Receiving' }}
+      </h2>
 
-    <form method="POST">
-      <div class="mb-3 mb-3">
-        <label class="form-label fw-bold">Select Purchase Order:</label>
-        <select name="po_id" class="form-select form-control-lg rounded-pill px-3" required>
-          <option value="">-- Select PO --</option>
-          {% for po in purchase_orders %}
-            <option value="{{ po.id }}" {% if selected_po and selected_po.id == po.id %}selected{% endif %}>
-              PO #{{ po.id }} — Vendor: {{ po.vendor.name }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
+      <form method="POST">
+        <div class="mb-4 table-responsive-sm">
+          <label class="form-label fw-semibold">Select Purchase Order</label>
+          <select name="po_id" class="form-select form-select-lg rounded-pill px-3" required>
+            <option value="">-- Select PO --</option>
+            {% for po in purchase_orders %}
+              <option value="{{ po.id }}" class="text-nowrap" {% if selected_po and selected_po.id == po.id %}selected{% endif %}>
+                PO #{{ po.id }} — Vendor: {{ po.vendor.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
 
-      <div class="mb-3 mb-3">
-        <label class="form-label fw-bold">Paste Scanned Serials:</label>
-        <textarea name="scanned_serials" class="form-control form-control-lg rounded-4 px-3" rows="8" placeholder="Paste or scan one serial per line or comma-separated..." required></textarea>
-        <small class="text-muted">Format: one per line or comma-separated.</small>
-      </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Paste Scanned Serials or Assets</label>
+          <textarea name="scanned_serials" class="form-control form-control-lg rounded-4 px-3" rows="6" placeholder="Paste or scan one serial or asset per line or comma-separated..." required></textarea>
+          <div class="form-text">Format: one per line or comma-separated. Both serials and assets are supported.</div>
+        </div>
 
-      <div class="d-flex flex-column gap-2 mt-3">
-        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i>Back
-        </a>
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-search me-1"></i>Compare & Preview
-        </button>
-      </div>
-    </form>
+        <div class="d-flex flex-column gap-3 mt-4">
+          <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100">
+            <i class="bi bi-search me-1"></i> Compare & Preview
+          </button>
+          <button type="submit" name="reset_scanned" value="1" class="btn btn-outline-danger rounded-pill fw-semibold btn-lg w-100">
+            <i class="bi bi-x-circle me-1"></i> Reset Scanned
+          </button>
+          <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100">
+            <i class="bi bi-arrow-left-circle me-1"></i> Back
+          </a>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
-
-<style>
-  .receiving-box {
-    background-color: #f3f4f8;
-    padding: 36px 28px;
-    border-radius: 1.1rem;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
-    width: 100%;
-    max-width: 700px;
-  }
-  h2 { font-weight: 700; }
-  .form-label { font-size: 1rem; }
-  .form-select, textarea { font-size: 0.97rem; }
-</style>
 {% endblock %}

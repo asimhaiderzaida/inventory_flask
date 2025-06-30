@@ -62,8 +62,8 @@
 </style>
 <div class="fixed-vendor-header">
   <div class="container-fluid">
-    <div class="row">
-      <div class="col d-flex flex-column justify-content-start">
+    <div class="d-flex justify-content-between align-items-start flex-wrap w-100 px-4">
+      <div class="d-flex flex-column">
         <h2 class="mb-2">Vendor Profile</h2>
         <div class="card shadow-sm mb-0" style="max-width:400px;">
           <div class="card-body py-2 px-3">
@@ -75,14 +75,14 @@
           </div>
         </div>
       </div>
-      <div class="col-auto vendor-actions align-items-center">
+      <div class="d-flex flex-column align-items-end ms-auto vendor-actions">
         <a href="{{ url_for('vendors_bp.export_vendor_po', vendor_id=vendor.id) }}" class="btn btn-outline-success btn-lg">Export PO History (Excel)</a>
         <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-secondary btn-lg">Back to Vendor Center</a>
       </div>
     </div>
   </div>
 </div>
-<div class="vendor-main-content">
+<div class="vendor-main-content" style="max-width: 100%; width: 100%;">
   <h4 class="mt-4 mb-3">Purchase Orders</h4>
   <div style="overflow-x:auto;">
     <table class="table table-bordered table-striped">
@@ -118,31 +118,29 @@
                   <thead>
                     <tr>
                       <th class="align-middle">Serial</th>
-                      <th class="align-middle">Product Name</th>
+                      <th class="align-middle">Asset</th>
+                      <th class="align-middle">Item Name</th>
                       <th class="align-middle">Model</th>
                       <th class="align-middle">RAM</th>
-                      <th class="align-middle">Processor</th>
-                      <th class="align-middle">Storage</th>
-                      <th class="align-middle">Screen Size</th>
-                      <th class="align-middle">Resolution</th>
+                      <th class="align-middle">CPU</th>
+                      <th class="align-middle">Disk 1 Size</th>
                       <th class="align-middle">Grade</th>
-                      <th class="align-middle">Video Card</th>
+                      <th class="align-middle">GPU 1</th>
                       <th class="align-middle">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for inst in po_details_map[po.id] %}
                     <tr>
-                      <td class="align-middle">{{ inst.serial_number }}</td>
-                      <td class="align-middle">{{ inst.product.name if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.model_number if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.ram if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.processor if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.storage if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.screen_size if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.resolution if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.grade if inst.product else '' }}</td>
-                      <td class="align-middle">{{ inst.product.video_card if inst.product else '' }}</td>
+                      <td class="align-middle">{{ inst.serial }}</td>
+                      <td class="align-middle">{{ inst.asset }}</td>
+                      <td class="align-middle">{{ inst.item_name }}</td>
+                      <td class="align-middle">{{ inst.model }}</td>
+                      <td class="align-middle">{{ inst.ram }}</td>
+                      <td class="align-middle">{{ inst.cpu }}</td>
+                      <td class="align-middle">{{ inst.disk1size }}</td>
+                      <td class="align-middle">{{ inst.grade }}</td>
+                      <td class="align-middle">{{ inst.gpu1 }}</td>
                       <td class="align-middle">{{ inst.status }}</td>
                     </tr>
                     {% endfor %}
@@ -202,35 +200,33 @@
                   <thead>
                     <tr>
                       <th class="align-middle">Serial</th>
-                      <th class="align-middle">Product Name</th>
+                      <th class="align-middle">Asset</th>
+                      <th class="align-middle">Item Name</th>
                       <th class="align-middle">Model</th>
                       <th class="align-middle">RAM</th>
-                      <th class="align-middle">Processor</th>
-                      <th class="align-middle">Storage</th>
-                      <th class="align-middle">Screen Size</th>
-                      <th class="align-middle">Resolution</th>
+                      <th class="align-middle">CPU</th>
+                      <th class="align-middle">Disk 1 Size</th>
                       <th class="align-middle">Grade</th>
-                      <th class="align-middle">Video Card</th>
+                      <th class="align-middle">GPU 1</th>
                       <th class="align-middle">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for inst in direct_uploads_map[upload.upload_date] %}
                     <tr>
-                      <td class="align-middle">{{ inst.serial_number }}</td>
-                      <td class="align-middle">{{ inst.product_name }}</td>
-                      <td class="align-middle">{{ inst.model_number }}</td>
+                      <td class="align-middle">{{ inst.serial }}</td>
+                      <td class="align-middle">{{ inst.asset }}</td>
+                      <td class="align-middle">{{ inst.item_name }}</td>
+                      <td class="align-middle">{{ inst.model }}</td>
                       <td class="align-middle">{{ inst.ram }}</td>
-                      <td class="align-middle">{{ inst.processor }}</td>
-                      <td class="align-middle">{{ inst.storage }}</td>
-                      <td class="align-middle">{{ inst.screen_size }}</td>
-                      <td class="align-middle">{{ inst.resolution }}</td>
+                      <td class="align-middle">{{ inst.cpu }}</td>
+                      <td class="align-middle">{{ inst.disk1size }}</td>
                       <td class="align-middle">{{ inst.grade }}</td>
-                      <td class="align-middle">{{ inst.video_card }}</td>
+                      <td class="align-middle">{{ inst.gpu1 }}</td>
                       <td class="align-middle">{{ inst.status }}</td>
                     </tr>
                     {% else %}
-                    <tr><td class="align-middle text-center" colspan="11">No items for this upload.</td></tr>
+                    <tr><td class="align-middle text-center" colspan="10">No items for this upload.</td></tr>
                     {% endfor %}
                   </tbody>
                 </table>

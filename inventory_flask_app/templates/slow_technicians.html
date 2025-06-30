@@ -1,0 +1,52 @@
+
+
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+  <div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body">
+      <h4 class="mb-4">Slow Technician Units (Inactive &gt; {{ threshold_days }} days)</h4>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle shadow-sm w-100" style="min-width: 960px;">
+          <thead class="table-light">
+            <tr>
+              <th>Serial</th>
+              <th>Asset</th>
+              <th>Model</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>Grade</th>
+              <th>Status</th>
+              <th>Team Assigned</th>
+              <th>Last Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in instances %}
+            <tr>
+              <td>{{ i.serial }}</td>
+              <td>{{ i.asset }}</td>
+              <td>{{ i.product.model if i.product }}</td>
+              <td>{{ i.product.cpu if i.product }}</td>
+              <td>{{ i.product.ram if i.product }}</td>
+              <td>{{ i.product.grade if i.product }}</td>
+              <td>{{ i.status }}</td>
+              <td>{{ i.team_assigned }}</td>
+              <td>{{ i.updated_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="10" class="text-center text-muted py-4">No delayed technician units found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

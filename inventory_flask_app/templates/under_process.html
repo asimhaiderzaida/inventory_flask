@@ -38,21 +38,25 @@
         <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
           <thead class="table-light">
             <tr>
-              <th>Serial</th>
-              <th>Model</th>
-              <th>Stage</th>
-              <th>Team</th>
-              <th>Last Updated</th>
+              <th class="text-nowrap">Serial</th>
+              <th class="text-nowrap">Asset</th>
+              <th class="text-nowrap">Product</th>
+              <th class="text-nowrap">Stage</th>
+              <th class="text-nowrap">Team</th>
+              <th class="text-nowrap">Last Updated</th>
             </tr>
           </thead>
           <tbody>
             {% for instance in instances %}
             <tr>
-              <td>{{ instance.serial_number }}</td>
-              <td>{{ instance.product.model_number }}</td>
-              <td>{{ instance.process_stage|capitalize }}</td>
-              <td>{{ instance.team_assigned }}</td>
-              <td>{{ instance.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="text-nowrap">{{ instance.serial }}</td>
+              <td class="text-nowrap">{{ instance.asset }}</td>
+              <td class="text-nowrap">
+                {{ instance.product.item_name }} ({{ instance.product.model }})
+              </td>
+              <td class="text-nowrap">{{ instance.process_stage|capitalize }}</td>
+              <td class="text-nowrap">{{ instance.team_assigned }}</td>
+              <td class="text-nowrap">{{ instance.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
             </tr>
             {% endfor %}
           </tbody>

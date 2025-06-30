@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4" style="max-width: 500px;">
-  <h3>Register New User</h3>
+  <h3 class="mb-4 fw-semibold text-primary text-center">👤 Register New User</h3>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -13,24 +13,29 @@
     {% endif %}
   {% endwith %}
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="mb-3">
-      <label>Username</label>
-      <input name="username" type="text" class="form-control" required>
+      <label class="form-label fw-semibold">Full Name</label>
+      <input name="full_name" type="text" class="form-control form-control-lg rounded-pill px-3" required>
     </div>
     <div class="mb-3">
-      <label>Password</label>
-      <input name="password" type="password" class="form-control" required>
+      <label class="form-label fw-semibold">Username</label>
+      <input name="username" type="text" class="form-control form-control-lg rounded-pill px-3" required>
     </div>
     <div class="mb-3">
-      <label>Role</label>
-      <select name="role" class="form-select">
+      <label class="form-label fw-semibold">Password</label>
+      <input name="password" type="password" class="form-control form-control-lg rounded-pill px-3" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Role</label>
+      <select name="role" class="form-select form-select-lg rounded-pill px-3">
         <option value="technician" selected>Technician</option>
         <option value="admin">Admin</option>
         <option value="supervisor">Supervisor</option>
         <option value="staff">Staff</option>
       </select>
     </div>
-    <button type="submit" class="btn btn-primary">Register User</button>
+    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-semibold">➕ Register</button>
   </form>
 </div>
 {% endblock %}

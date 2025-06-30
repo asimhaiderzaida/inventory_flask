@@ -1,31 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-  <h2>Edit Product Instance</h2>
-  <form method="POST" class="row g-3">
-    <div class="col-md-6">
-      <div class="card mb-3">
+  <h2 class="mb-4">Edit Product Instance</h2>
+  <form method="POST" class="row row-cols-1 row-cols-md-2 g-4">
+    <div class="col">
+      <div class="card h-100">
         <div class="card-header bg-light">
           <strong>Product Details</strong>
         </div>
         <div class="card-body">
-          <div class="mb-2"><strong>Serial:</strong> {{ instance.serial_number }}</div>
-          <div class="mb-2"><strong>Model:</strong> {{ instance.product.model_number if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Name:</strong> {{ instance.product.name if instance.product else '' }}</div>
-          <div class="mb-2"><strong>RAM:</strong> {{ instance.product.ram if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Processor:</strong> {{ instance.product.processor if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Storage:</strong> {{ instance.product.storage if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Screen Size:</strong> {{ instance.product.screen_size if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Resolution:</strong> {{ instance.product.resolution if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Grade:</strong> {{ instance.product.grade if instance.product else '' }}</div>
-          <div class="mb-2"><strong>Video Card:</strong> {{ instance.product.video_card if instance.product else '' }}</div>
+          <p class="mb-2"><strong>Serial:</strong> {{ instance.serial_number }}</p>
+          <p class="mb-2"><strong>Asset Tag:</strong> {{ instance.asset_tag }}</p>
+          <p class="mb-2"><strong>Model:</strong> {{ instance.product.model if instance.product else '' }}</p>
+          <p class="mb-2"><strong>Name:</strong> {{ instance.product.item_name if instance.product else '' }}</p>
+          <p class="mb-2"><strong>RAM:</strong> {{ instance.product.ram if instance.product else '' }}</p>
+          <p class="mb-2"><strong>Processor:</strong> {{ instance.product.cpu if instance.product else '' }}</p>
+          <p class="mb-2"><strong>Storage:</strong> {{ instance.product.disk1size if instance.product else '' }}</p>
+          <p class="mb-2"><strong>Grade:</strong> {{ instance.product.grade if instance.product else '' }}</p>
+          <p class="mb-2"><strong>Video Card:</strong> {{ instance.product.gpu1 if instance.product else '' }}</p>
         </div>
       </div>
     </div>
-    <div class="col-md-6">
+    <div class="col">
       <div class="mb-3">
-        <label class="form-label">Status</label>
-        <select name="status" class="form-select form-select-lg">
+        <label for="status" class="form-label fw-semibold">Status</label>
+        <select id="status" name="status" class="form-select form-select-lg">
           <option value="unprocessed" {% if instance.status == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
           <option value="under_process" {% if instance.status == 'under_process' %}selected{% endif %}>Under Process</option>
           <option value="processed" {% if instance.status == 'processed' %}selected{% endif %}>Processed</option>
@@ -33,20 +32,20 @@
         </select>
       </div>
       <div class="mb-3">
-        <label class="form-label">Process Stage</label>
-        <input type="text" name="process_stage" class="form-control form-control-lg" value="{{ instance.process_stage or '' }}">
+        <label for="process_stage" class="form-label fw-semibold">Process Stage</label>
+        <input type="text" id="process_stage" name="process_stage" class="form-control form-control-lg" value="{{ instance.process_stage or '' }}">
       </div>
       <div class="mb-3">
-        <label class="form-label">Team Assigned</label>
-        <input type="text" name="team_assigned" class="form-control form-control-lg" value="{{ instance.team_assigned or '' }}">
+        <label for="team_assigned" class="form-label fw-semibold">Team Assigned</label>
+        <input type="text" id="team_assigned" name="team_assigned" class="form-control form-control-lg" value="{{ instance.team_assigned or '' }}">
       </div>
-      <button type="submit" class="btn btn-primary btn-lg w-100 mt-2">Save</button>
-      <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-secondary ms-2 btn-lg w-100 mt-2">Cancel</a>
+      <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Save</button>
+      <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-secondary btn-lg w-100 mt-3">Cancel</a>
     </div>
   </form>
   <form method="POST" action="{{ url_for('stock_bp.delete_instance', instance_id=instance.id) }}"
-        onsubmit="return confirm('Are you sure you want to delete this item?');" style="display:inline;">
-    <button type="submit" class="btn btn-danger ms-2 btn-lg w-100 mt-2">Delete</button>
+        onsubmit="return confirm('Are you sure you want to delete this item?');" class="mt-4">
+    <button type="submit" class="btn btn-danger btn-lg w-100">Delete</button>
   </form>
 </div>
 {% endblock %}

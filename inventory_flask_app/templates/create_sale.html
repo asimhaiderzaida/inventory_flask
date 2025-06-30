@@ -1,16 +1,15 @@
 {% extends "base.html" %}
-            
-{% block content %}
 
+{% block head %}
 <style>
 .create-sale-card {
   background: #f3f4f8;
   border-radius: 1.2rem;
   box-shadow: 0 2px 16px #0057b710;
   border: none;
-  padding: 2rem 1.4rem 1.4rem 1.4rem;
-  max-width: 850px;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 1.2rem 0.6rem;
 }
 .create-sale-heading {
   font-size: 1.62rem;
@@ -21,7 +20,33 @@
   .create-sale-card { padding: 1.2rem 0.3rem; }
   .create-sale-heading { font-size: 1.15rem; }
 }
+@media (min-width: 1200px) {
+  .create-sale-card {
+    max-width: 100%;
+  }
+}
+body {
+  background-color: #f5f7fa;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+table.table td,
+table.table th {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+@media (max-width: 992px) {
+  .table-responsive table {
+    font-size: 0.88rem;
+  }
+}
 </style>
+{% endblock %}
+{% block content %}
 
 {% if selected_instances %}
 <script>
@@ -29,70 +54,93 @@ var products = [
   {% for item in selected_instances %}
   {
     product_instance_id: {{ item.id }},
-    serial_number: "{{ item.serial_number }}",
-    name: "{{ item.product.name|e }}",
-    model_number: "{{ item.product.model_number|e }}",
-    cpu: "{{ item.product.processor|e }}",
+    serial: "{{ item.serial }}",
+    asset: "{{ item.asset|e }}",
+    name: "{{ item.product.item_name|e }}",
+    make: "{{ item.product.make|e }}",
+    model: "{{ item.product.model|e }}",
+    cpu: "{{ item.product.cpu|e }}",
     ram: "{{ item.product.ram|e }}",
-    storage: "{{ item.product.storage|e }}",
-    gpu: "{{ item.product.video_card|e }}",
+    disk1size: "{{ item.product.disk1size|e }}",
+    display: "{{ item.product.display|e }}",
+    gpu1: "{{ item.product.gpu1|e }}",
+    gpu2: "{{ item.product.gpu2|e }}",
     grade: "{{ item.product.grade|e }}",
-    screen_size: "{{ item.product.screen_size|e }}",
     price_at_sale: 0
   }{% if not loop.last %},{% endif %}
   {% endfor %}
 ];
 </script>
+{% elif available_instances %}
+<script>
+var products = [];
+const availableSerials = {{ available_instances | tojson | safe }};
+const availableSerialsData = {{ available_serials_data | tojson | safe }};
+</script>
 {% else %}
 <script>
 var products = [];
+const availableSerialsData = {{ available_serials_data | tojson | safe }};
 </script>
 {% endif %}
 
-<div class="create-sale-card mt-5">
-  <div class="mb-4 text-center">
-    <h2 class="create-sale-heading mb-1">
-      <i class="bi bi-receipt text-primary me-2"></i>Create Sale Invoice
-    </h2>
-    <div class="text-muted" style="font-size:1.07rem;">Complete the fields below to generate an invoice</div>
-  </div>
-  <form id="saleForm">
+<div class="container" style="max-width: 880px;">
+  <div class="create-sale-card mt-5">
+    <div class="mb-4 text-center">
+      <h2 class="create-sale-heading mb-1">
+        <i class="bi bi-receipt text-primary me-2"></i>Create Sale Invoice
+      </h2>
+      <div class="text-muted" style="font-size:1.07rem;">Complete the fields below to generate an invoice</div>
+    </div>
+    <form id="saleForm" class="form">
       <div class="mb-3">
-          <label for="customerSelect" class="form-label">Select Customer:</label>
-          <div class="d-flex flex-column flex-md-row">
-              <select id="customerSelect" class="form-select form-control-lg me-md-2 rounded-pill px-3" name="customer_id" required>
-                  <option value="">-- Select Customer --</option>
-                  {% for customer in customers %}
-                      <option value="{{ customer.id }}"
-                          {% if selected_customer_id and customer.id|string == selected_customer_id|string %}selected{% endif %}
-                      >{{ customer.name }}</option>
-                  {% endfor %}
-              </select>
-              <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2 mt-md-0">➕ Add New Customer</a>
+        <label for="customerSelect" class="form-label">Select Customer:</label>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-8">
+            <select id="customerSelect" class="form-select form-control-sm rounded-pill px-3" style="max-width: 400px;" name="customer_id" required>
+              <option value="">-- Select Customer --</option>
+              {% for customer in customers %}
+                  <option value="{{ customer.id }}"
+                      {% if selected_customer_id and customer.id|string == selected_customer_id|string %}selected{% endif %}
+                  >{{ customer.name }}</option>
+              {% endfor %}
+            </select>
           </div>
+          <div class="col-md-4">
+            <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-primary rounded-pill fw-semibold btn-sm px-4 w-100" style="min-width: 160px;">➕ Add Customer</a>
+          </div>
+        </div>
       </div>
-      
+
       <div id="scan-add-row" class="mb-3">
-          <div class="mb-3">
-              <label for="scanSerial" class="form-label">Scan or Type Serial Number:</label>
-              <input type="text" id="scanSerial" class="form-control form-control-lg rounded-pill px-3" placeholder="Enter or scan serial number">
+        <div class="row g-3 align-items-end mt-3">
+          <div class="col-md-8">
+            <label for="scanSerialInput" class="form-label">Scan or Type Serial Number:</label>
+            <input type="text" id="scanSerialInput" class="form-control form-control-sm rounded-pill px-3" style="max-width: 400px;" placeholder="Enter or scan serial number">
           </div>
-          <button type="button" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold" onclick="addProduct()">Add Product</button>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-primary btn-sm fw-semibold px-4 w-100" style="min-width: 160px;" onclick="addProduct()">➕ Add Product</button>
+          </div>
+        </div>
       </div>
-              
-      <div style="overflow-x:auto;">
-        <table class="table table-hover table-sm align-middle" id="productTable" style="display: none;">
+
+      <!-- MOVED TABLE BLOCK HERE, new markup below -->
+      <div class="table-responsive mt-4" style="overflow-x: auto;">
+        <table class="table table-hover table-sm align-middle table-bordered table-striped shadow-sm rounded" id="productTable" style="display: none; min-width: 960px;">
             <thead>
                 <tr>
-                    <th>Serial Number</th>
-                    <th>Product Name</th>
-                    <th>Model Number</th>
+                    <th>Serial</th>
+                    <th>Asset</th>
+                    <th>Item Name</th>
+                    <th>Make</th>
+                    <th>Model</th>
                     <th class="d-none d-md-table-cell">CPU</th>
                     <th class="d-none d-md-table-cell">RAM</th>
-                    <th class="d-none d-md-table-cell">Storage</th>
-                    <th class="d-none d-md-table-cell">GPU</th>
+                    <th class="d-none d-md-table-cell">Disk</th>
+                    <th class="d-none d-md-table-cell">Display</th>
+                    <th class="d-none d-md-table-cell">GPU 1</th>
+                    <th class="d-none d-md-table-cell">GPU 2</th>
                     <th class="d-none d-md-table-cell">Grade</th>
-                    <th class="d-none d-md-table-cell">Screen</th>
                     <th class="d-none d-md-table-cell">Price (USD)</th>
                     <th>Remove</th>
                 </tr>
@@ -100,9 +148,21 @@ var products = [];
             <tbody id="productList"></tbody>
         </table>
       </div>
-          
-      <button type="submit" id="submitInvoiceBtn" class="btn btn-success btn-lg w-100 mt-2 rounded-pill fw-semibold" style="display: none;">Confirm Sale & Create Invoice</button>
-      <button type="button" id="previewInvoiceBtn" class="btn btn-info btn-lg w-100 mt-2 rounded-pill fw-semibold" style="display: none;">Preview Invoice</button>
+      <!-- END MOVED TABLE BLOCK -->
+
+      <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-3">
+        <button type="submit" id="submitInvoiceBtn" class="btn btn-success btn-sm px-4 fw-semibold" style="display: none;">✅ Confirm & Create Invoice</button>
+        <button type="button" id="previewInvoiceBtn" class="btn btn-outline-primary btn-sm px-4 fw-semibold" style="display: none;">👁️ Preview Invoice</button>
+      </div>
+      <div id="saleLoadingSpinner" class="text-center mt-3" style="display:none;">
+        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+      </div>
+      <script>
+      // Inject availableSerials into autocomplete or dropdown later if needed
+      if (typeof availableSerials !== 'undefined' && Array.isArray(availableSerials)) {
+          console.log('Available unsold instances for selection:', availableSerials);
+      }
+      </script>
   </form>
 </div>
 
@@ -114,7 +174,9 @@ var products = [];
         <h5 class="modal-title me-3" id="invoicePreviewModalLabel">Invoice Preview</h5>
         <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="printPreviewInvoice()">🖨️ Print</button>
         <button type="button" class="btn btn-outline-success btn-sm me-2" id="downloadPdfBtn" style="display:none;">⬇️ Download PDF</button>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+          ✖ Close Preview
+        </button>
       </div>
       <div class="modal-body" id="preview-container">
         <!-- Invoice HTML will be inserted here -->
@@ -125,15 +187,16 @@ var products = [];
             
 <script>
 function addProduct() {
-    const serial = document.getElementById('scanSerial').value.trim();
+    const rawInput = document.getElementById('scanSerialInput').value.trim();
+    const serial = rawInput.toUpperCase();
     if (!serial) {
         alert('Please scan or enter a serial number.');
         return;
     }
 
-    // Check for duplicate serial number in products
-    if (products.some(p => p.serial_number === serial)) {
-        alert('This product is already added to the sale.');
+    if (products.some(p => (p.serial && p.serial.toUpperCase() === serial))) {
+        alert('⚠️ This serial is already added to the sale.');
+        document.getElementById('scanSerialInput').value = '';
         return;
     }
 
@@ -151,23 +214,27 @@ function addProduct() {
                 return;
             }
 
+            // Use 'serial' field from data for both 'serial'
             const product = {
                 product_instance_id: data.product_instance_id,
-                serial_number: data.serial_number,
-                name: data.name,
-                model_number: data.model_number,
-                cpu: data.processor,         // map backend 'processor' to JS 'cpu'
+                serial: data.serial,
+                asset: data.asset, // Ensure asset field is present
+                name: data.item_name,
+                make: data.make,
+                model: data.model,
+                cpu: data.cpu,
                 ram: data.ram,
-                storage: data.storage,
-                gpu: data.video_card,        // map backend 'video_card' to JS 'gpu'
+                disk1size: data.disk1size,
+                display: data.display,
+                gpu1: data.gpu1,
+                gpu2: data.gpu2,
                 grade: data.grade,
-                screen_size: data.screen_size,
                 price_at_sale: 0
             };
 
             products.push(product);
             updateProductTable();
-            document.getElementById('scanSerial').value = '';
+            document.getElementById('scanSerialInput').value = '';
         })
         .catch(err => {
             console.error('Fetch error:', err);
@@ -176,7 +243,7 @@ function addProduct() {
 }
 
 // Listen for Enter key on the serial input to trigger addProduct
-document.getElementById('scanSerial').addEventListener('keydown', function(e) {
+document.getElementById('scanSerialInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
         addProduct();
@@ -192,17 +259,23 @@ function updateProductTable() {
     products.forEach((product, index) => {
         total += parseFloat(product.price_at_sale) || 0;
         const row = document.createElement('tr');
+        // Ensure asset is shown in the correct column (second column)
         row.innerHTML = `
-            <td>${product.serial_number}</td>
+            <td>${product.serial || product.serial_number || ''}</td>
+            <td>${product.asset || product.asset_tag || ''}</td>
             <td>${product.name}</td>
-            <td>${product.model_number}</td>
+            <td>${product.make || ''}</td>
+            <td>${product.model || ''}</td>
             <td class="d-none d-md-table-cell">${product.cpu || ''}</td>
             <td class="d-none d-md-table-cell">${product.ram || ''}</td>
-            <td class="d-none d-md-table-cell">${product.storage || ''}</td>
-            <td class="d-none d-md-table-cell">${product.gpu || ''}</td>
+            <td class="d-none d-md-table-cell">${product.disk1size || ''}</td>
+            <td class="d-none d-md-table-cell">${product.display || ''}</td>
+            <td class="d-none d-md-table-cell">${product.gpu1 || ''}</td>
+            <td class="d-none d-md-table-cell">${product.gpu2 || ''}</td>
             <td class="d-none d-md-table-cell">${product.grade || ''}</td>
-            <td class="d-none d-md-table-cell">${product.screen_size || ''}</td>
-            <td class="d-none d-md-table-cell"><input type="number" value="${product.price_at_sale}" min="0" onchange="updatePrice(${index}, this.value)" class="form-control"></td>
+            <td class="d-none d-md-table-cell">
+              <input type="number" value="${product.price_at_sale}" min="0" onchange="updatePrice(${index}, this.value)" class="form-control" style="min-width: 100px; max-width: 150px;">
+            </td>
             <td><button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">Remove</button></td>
         `;
         tbody.appendChild(row);
@@ -212,7 +285,7 @@ function updateProductTable() {
     if (products.length > 0) {
         const totalRow = document.createElement('tr');
         totalRow.innerHTML = `
-            <td colspan="9" style="text-align:right;"><strong>Total:</strong></td>
+            <td colspan="12" style="text-align:right;"><strong>Total:</strong></td>
             <td colspan="2"><strong>$${total.toFixed(2)}</strong></td>
         `;
         tbody.appendChild(totalRow);
@@ -258,11 +331,16 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        document.getElementById('saleLoadingSpinner').style.display = 'block';
+
         const saleFormData = new FormData();
         saleFormData.append('customer_id', customerId);
+        // Ensure we are always using serial and asset as in invoice preview & backend
         products.forEach((product) => {
-            saleFormData.append('serials', product.serial_number);
-            saleFormData.append(`price_${product.serial_number}`, product.price_at_sale || 0);
+            // Use .serial for serials and .asset for assets, always present
+            saleFormData.append('serials', product.serial);
+            saleFormData.append('assets', product.asset);
+            saleFormData.append(`price_${product.serial}`, product.price_at_sale || 0);
         });
 
         fetch('/confirm_sale', {
@@ -277,18 +355,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('modalDownloadInvoiceBtn').onclick = function() {
                     window.open(data.invoice_url, "_blank");
                     modal.hide();
+                    document.getElementById('saleLoadingSpinner').style.display = 'none';
                 };
                 document.getElementById('modalDoneBtn').onclick = function() {
                     modal.hide();
+                    document.getElementById('saleLoadingSpinner').style.display = 'none';
                     window.location.href = "/create_sale_form";
                 };
+                document.getElementById('saleLoadingSpinner').style.display = 'none';
             } else {
                 alert(data.error || "Failed to confirm sale.");
+                document.getElementById('saleLoadingSpinner').style.display = 'none';
             }
         })
         .catch(err => {
             console.error('Submit error:', err);
             alert('Failed to confirm sale.');
+            document.getElementById('saleLoadingSpinner').style.display = 'none';
         });
     });
 });
@@ -303,6 +386,7 @@ document.getElementById('previewInvoiceBtn').addEventListener('click', function 
         alert('Please add at least one product.');
         return;
     }
+    document.getElementById('saleLoadingSpinner').style.display = 'block';
     fetch('/preview_invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,10 +398,12 @@ document.getElementById('previewInvoiceBtn').addEventListener('click', function 
         document.getElementById('preview-container').innerHTML = html;
         var modal = new bootstrap.Modal(document.getElementById('invoicePreviewModal'));
         modal.show();
+        document.getElementById('saleLoadingSpinner').style.display = 'none';
     })
     .catch(err => {
         console.error('Preview error:', err);
         alert('Failed to generate invoice preview.');
+        document.getElementById('saleLoadingSpinner').style.display = 'none';
     });
 });
 

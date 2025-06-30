@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>{% block title %}PCMart{% endblock %}</title>
+  <meta name="theme-color" content="{{ settings.primary_color or '#007bff' }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.2/dist/spacelab/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
@@ -13,8 +14,15 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f8f9fa;
       margin: 0;
+    }
+    body.light {
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+    body.dark {
+      background-color: #1e1e1e;
+      color: #f1f1f1;
     }
 
     .sidebar {
@@ -27,17 +35,25 @@
       z-index: 1030;
     }
     .sidebar .nav-link {
-      color: #dbeafe;
+      color: #1f2b3e;
+      font-weight: 500;
       border-radius: 0.7rem;
       padding: 0.55rem 1rem;
       font-size: 1rem;
       transition: background 0.12s, color 0.12s;
     }
+    .sidebar .nav-link {
+      transition: all 0.2s ease;
+    }
+    .sidebar .nav-link:hover {
+      transform: scale(1.04);
+      background-color: rgba(0, 0, 0, 0.05);
+      color: #000;
+    }
     .sidebar .nav-link.active,
     .sidebar .nav-link:hover {
-      background: #ffffff22;
-      color: #fff;
-      font-weight: 600;
+      background: rgba(0, 0, 0, 0.04);
+      color: #0d1117;
     }
     .sidebar .nav-link i {
       font-size: 1.25em;
@@ -46,11 +62,12 @@
     .navbar {
       position: fixed;
       top: 0;
-      left: 240px;   /* Match the sidebar width */
+      left: 240px;
       right: 0;
       height: 60px;
-      background-color: #ffffff;
-      border-bottom: 1px solid #dee2e6;
+      background-color: transparent;
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       display: flex;
       align-items: center;
       padding: 0 1rem;
@@ -60,7 +77,7 @@
     .main-content {
       margin-left: 240px;
       margin-top: 0;
-      padding: 0 0.9rem 1.1rem 1.2rem;
+      padding: 0.75rem 1rem;
       min-height: 100vh;
       background: #f8f9fa;
     }
@@ -70,7 +87,7 @@
       }
       .main-content {
         margin-left: 0;
-        padding: 10px 0.5rem 0.7rem 0.5rem;
+        padding: 0.5rem;
       }
       .navbar {
         left: 0 !important;
@@ -87,18 +104,135 @@
     }
 
     .btn {
-      border-radius: 30px;
+      border-radius: var(--button-radius);
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
     }
   </style>
-</head>
-<body>
+{% if settings %}
+<style>
+  :root {
+    --primary-color: {{ settings.primary_color or '#007bff' }};
+    --sidebar-color: {{ settings.sidebar_color or '#0057b7' }};
+    --text-color: {{ settings.text_color or '#ffffff' }};
+    --button-radius: {{ settings.button_radius or '30px' }};
+    --font-size: {{ settings.base_font_size or '14px' }};
+    --background-mode: {{ settings.theme_mode or 'light' }};
+  }
 
-<div class="sidebar d-flex flex-column justify-content-between py-3 px-2" style="background: linear-gradient(180deg, #0057b7 0%, #0c2546 100%); border-radius: 1.4rem 0 0 1.4rem; box-shadow: 2px 0 16px #0057b726;">
+  .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    border-radius: var(--button-radius);
+  }
+
+  .sidebar {
+    background: var(--sidebar-color);
+    color: var(--text-color);
+  }
+
+  .sidebar .nav-link {
+    color: #111 !important;
+  }
+
+  .sidebar .nav-link:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: #000;
+  }
+
+  body {
+    font-size: var(--font-size);
+  }
+  </style>
+  <!-- Modern Design System Utilities -->
+  <style>
+    /* Modern UI upgrades */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .card {
+      border: none;
+      border-radius: 1rem;
+      box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.06);
+      padding: 1.5rem;
+      background-color: #fff;
+    }
+
+    .btn {
+      padding: 0.5rem 1.25rem;
+      font-weight: 500;
+      border-radius: var(--button-radius);
+    }
+
+    .btn-outline-primary:hover {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .form-control, .form-select {
+      border-radius: 0.6rem;
+      border: 1px solid #ccc;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.96rem;
+    }
+
+    .table {
+      font-size: 0.93rem;
+      border-collapse: separate;
+      border-spacing: 0 0.25rem;
+    }
+
+    .table thead th {
+      background-color: #f0f4f9;
+      font-weight: 600;
+      border-bottom: none;
+    }
+
+    .table tbody tr {
+      background-color: #ffffff;
+      border-radius: 0.5rem;
+    }
+
+    .shadow-card {
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+      border-radius: 1rem;
+    }
+
+    .dashboard-card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: 0 0 0 1px #e1e5ee, 0 6px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .dashboard-card h4 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .dashboard-card span {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+  </style>
+{% endif %}
+</head>
+<body class="{{ settings.theme_mode or 'light' }}">
+
+<div class="sidebar d-flex flex-column justify-content-between py-3 px-2" style="background: #f3f4f6; border-radius: 1.4rem 0 0 1.4rem; box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08); color: #111;">
   <div>
     <div class="text-center mb-4">
       <a href="{{ url_for('dashboard_bp.main_dashboard') }}" style="text-decoration: none;">
         <!-- <img src="{{ url_for('static', filename='pcmart-logo.png') }}" alt="PCMart" width="48" height="48" style="border-radius: 12px; background:#fff; box-shadow:0 2px 8px #2221;"> -->
-        <h2 class="fw-bold mt-2 mb-0 text-white" style="font-size: 1.17rem; letter-spacing: 0.01em;">PCMart</h2>
+        <h2 class="fw-bold mt-2 mb-0 text-dark" style="font-size: 1.35rem; letter-spacing: 0.01em;">PCMart</h2>
       </a>
     </div>
     <nav class="nav flex-column">
@@ -122,32 +256,39 @@
         <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1">
           <i class="bi bi-pin-angle me-2"></i>Reserve
         </a>
+        {% if settings.enable_order_module == 'true' %}
         <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1">
           <i class="bi bi-card-list me-2"></i>Customer Orders
         </a>
+        {% endif %}
         <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1">
           <i class="bi bi-person me-2"></i>Customers
         </a>
         <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1">
           <i class="bi bi-shop-window me-2"></i>Vendors
         </a>
+        {% if settings.enable_parts_module == 'true' %}
         <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1">
           <i class="bi bi-tools me-2"></i>Parts
         </a>
-        {% if current_user.is_authenticated and current_user.role == 'admin' %}
-          <a href="{{ url_for('auth_bp.register_user') }}" class="nav-link my-1">
-            <i class="bi bi-person-plus me-2"></i>Register User
-          </a>
         {% endif %}
-        {% if current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
+        {% if settings.enable_reports_module == 'true' and current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
           <a href="{{ url_for('reports_bp.tech_productivity') }}" class="nav-link my-1">
             <i class="bi bi-bar-chart-steps me-2"></i>Tech Productivity
           </a>
+        {% endif %}
+        {% if settings.enable_export_module == 'true' %}
+          <a href="/export-products" class="nav-link my-1">Export Products</a>
         {% endif %}
       {% endif %}
     </nav>
   </div>
   <div class="mb-2 text-center">
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <a href="{{ url_for('auth_bp.register_user') }}" class="btn btn-outline-secondary btn-sm rounded-pill w-75 mb-2">
+        <i class="bi bi-person-plus me-1"></i> Register User
+      </a>
+    {% endif %}
     <a href="{{ url_for('auth_bp.logout') }}" class="btn btn-outline-danger btn-sm rounded-pill w-75 mt-3">
       <i class="bi bi-box-arrow-left me-1"></i>Logout
     </a>
@@ -181,27 +322,34 @@
         <a href="{{ url_for('order_bp.reserve_product') }}" class="nav-link my-1 text-white">
           <i class="bi bi-pin-angle me-2"></i>Reserve
         </a>
+        {% if settings.enable_order_module == 'true' %}
         <a href="{{ url_for('order_bp.customer_orders') }}" class="nav-link my-1 text-white">
           <i class="bi bi-card-list me-2"></i>Customer Orders
         </a>
+        {% endif %}
         <a href="{{ url_for('customers_bp.customer_center') }}" class="nav-link my-1 text-white">
           <i class="bi bi-person me-2"></i>Customers
         </a>
         <a href="{{ url_for('vendors_bp.vendor_center') }}" class="nav-link my-1 text-white">
           <i class="bi bi-shop-window me-2"></i>Vendors
         </a>
+        {% if settings.enable_parts_module == 'true' %}
         <a href="{{ url_for('parts_bp.parts_list') }}" class="nav-link my-1 text-white">
           <i class="bi bi-tools me-2"></i>Parts
         </a>
+        {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
           <a href="{{ url_for('auth_bp.register_user') }}" class="nav-link my-1 text-white">
             <i class="bi bi-person-plus me-2"></i>Register User
           </a>
         {% endif %}
-        {% if current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
+        {% if settings.enable_reports_module == 'true' and current_user.is_authenticated and current_user.role in ['admin', 'supervisor'] %}
           <a href="{{ url_for('reports_bp.tech_productivity') }}" class="nav-link my-1 text-white">
             <i class="bi bi-bar-chart-steps me-2"></i>Tech Productivity
           </a>
+        {% endif %}
+        {% if settings.enable_export_module == 'true' %}
+          <a href="/export-products" class="nav-link my-1 text-white">Export Products</a>
         {% endif %}
       {% endif %}
     </nav>
@@ -218,12 +366,36 @@
   <button class="btn btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar" aria-controls="offcanvasSidebar" aria-label="Open menu">
     <i class="bi bi-list" style="font-size:1.6rem;"></i>
   </button>
-  <span class="navbar-brand mb-0 h1">
-    {% block titlebar %}Dashboard{% endblock %}
-  </span>
+  {% block titlebar %}{% endblock %}
+  {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="dropdown">
+        <a class="btn btn-outline-secondary btn-sm rounded-pill position-relative" href="#" role="button" id="notifDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-bell"></i>
+          {% if notifications and notifications|length > 0 %}
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+              {{ notifications|length }}
+            </span>
+          {% endif %}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm p-2" aria-labelledby="notifDropdown" style="min-width: 320px;">
+          {% if notifications and notifications|length > 0 %}
+            {% for n in notifications %}
+              <li><a class="dropdown-item small py-2" href="{{ n.url }}"><i class="bi bi-dot me-2"></i>{{ n.label }}</a></li>
+            {% endfor %}
+          {% else %}
+            <li class="dropdown-item text-muted small">No new notifications</li>
+          {% endif %}
+        </ul>
+      </div>
+      <a href="{{ url_for('admin_bp.admin_settings') }}" class="btn btn-sm btn-dark rounded-pill">
+        <i class="bi bi-gear me-1"></i> Admin Settings
+      </a>
+    </div>
+  {% endif %}
 </div>
 
-<div class="container" style="max-width: 900px; margin-top: 70px;">
+<div class="container" style="max-width: 900px; margin-top: 60px;">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}

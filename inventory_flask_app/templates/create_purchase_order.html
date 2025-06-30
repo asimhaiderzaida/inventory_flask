@@ -10,7 +10,8 @@
       </h2>
       <div class="text-muted" style="font-size:0.98rem;">Add a new PO and upload Excel with serials & specs</div>
     </div>
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" id="createPOForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3 mb-3">
         <label class="form-label fw-bold">PO Number:</label>
         <input type="text" name="po_number" class="form-control form-control-lg rounded-pill px-3" required>
@@ -29,6 +30,15 @@
           </a>
         </div>
       </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Default Location for Uploaded Units:</label>
+        <select name="location_id" class="form-select form-select-lg rounded-pill px-3" required>
+          <option value="">-- Select Location --</option>
+          {% for location in locations %}
+            <option value="{{ location.id }}">{{ location.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="mb-3 mb-3">
         <label class="form-label fw-bold">Upload Excel File with Serials + Specs:</label>
         <input type="file" name="file" class="form-control form-control-lg rounded-pill px-3" accept=".xlsx, .xls" required>
@@ -38,6 +48,9 @@
         <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
         </a>
+        <div id="poLoadingSpinner" class="spinner-border text-success d-none mx-auto" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
         <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
           <i class="bi bi-check2-circle me-1"></i>Create PO
         </button>
@@ -70,4 +83,15 @@
     padding: 10px 25px;
   }
 </style>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('createPOForm');
+    const spinner = document.getElementById('poLoadingSpinner');
+    if (form && spinner) {
+      form.addEventListener('submit', function () {
+        spinner.classList.remove('d-none');
+      });
+    }
+  });
+</script>
 {% endblock %}

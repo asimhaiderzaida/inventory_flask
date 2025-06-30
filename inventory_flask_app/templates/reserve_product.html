@@ -17,18 +17,18 @@
           {% endfor %}
         </select>
       </div>
-      <div class="d-flex gap-2 align-items-end">
+      <div class="d-flex flex-wrap gap-2 align-items-end">
         <div class="flex-grow-1">
           <label class="form-label fw-semibold">Scan or Enter Serial:</label>
           <input type="text" name="serial_input" class="form-control form-control-lg rounded-pill px-3" placeholder="Scan or type serial..." autofocus>
         </div>
-        <button type="submit" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold mb-1 px-4">
+        <button type="submit" class="btn btn-outline-primary btn-lg w-100 mt-2 rounded-pill px-4" style="min-height: 42px; min-width: 160px;">
           <i class="bi bi-plus-circle me-1"></i>Add
         </button>
         {% if preview_instances %}
           <form id="reset-batch-form" method="POST" style="display:inline;">
             <input type="hidden" name="action" value="reset_batch">
-            <button type="submit" class="btn btn-warning btn-lg w-100 mt-2 rounded-pill fw-semibold ms-2">Reset Batch</button>
+            <button type="submit" class="btn btn-outline-warning btn-lg w-100 mt-2 rounded-pill ms-2" style="min-height: 42px; min-width: 160px;">Reset Batch</button>
           </form>
         {% endif %}
       </div>
@@ -43,6 +43,7 @@
               <thead class="table-light">
                 <tr>
                   <th>Serial</th>
+                  <th>Asset</th>
                   <th>Model</th>
                   <th>Specs</th>
                   <th>Remove</th>
@@ -51,17 +52,18 @@
               <tbody>
                 {% for instance in preview_instances %}
                   <tr>
-                    <td>{{ instance.serial_number }}</td>
-                    <td>{{ instance.product.model_number if instance.product else "" }}</td>
+                    <td>{{ instance.serial }}</td>
+                    <td>{{ instance.asset }}</td>
+                    <td>{{ instance.product.model if instance.product else "" }}</td>
                     <td>
                       RAM: {{ instance.product.ram if instance.product else "" }},
-                      CPU: {{ instance.product.processor if instance.product else "" }},
-                      Storage: {{ instance.product.storage if instance.product else "" }}
+                      CPU: {{ instance.product.cpu if instance.product else "" }},
+                      Storage: {{ instance.product.disk1size if instance.product else "" }}
                     </td>
                     <td>
                       <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="remove">
-                        <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                        <input type="hidden" name="remove_serial" value="{{ instance.serial }}">
                         <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
                       </form>
                     </td>
@@ -72,8 +74,8 @@
           </div>
         </div>
       </div>
-      <div class="text-end mt-2">
-        <button type="button" class="btn btn-primary btn-lg w-100 mt-2 rounded-pill fw-semibold px-4"
+      <div class="text-center mt-3">
+        <button type="button" class="btn btn-outline-primary btn-lg mt-2 rounded-pill px-4" style="min-height: 42px; min-width: 200px;"
           data-bs-toggle="modal" data-bs-target="#reserveModal">
           <i class="bi bi-eye me-1"></i>Preview & Confirm
         </button>
@@ -107,6 +109,7 @@
                     <thead class="table-light">
                       <tr>
                         <th>Serial</th>
+                        <th>Asset</th>
                         <th>Model</th>
                         <th>Specs</th>
                         <th>Remove</th>
@@ -115,17 +118,18 @@
                     <tbody>
                       {% for instance in preview_instances %}
                         <tr>
-                          <td>{{ instance.serial_number }}</td>
-                          <td>{{ instance.product.model_number if instance.product else "" }}</td>
+                          <td>{{ instance.serial }}</td>
+                          <td>{{ instance.asset }}</td>
+                          <td>{{ instance.product.model if instance.product else "" }}</td>
                           <td>
                             RAM: {{ instance.product.ram if instance.product else "" }},
-                            CPU: {{ instance.product.processor if instance.product else "" }},
-                            Storage: {{ instance.product.storage if instance.product else "" }}
+                            CPU: {{ instance.product.cpu if instance.product else "" }},
+                            Storage: {{ instance.product.disk1size if instance.product else "" }}
                           </td>
                           <td>
                             <form method="POST" style="display:inline;">
                               <input type="hidden" name="action" value="remove">
-                              <input type="hidden" name="remove_serial" value="{{ instance.serial_number }}">
+                              <input type="hidden" name="remove_serial" value="{{ instance.serial }}">
                               <button class="btn btn-sm btn-outline-danger rounded-pill" type="submit" title="Remove">&times;</button>
                             </form>
                           </td>
@@ -138,7 +142,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-success btn-lg w-100 mt-2 rounded-pill fw-semibold" id="confirmReserveBtn">
+            <button type="button" class="btn btn-outline-success btn-lg w-100 mt-2 rounded-pill" style="min-height: 42px; min-width: 200px;" id="confirmReserveBtn">
               <i class="bi bi-check-circle me-1"></i>Confirm Reserve
             </button>
           </div>

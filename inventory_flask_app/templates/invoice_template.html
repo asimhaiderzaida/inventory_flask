@@ -12,7 +12,18 @@
 </style>
 
 <div class="container">
-    <h2>🧾 Invoice #{{ invoice.id if invoice else invoice_number }}</h2>
+    {% if settings.invoice_logo %}
+      <div class="text-center mb-3">
+        <img src="{{ settings.invoice_logo }}" alt="Logo" style="max-height: 70px;">
+      </div>
+    {% endif %}
+    <h2>
+      {% if settings.invoice_title %}
+        {{ settings.invoice_title }}
+      {% else %}
+        🧾 Invoice #{{ invoice.id if invoice else invoice_number }}
+      {% endif %}
+    </h2>
 
     <p><strong>Customer:</strong> {{ customer.name }}</p>
     <p><strong>Invoice Date:</strong>
@@ -27,7 +38,7 @@
         <table class="table table-bordered mt-4 invoice-table">
             <thead>
                 <tr>
-                    <th class="serial-col">Serial Number</th>
+                    <th class="serial-col">Serial</th>
                     <th class="model-col">Model & Specs</th>
                     <th class="currency-col">Unit Price (AED)</th>
                     <th class="currency-col">VAT %</th>
@@ -42,12 +53,32 @@
                     {% set vat_amount = unit_price * (vat_rate / 100) %}
                     {% set total_with_vat = unit_price + vat_amount %}
                     <tr>
-                        <td class="serial-col">{{ item.serial_number }}</td>
-                        <td class="model-col">{{ item.specs }}</td>
+                        <td class="serial-col">
+                          SN: {{ item.serial }}<br>
+                          AT: {{ item.asset }}
+                        </td>
+                        <td class="model-col">
+                          <div><strong>{{ item.product_name or '-' }}</strong></div>
+                          <div>Model: {{ item.model or '-' }}</div>
+                          <div>CPU: {{ item.cpu or '-' }}</div>
+                          <div>RAM: {{ item.ram or '-' }}</div>
+                          <div>Disk: {{ item.disk1size or '-' }}</div>
+                          <div>Display: {{ item.display or '-' }}</div>
+                          <div>GPU1: {{ item.gpu1 or '-' }}</div>
+                          <div>GPU2: {{ item.gpu2 or '-' }}</div>
+                          <div>Grade: {{ item.grade or '-' }}</div>
+                        </td>
                         <td class="currency-col">{{ "%.2f"|format(unit_price) }}</td>
                         <td class="currency-col">{{ vat_rate }}</td>
                         <td class="currency-col">{{ "%.2f"|format(vat_amount) }}</td>
                         <td class="currency-col">{{ "%.2f"|format(total_with_vat) }}</td>
+                    </tr>
+                    <!-- Display item name and disk size in a summary row for unified product specs -->
+                    <tr>
+                        <td colspan="6" style="background: #f9f9f9;">
+                          {% if item.product_name %}Item: <strong>{{ item.product_name }}</strong>{% endif %}
+                          {% if item.disk1size %} | Disk Size: {{ item.disk1size }}{% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -71,4 +102,17 @@
     <div class="mt-4 no-print">
         <a href="/main_dashboard" class="btn btn-primary btn-lg w-100 mt-2">Back to Dashboard</a>
     </div>
+
+</div>
+{% if settings.invoice_footer or settings.invoice_terms %}
+  <div class="mt-5">
+    <hr>
+    {% if settings.invoice_footer %}
+      <p class="text-muted" style="font-size: 0.9rem;">{{ settings.invoice_footer }}</p>
+    {% endif %}
+    {% if settings.invoice_terms %}
+      <p class="text-muted" style="font-size: 0.85rem;"><strong>Terms:</strong> {{ settings.invoice_terms }}</p>
+    {% endif %}
+  </div>
+{% endif %}
 </div>

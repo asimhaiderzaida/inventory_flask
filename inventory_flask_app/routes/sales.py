@@ -1,45 +1,88 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required
-from ..models import db, Customer, ProductInstance, SaleTransaction
+from flask_login import current_user
+from ..models import db, Customer, ProductInstance, SaleTransaction, Product
+from sqlalchemy import or_
+from inventory_flask_app import csrf
+from inventory_flask_app.utils import get_now_for_tenant
 
 sales_bp = Blueprint('sales_bp', __name__)
 
+@csrf.exempt
 @sales_bp.route('/create_sale_form', methods=['GET'])
 @login_required
 def create_sale_form():
-    customers = Customer.query.all()
-    # Get serials from query params (?serials=SN1&serials=SN2)
-    serials = request.args.getlist('serials')
+    customers = Customer.query.filter_by(tenant_id=current_user.tenant_id).all()
+    serial_asset_pairs = list(zip(
+        request.args.getlist('serials'),
+        request.args.getlist('assets')
+    ))
     selected_instances = []
-    if serials:
-        selected_instances = ProductInstance.query.filter(ProductInstance.serial_number.in_(serials)).all()
-    # Only include available (not sold) product instances in your frontend (if you list them here)
-    # If you use AJAX to get product by serial, be sure to check is_sold status in that endpoint too!
+    for serial, asset in serial_asset_pairs:
+        instance = ProductInstance.query.join(Product).filter(
+            ProductInstance.serial == serial,
+            ProductInstance.asset == asset,
+            Product.tenant_id == current_user.tenant_id
+        ).first()
+        if instance:
+            selected_instances.append(instance)
+
+    # Add available unsold product instances for selection in UI
+    available_instances = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.is_sold == False
+    ).all()
+
+    # Serialize available_instances to a list of dicts for JSON
+    available_serials_data = [
+        {
+            "serial": i.serial,
+            "product_instance_id": i.id
+        }
+        for i in available_instances
+    ]
+
     selected_customer_id = request.args.get('customer_id')
     return render_template(
         'create_sale.html',
         customers=customers,
         selected_instances=selected_instances,
+        available_serials_data=available_serials_data,
         selected_customer_id=selected_customer_id
     )
-
+@csrf.exempt
 @sales_bp.route('/confirm_sale', methods=['POST'])
 @login_required
 def confirm_sale():
     try:
         from ..models import Invoice  # Import here to avoid circular import if needed
         serials = request.form.getlist('serials')
+        assets = request.form.getlist('assets')
         customer_id = request.form.get('customer_id')
-        from flask_login import current_user
         user_id = current_user.id
 
         if not serials or not customer_id:
             return jsonify({"error": "No products or customer selected."})
 
-        instances = ProductInstance.query.filter(ProductInstance.serial_number.in_(serials)).all()
-        customer = db.session.get(Customer, customer_id)
+        serial_asset_pairs = list(zip(
+            request.form.getlist('serials'),
+            request.form.getlist('assets')
+        ))
+        instances = []
+        for serial, asset in serial_asset_pairs:
+            instance = ProductInstance.query.join(Product).filter(
+                ProductInstance.serial == serial,
+                ProductInstance.asset == asset,
+                Product.tenant_id == current_user.tenant_id
+            ).first()
+            if instance:
+                instances.append(instance)
+        customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first()
 
-        if not instances or not customer:
+        if not customer:
+            return jsonify({"error": "Unauthorized customer access"}), 403
+
+        if not instances:
             return jsonify({"error": "Invalid data. Please try again."})
 
         total_amount = 0
@@ -49,7 +92,7 @@ def confirm_sale():
         # Build list of sale items and calculate total
         for instance in instances:
             if not instance.is_sold:
-                price = float(request.form.get(f"price_{instance.serial_number}", 0))
+                price = float(request.form.get(f"price_{instance.serial}", 0))
                 sale = SaleTransaction(
                     product_instance_id=instance.id,
                     customer_id=customer.id,
@@ -67,9 +110,18 @@ def confirm_sale():
                 total_amount += price
                 # Add details for invoice item
                 items.append({
-                    'serial_number': instance.serial_number,
-                    'product': instance.product if hasattr(instance, 'product') else None,
-                    'price_at_sale': price
+                    'serial': instance.serial,
+                    'asset': instance.asset,
+                    'item_name': instance.product.item_name if instance.product else '',
+                    'make': instance.product.make if instance.product else '',
+                    'model': instance.product.model if instance.product else '',
+                    'cpu': instance.product.cpu if instance.product else '',
+                    'ram': instance.product.ram if instance.product else '',
+                    'disk1size': instance.product.disk1size if instance.product else '',
+                    'display': instance.product.display if instance.product else '',
+                    'gpu1': instance.product.gpu1 if instance.product else '',
+                    'gpu2': instance.product.gpu2 if instance.product else '',
+                    'grade': instance.product.grade if instance.product else ''
                 })
 
         if not sale_transactions:
@@ -81,7 +133,8 @@ def confirm_sale():
         # Create a new invoice and link sale transactions to it
         invoice = Invoice(
             customer_id=customer.id,
-            created_at=datetime.now()
+            tenant_id=current_user.tenant_id,
+            created_at=get_now_for_tenant()
         )
         db.session.add(invoice)
         db.session.commit()  # To get invoice.id
@@ -105,6 +158,7 @@ def confirm_sale():
 import json
 from datetime import datetime
 
+@csrf.exempt
 @sales_bp.route('/preview_invoice', methods=['POST'])
 @login_required
 def preview_invoice():
@@ -113,16 +167,14 @@ def preview_invoice():
     customer_id = data.get('customer_id')
     items = data.get('items', [])
 
-    # Remap alternative keys
+    # Remap alternative keys to unified structure
     for item in items:
-        if 'product_name' not in item and 'name' in item:
-            item['product_name'] = item['name']
-        if 'processor' not in item and 'cpu' in item:
-            item['processor'] = item['cpu']
-        if 'video_card' not in item and 'gpu' in item:
-            item['video_card'] = item['gpu']
-        if 'resolution' not in item and 'screen' in item:
-            item['resolution'] = item['screen']
+        item['product_name'] = item.get('product_name') or item.get('name') or item.get('item_name')
+        item['cpu'] = item.get('cpu') or item.get('processor')
+        item['gpu1'] = item.get('gpu1') or item.get('gpu') or item.get('video_card')
+        item['model'] = item.get('model') or item.get('model_number')
+        item['serial'] = item.get('serial') or ''
+        item['asset'] = item.get('asset') or ''
 
     for item in items:
         if 'quantity' not in item or not item['quantity']:
@@ -135,7 +187,7 @@ def preview_invoice():
         return "<h3 style='color:red;'>Missing customer or products for preview.</h3>"
 
     # Fake sale date and invoice number (since not saved)
-    fake_invoice_number = "PREVIEW-" + datetime.now().strftime('%Y%m%d%H%M%S')
+    fake_invoice_number = "PREVIEW-" + get_now_for_tenant().strftime('%Y%m%d%H%M%S')
 
     subtotal = 0
     total_vat = 0
@@ -154,52 +206,70 @@ def preview_invoice():
         grand_total += total_with_vat
 
     for item in items:
-        if not item.get('product_name') and item.get('name'):
-            item['product_name'] = item['name']
-
-    for item in items:
         # Pick correct field names and support variations from cart data
-        model = item.get('model_number', '') or item.get('model', '') or ''
-        processor = item.get('processor', '') or item.get('cpu', '') or ''
-        ram = item.get('ram', '')
-        storage = item.get('storage', '')
-        vga = item.get('video_card', '') or item.get('gpu', '')
-
-        specs_parts = [model]
-        if processor: specs_parts.append(processor)
-        if ram: specs_parts.append(ram)
-        if storage: specs_parts.append(storage)
-        if vga: specs_parts.append(vga)
-        item['specs'] = " / ".join(specs_parts)
+        specs_parts = [
+            item.get('model', ''),
+            item.get('cpu', ''),
+            item.get('ram', ''),
+            item.get('disk1size', ''),
+            item.get('display', ''),
+            item.get('gpu1', ''),
+            item.get('gpu2', ''),
+            item.get('grade', ''),
+        ]
+        item['specs'] = " / ".join(filter(None, specs_parts))
 
     return render_template(
         'invoice_template.html',
         invoice_number=fake_invoice_number,
-        sale_date=datetime.now().strftime('%d-%b-%Y'),
+        sale_date=get_now_for_tenant().strftime('%d-%b-%Y'),
         customer=customer,
         items=items,
         subtotal=subtotal,
         total_vat=total_vat,
         grand_total=grand_total,
-        is_preview=True  # You can use this in your template for "DRAFT" watermark etc.
+        is_preview=True
     )
 
+@csrf.exempt
 @sales_bp.route('/get_product_by_serial/<serial>')
 @login_required
 def get_product_by_serial(serial):
-    instance = ProductInstance.query.filter_by(serial_number=serial).first()
-    if not instance or not instance.product:
-        return jsonify({"error": "not found"}), 404
+    serial = serial.strip().upper()
+    instance = ProductInstance.query.join(Product).filter(
+        or_(
+            ProductInstance.serial == serial,
+            ProductInstance.asset == serial
+        ),
+        Product.tenant_id == current_user.tenant_id
+    ).first()
+    if not instance:
+        return jsonify({"error": "Unauthorized access"}), 403
     return jsonify({
-        "serial_number": instance.serial_number,
-        "product_name": instance.product.name,
-        "name": instance.product.name,
-        "model_number": instance.product.model_number,
-        "processor": instance.product.processor,
+        "serial": instance.serial,
+        "asset": instance.asset,
+        "item_name": instance.product.item_name,
+        "name": instance.product.item_name,
+        "make": instance.product.make,
+        "model": instance.product.model,
+        "cpu": instance.product.cpu,
         "ram": instance.product.ram,
-        "storage": instance.product.storage,
-        "screen_size": instance.product.screen_size,
-        "resolution": instance.product.resolution,
         "grade": instance.product.grade,
-        "video_card": instance.product.video_card,
+        "display": instance.product.display,
+        "gpu1": instance.product.gpu1,
+        "gpu2": instance.product.gpu2,
+        "disk1size": instance.product.disk1size
     })
+
+
+# Route to serve list of sold units for dashboard linking
+@csrf.exempt
+@sales_bp.route('/sales/sold_units')
+@login_required
+def sold_units_view():
+    sold_units = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.is_sold == True
+    ).order_by(ProductInstance.updated_at.desc()).all()
+
+    return render_template("sold_units.html", units=sold_units)

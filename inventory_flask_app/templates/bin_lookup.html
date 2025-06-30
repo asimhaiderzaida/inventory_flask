@@ -6,17 +6,32 @@
       <h5 class="mb-0"><i class="bi bi-upc-scan me-2"></i>Scan Bin Barcode</h5>
     </div>
     <div class="card-body">
-      <form method="post" autocomplete="off">
-        <label class="form-label">Scan or enter Bin Barcode:</label>
-        <input type="text" name="bin_code" class="form-control rounded-pill fs-5" autofocus required placeholder="Scan bin barcode...">
-        <button class="btn btn-success mt-3 w-100 rounded-pill fw-bold" type="submit">
-          <i class="bi bi-search me-1"></i> Show Bin Contents
-        </button>
-      </form>
+      <div id="bin-form-wrapper">
+        <form method="post" autocomplete="off" onsubmit="handleSubmit(event)">
+          <label class="form-label">Scan or enter Bin Barcode:</label>
+          <input type="text" name="bin_code" class="form-control rounded-pill fs-5" autofocus required placeholder="Scan or type bin code...">
+          <button id="submitBtn" class="btn btn-success mt-3 w-100 rounded-pill fw-bold" type="submit">
+            <i class="bi bi-search me-1"></i> Show Bin Contents
+          </button>
+          <div id="spinner" class="text-center mt-2" style="display:none;">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        </form>
+      </div>
       <div class="text-muted mt-2" style="font-size:0.98rem;">
         Scan a bin barcode label with your scanner, or type a bin code and press Enter.
       </div>
     </div>
   </div>
 </div>
+<script>
+function handleSubmit(e) {
+  const btn = document.getElementById('submitBtn');
+  const spinner = document.getElementById('spinner');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+}
+</script>
 {% endblock %}

@@ -55,13 +55,14 @@
 </head>
 <body>
     <div class="header">
-        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Company Logo">
+        {% if settings.invoice_logo %}
+          <img src="{{ settings.invoice_logo }}" alt="Company Logo">
+        {% endif %}
     </div>
     <div class="company-info">
-        <strong>STAR USED COMPUTERS TR LLC</strong><br>
-        Al Salehi Building, Warehouse no 27, Industrial Area 6, JNP Signal, Sharjah<br>
-        TRN: 100619291600003 &nbsp;|&nbsp; Tel: 065939199<br>
-        Email: info@pcmart.ae &nbsp;|&nbsp; Website: pcmart.ae
+      {% if settings.invoice_title %}
+        <strong>{{ settings.invoice_title }}</strong><br>
+      {% endif %}
     </div>
     <div class="invoice-title">INVOICE</div>
     <table class="info-table">
@@ -74,8 +75,8 @@
     <table class="border-table invoice-table">
         <thead>
             <tr>
-                <th class="serial-col" style="text-align: center;">Serial #</th>
-                <th class="model-col" style="text-align: center;">Model & Specs</th>
+                <th class="serial-col" style="text-align: center;">Serial</th>
+                <th class="model-col" style="text-align: center;">Item Name & Full Specs</th>
                 <th class="currency-col" style="text-align:center; vertical-align:middle;">Unit<br>Price</th>
                 <th class="currency-col" style="text-align:center; vertical-align:middle;">VAT<br>%</th>
                 <th class="currency-col" style="text-align:center; vertical-align:middle;">VAT<br>Amt</th>
@@ -89,8 +90,20 @@
                 {% set vat_amount = unit_price * (vat_rate / 100) %}
                 {% set total_with_vat = unit_price + vat_amount %}
                 <tr>
-                    <td class="serial-col">{{ item.serial_number if item.serial_number is defined else "" }}</td>
-                    <td class="model-col">{{ item.specs }}</td>
+                    <td class="serial-col">
+                      SN: {{ item.serial if item.serial is defined else "" }}<br>
+                      AT: {{ item.asset if item.asset is defined else "" }}
+                    </td>
+                    <td class="model-col">
+                      <strong>{{ item.product_name or '-' }}</strong> — Specs:
+                      {{ item.model or '-' }} /
+                      {{ item.cpu or '-' }} /
+                      {{ item.ram or '-' }} /
+                      {{ item.disk1size or '-' }} /
+                      {{ item.display or '-' }} /
+                      {{ item.gpu1 or '-' }} /
+                      Grade: {{ item.grade or '-' }}
+                    </td>
                     <td class="currency-col">{{ "%.2f"|format(unit_price) }}</td>
                     <td class="currency-col">{{ vat_rate }}</td>
                     <td class="currency-col">{{ "%.2f"|format(vat_amount) }}</td>
@@ -113,8 +126,15 @@
             <td class="value">{{ "%.2f"|format(grand_total) }}</td>
         </tr>
     </table>
-    <div class="footer">
-        Thank you for your business!
-    </div>
+    {% if settings.invoice_footer or settings.invoice_terms %}
+      <div class="footer">
+        {% if settings.invoice_footer %}
+          <div>{{ settings.invoice_footer }}</div>
+        {% endif %}
+        {% if settings.invoice_terms %}
+          <div><strong>Terms:</strong> {{ settings.invoice_terms }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
 </body>
 </html>

@@ -2,6 +2,13 @@
 {% block content %}
 <div class="container mt-4">
   <h2>Stock In (Receive Parts)</h2>
+  {% if parts %}
+  <p class="text-muted">Total Results: {{ parts|length }}</p>
+  {% endif %}
+  <form method="get" action="" class="mb-4 d-flex gap-2 align-items-center">
+    <input type="text" name="q" class="form-control form-control-lg" placeholder="Search part..." value="{{ search_query or '' }}">
+    <button type="submit" class="btn btn-outline-primary btn-lg">Search</button>
+  </form>
   <form method="post">
     <div class="form-group mb-3">
       <label>Part</label>
@@ -84,6 +91,11 @@
     </div>
     <button type="submit" class="btn btn-primary btn-lg w-100 mt-2">Stock In</button>
     <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-secondary btn-lg w-100 mt-2">Cancel</a>
+    {% if parts %}
+    <div class="alert alert-info mt-4">
+      {{ parts|length }} matching parts found.
+    </div>
+    {% endif %}
   </form>
 </div>
 <!-- Select2 and Bootstrap 5.1.3 CSS/JS (correct order) -->

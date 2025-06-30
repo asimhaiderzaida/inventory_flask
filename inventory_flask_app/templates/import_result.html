@@ -2,8 +2,9 @@
 {% block title %}Import Result{% endblock %}
 
 {% block content %}
-<div class="card shadow p-4">
-    <h2 class="mb-4 text-success">✅ Import Result Summary</h2>
+<div class="container my-5">
+  <div class="card shadow rounded-4 p-4 bg-white">
+    <h2 class="mb-4 fw-bold text-success" style="font-size: 1.45rem;">✅ Import Result Summary</h2>
 
     <ul class="list-group mb-4">
         <li class="list-group-item">🟢 Products Saved: <strong>{{ saved }}</strong></li>
@@ -19,9 +20,12 @@
 
     {% if skipped_rows %}
     <h4 class="mt-4">🔎 Skipped Products Preview:</h4>
+    <div class="text-muted small mb-2">
+      The table below shows fields from skipped products including Serial Number and Asset Tag.
+    </div>
     <div style="overflow-x:auto;">
     <div class="table-responsive">
-        <table class="table table-bordered table-striped table-hover align-middle mt-3">
+        <table class="table table-sm table-bordered table-striped table-hover align-middle bg-white rounded-3 overflow-hidden mt-3">
             <thead class="table-warning">
                 <tr>
                     {% for col in skipped_rows[0].keys() %}
@@ -44,8 +48,9 @@
     {% endif %}
 
     <div class="mt-4">
-        <a href="/main_dashboard" class="btn btn-primary btn-lg w-100 mt-2">🏠 Back to Dashboard</a>
-        <a href="/upload_excel" class="btn btn-secondary btn-lg w-100 mt-2">⬆️ Upload More Products</a>
+        <a href="/main_dashboard" class="btn btn-outline-primary rounded-pill btn-lg w-100 mt-2">🏠 Back to Dashboard</a>
+        <a href="/upload_excel" class="btn btn-outline-secondary rounded-pill btn-lg w-100 mt-2">⬆️ Upload More Products</a>
     </div>
+  </div>
 </div>
 {% endblock %}

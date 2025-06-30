@@ -18,6 +18,7 @@
       <div class="text-muted" style="font-size:0.98rem;">Import inventory in bulk from Excel</div>
     </div>
     <form method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label">Select Vendor:</label>
         <div class="input-group">
@@ -32,6 +33,21 @@
           </a>
         </div>
       </div>
+      <div class="mb-3">
+        <label class="form-label">Select Location:</label>
+        <div class="input-group">
+          <select name="location_id" class="form-select rounded-pill px-3 form-control-lg" required>
+            <option value="">-- Select Location --</option>
+            {% for location in locations %}
+              <option value="{{ location.id }}">{{ location.name }}</option>
+            {% endfor %}
+          </select>
+          <a href="{{ url_for('stock_bp.add_location') }}" target="_blank" class="btn btn-outline-success ms-2 rounded-pill btn-lg">
+            <i class="bi bi-plus-circle"></i> Add Location
+          </a>
+        </div>
+      </div>
+
       <div class="mb-3">
         <label class="form-label">Upload Excel File:</label>
         <input type="file" name="file" class="form-control rounded-pill px-3 form-control-lg" accept=".xlsx,.xls" required>
@@ -66,19 +82,22 @@
                 {% endif %}
               {% endwith %}
               <div style="overflow-x:auto;">
+                <p class="text-muted small mb-2">
+                  This preview includes all uploaded fields such as Serial, Asset, and more. Confirm to proceed with import.
+                </p>
                 <div class="table-responsive w-100">
                   <table class="table table-sm table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
                     <thead>
                       <tr>
-                        {% for col in preview_columns %}
-                          <th>{{ col }}</th>
+                        {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
+                          <th class="text-nowrap">{{ col|title }}</th>
                         {% endfor %}
                       </tr>
                     </thead>
                     <tbody>
                       {% for row in preview_data %}
                         <tr>
-                          {% for col in preview_columns %}
+                          {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
                             <td>{{ row[col] }}</td>
                           {% endfor %}
                         </tr>
@@ -88,6 +107,7 @@
                 </div>
               </div>
               <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
                 <input type="hidden" name="excel_data" value="{{ excel_data }}">
                 <input type="hidden" name="confirm" value="yes">

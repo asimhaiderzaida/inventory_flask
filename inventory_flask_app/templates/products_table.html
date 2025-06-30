@@ -14,13 +14,14 @@
           <tr>
             <th>ID</th>
             <th>Barcode</th>
-            <th>Name</th>
+            <th>Asset</th>
+            <th>Item Name</th>
             <th>Model</th>
             <th class="d-none d-md-table-cell">Grade</th>
             <th class="d-none d-md-table-cell">RAM</th>
-            <th class="d-none d-md-table-cell">Processor</th>
-            <th class="d-none d-md-table-cell">Storage</th>
-            <th class="d-none d-md-table-cell">Screen</th>
+            <th class="d-none d-md-table-cell">CPU</th>
+            <th class="d-none d-md-table-cell">Disk 1 Size</th>
+            <th class="d-none d-md-table-cell">Display</th>
             <th>Stock</th>
             <th>Location</th>
             <th class="d-none d-md-table-cell">Vendor</th>
@@ -33,13 +34,14 @@
           <tr>
             <td>{{ p.id }}</td>
             <td>{{ p.barcode }}</td>
-            <td>{{ p.name }}</td>
-            <td>{{ p.model_number }}</td>
+            <td>{{ p.asset }}</td>
+            <td>{{ p.item_name }}</td>
+            <td>{{ p.model }}</td>
             <td class="d-none d-md-table-cell">{{ p.grade }}</td>
             <td class="d-none d-md-table-cell">{{ p.ram }}</td>
-            <td class="d-none d-md-table-cell">{{ p.processor }}</td>
-            <td class="d-none d-md-table-cell">{{ p.storage }}</td>
-            <td class="d-none d-md-table-cell">{{ p.screen_size }}</td>
+            <td class="d-none d-md-table-cell">{{ p.cpu }}</td>
+            <td class="d-none d-md-table-cell">{{ p.disk1size }}</td>
+            <td class="d-none d-md-table-cell">{{ p.display }}</td>
             <td><span class="badge bg-primary bg-opacity-10 text-primary fw-bold">{{ p.stock }}</span></td>
             <td>{{ p.location.name if p.location }}</td>
             <td class="d-none d-md-table-cell">{{ p.vendor.name if p.vendor }}</td>

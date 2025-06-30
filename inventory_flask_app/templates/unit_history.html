@@ -6,16 +6,33 @@
       <h4 class="mb-0">
         <i class="bi bi-clock-history me-2"></i>
         Unit History — {{ instance.serial_number }}
-        <span class="badge bg-secondary ms-2">{{ instance.product.model_number if instance.product else 'Unknown Model' }}</span>
+        {% if instance.asset_tag %}
+          <span class="badge bg-secondary ms-2">Asset: {{ instance.asset_tag }}</span>
+        {% endif %}
+        <span class="badge bg-secondary ms-2">{{ instance.product.model if instance.product else 'Unknown Model' }}</span>
       </h4>
     </div>
     <div class="card-body pb-2">
+      {% if sale and sale.customer %}
+        <div class="alert alert-success d-flex align-items-center justify-content-between px-4 py-3 mb-4 rounded-4">
+          <div>
+            <i class="bi bi-person-circle me-2"></i>
+            <strong>Sold To:</strong> {{ sale.customer.name }}
+            {% if sale.customer.company %}
+              <span class="text-muted">({{ sale.customer.company }})</span>
+            {% endif %}
+          </div>
+          <span class="text-muted small">
+            {{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '' }}
+          </span>
+        </div>
+      {% endif %}
       <div class="mb-3">
         <span class="fw-bold">Specs:</span>
         {% if instance.product %}
           RAM: <span class="badge bg-light text-dark">{{ instance.product.ram }}</span>
-          | Storage: <span class="badge bg-light text-dark">{{ instance.product.storage }}</span>
-          | Processor: <span class="badge bg-light text-dark">{{ instance.product.processor }}</span>
+          | Storage: <span class="badge bg-light text-dark">{{ instance.product.disk1size }}</span>
+          | Processor: <span class="badge bg-light text-dark">{{ instance.product.cpu }}</span>
           | Grade: <span class="badge bg-light text-dark">{{ instance.product.grade }}</span>
         {% endif %}
       </div>
@@ -23,28 +40,28 @@
         <table class="table table-striped table-hover align-middle border shadow-sm rounded">
           <thead class="table-light">
             <tr>
-              <th>Date/Time</th>
-              <th>Action</th>
-              <th>Process Stage</th>
-              <th>Team</th>
-              <th>Technician</th>
-              <th>Note</th>
+              <th class="text-nowrap">Date/Time</th>
+              <th class="text-nowrap">Action</th>
+              <th class="text-nowrap">Process Stage</th>
+              <th class="text-nowrap">Team</th>
+              <th class="text-nowrap">Technician</th>
+              <th class="text-nowrap">Note</th>
             </tr>
           </thead>
           <tbody>
             {% if logs and logs|length > 0 %}
               {% for log in logs %}
               <tr>
-                <td>{{ log.moved_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                <td>
+                <td class="text-nowrap">{{ log.moved_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td class="text-nowrap">
                   <span class="badge {% if log.action == 'check-in' %}bg-success{% else %}bg-danger{% endif %} text-white rounded-pill">
                     {{ log.action|capitalize }}
                   </span>
                 </td>
-                <td>{{ log.to_stage or '-' }}</td>
-                <td>{{ log.to_team or '-' }}</td>
-                <td>{{ log.user.username if log.user else '-' }}</td>
-                <td>{{ log.note or '' }}</td>
+                <td class="text-nowrap">{{ log.to_stage or '-' }}</td>
+                <td class="text-nowrap">{{ log.to_team or '-' }}</td>
+                <td class="text-nowrap">{{ log.user.username if log.user else '-' }}</td>
+                <td class="text-nowrap">{{ log.note or '' }}</td>
               </tr>
               {% endfor %}
             {% else %}
