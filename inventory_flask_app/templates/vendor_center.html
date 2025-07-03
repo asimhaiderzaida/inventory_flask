@@ -51,7 +51,7 @@
             <td class="text-nowrap">{{ vendor.phone or '' }}</td>
             <td class="text-nowrap">{{ vendor.email or '' }}</td>
             <td class="text-nowrap">{{ vendor.company or '' }}</td>
-            <td class="text-nowrap">{{ vendor.asset_count or 0 }}</td>
+            <td class="text-nowrap">{{ vendor.products|length }}</td>
             <td>
               <div class="d-grid gap-2 d-sm-flex">
                 <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-primary btn-modern w-100 w-sm-auto">View</a>

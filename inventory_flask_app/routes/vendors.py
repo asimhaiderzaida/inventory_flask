@@ -189,6 +189,24 @@ def export_vendor_po(vendor_id):
         vendor_id=vendor.id,
         tenant_id=current_user.tenant_id
     ).order_by(PurchaseOrder.created_at.desc()).all()
+    from inventory_flask_app.models import ProductInstance, Product
+
+    # Get direct-uploaded units (no PO)
+    direct_instances = (
+        ProductInstance.query
+        .join(Product)
+        .filter(
+            Product.vendor_id == vendor.id,
+            Product.tenant_id == current_user.tenant_id,
+            ProductInstance.po_id == None
+        )
+        .all()
+    )
+
+    if not purchase_orders and not direct_instances:
+        flash("⚠️ No purchase orders or uploaded units found for this vendor.", "warning")
+        return redirect(url_for('vendors_bp.vendor_profile', vendor_id=vendor.id))
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Vendor PO History"
@@ -215,19 +233,6 @@ def export_vendor_po(vendor_id):
                 product.grade if product else "",
                 product.disk1size if product else ""
             ])
-    from inventory_flask_app.models import ProductInstance, Product
-
-    # Get direct-uploaded units (no PO)
-    direct_instances = (
-        ProductInstance.query
-        .join(Product)
-        .filter(
-            Product.vendor_id == vendor.id,
-            Product.tenant_id == current_user.tenant_id,
-            ProductInstance.po_id == None
-        )
-        .all()
-    )
 
     for inst in direct_instances:
         product = inst.product
@@ -276,7 +281,7 @@ def export_vendor_upload(vendor_id):
         .filter(
             Product.vendor_id == vendor_id,
             Product.tenant_id == current_user.tenant_id,
-            db.func.strftime('%Y-%m-%d', db.func.datetime(ProductInstance.created_at, 'localtime')) == upload_date
+            db.func.date(ProductInstance.created_at) == upload_date
         )
         .all()
     )

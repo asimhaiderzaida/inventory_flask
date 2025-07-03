@@ -1,4 +1,3 @@
-from inventory_flask_app import app
+from inventory_flask_app import create_app
 
-if __name__ == "__main__":
-    app.run()
+app = create_app()

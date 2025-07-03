@@ -43,7 +43,7 @@
       <table class="table table-striped table-sm align-middle rounded-4 overflow-hidden shadow-sm bg-white">
         <thead>
           <tr>
-            <th class="text-nowrap"><input type="checkbox" id="select-all" onclick="for(let cb of document.querySelectorAll('.batch-checkbox')) cb.checked=this.checked;"></th>
+            <th class="text-nowrap"><input type="checkbox" id="select-all"></th>
             <th class="text-nowrap">Serial</th>
             <th class="text-nowrap">Asset</th>
             <th class="text-nowrap">Item Name</th>
@@ -117,7 +117,36 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      $('.table').DataTable({ pageLength: 50 });
+      const table = $('.table').DataTable({ pageLength: 50 });
+
+      document.getElementById("select-all").addEventListener("change", function () {
+        const checked = this.checked;
+        table.rows().every(function () {
+          const row = this.node();
+          const checkbox = row.querySelector('.batch-checkbox');
+          if (checkbox) checkbox.checked = checked;
+        });
+      });
+
+      // Ensure all checked checkboxes across all DataTables pages are included in batch update form submit
+      const form = document.querySelector("form[action='{{ url_for('stock_bp.batch_update_status') }}']");
+      form.addEventListener("submit", function (e) {
+        // Remove any previously added hidden inputs
+        document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+
+        // Append checked rows across all pages
+        table.rows().every(function () {
+          const row = this.node();
+          const checkbox = row.querySelector('.batch-checkbox');
+          if (checkbox && checkbox.checked) {
+            const hiddenInput = document.createElement("input");
+            hiddenInput.type = "hidden";
+            hiddenInput.name = "instance_ids";
+            hiddenInput.value = checkbox.value;
+            form.appendChild(hiddenInput);
+          }
+        });
+      });
     });
   </script>
 </div>

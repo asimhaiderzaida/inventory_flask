@@ -442,6 +442,9 @@ def under_process():
     team_filter = request.args.get('team')
     location_id = request.args.get('location_id')
     bin_search = request.args.get('bin_search', '').strip()
+    # New RAM and Disk filters
+    ram_filter = request.args.get('ram')
+    disk_filter = request.args.get('disk1size')
 
     # Improved status filter logic: always use .filter(), never .filter_by() for status
     if not status_filter or status_filter == 'all':
@@ -464,13 +467,18 @@ def under_process():
     if low_stock:
         query = query.join(Product).filter(Product.stock != None, Product.stock <= 3)
 
-    # Join Product only once if any filter is present
-    if model_filter or processor_filter:
+    # Join Product only once if any filter is present (or always, to simplify filter logic)
+    if model_filter or processor_filter or ram_filter or disk_filter or True:
         query = query.join(Product)
     if model_filter:
-        query = query.filter(Product.model_number.ilike(f"%{model_filter}%"))
+        query = query.filter(Product.model.ilike(f"%{model_filter}%"))
     if processor_filter:
-        query = query.filter(Product.processor == processor_filter)
+        query = query.filter(Product.cpu == processor_filter)
+    # RAM and Disk filter logic (re-added after model/processor filter)
+    if ram_filter:
+        query = query.filter(Product.ram == ram_filter)
+    if disk_filter:
+        query = query.filter(Product.disk1size == disk_filter)
     if serial_search:
         from sqlalchemy import or_
         query = query.filter(or_(
@@ -499,16 +507,17 @@ def under_process():
     ).filter(reserved_order.id == None)
 
     # --- Tenant scoping: only show ProductInstances for current tenant ---
-    query = query.join(Product).filter(Product.tenant_id == current_user.tenant_id)
+    query = query.filter(Product.tenant_id == current_user.tenant_id)
     # --------------------------------------------------------------------
 
     instances = query.all()
     all_models = list({i.product.model for i in instances if i.product and i.product.model})
     all_processors = list({i.product.cpu for i in instances if i.product and i.product.cpu})
+    # Rebuild all_rams and all_disks for dropdowns based on filtered instances
+    all_rams = list({i.product.ram for i in instances if i.product and i.product.ram})
+    all_disks = list({i.product.disk1size for i in instances if i.product and i.product.disk1size})
     distinct_stages = db.session.query(ProductInstance.process_stage).distinct().all()
     distinct_teams = db.session.query(ProductInstance.team_assigned).distinct().all()
-
-    # Debug output removed: no print statements for production
 
     # --- Unified column structure logic ---
     from inventory_flask_app.models import TenantSettings
@@ -551,6 +560,8 @@ def under_process():
         instances=instances,
         models=sorted(all_models),
         processors=sorted(all_processors),
+        rams=sorted(all_rams),
+        disk1sizes=sorted(all_disks),
         stages=[s[0] for s in distinct_stages if s[0]],
         teams=[t[0] for t in distinct_teams if t[0]],
         selected_stage=stage_filter,

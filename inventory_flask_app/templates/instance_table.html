@@ -53,6 +53,7 @@
 }
 
 .comfortable-table th {
+  padding: 10px 12px;
   font-size: 13px;
   font-weight: 600;
   background: #f0f2f5;
@@ -61,6 +62,8 @@
 }
 
 .comfortable-table td {
+  padding: 8px 12px;
+  font-size: 13px;
   background: #fff;
   vertical-align: middle;
   border: none;
@@ -109,6 +112,29 @@
   border-color: #bbb;
 }
 </style>
+<style>
+.comfortable-table td,
+.comfortable-table th {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 180px;
+}
+
+.comfortable-table th:nth-child(1),
+.comfortable-table td:nth-child(1) {
+  width: 40px;
+}
+
+.comfortable-table th:nth-child(2),
+.comfortable-table td:nth-child(2) {
+  min-width: 100px;
+}
+
+.comfortable-table td a.btn {
+  white-space: nowrap;
+}
+</style>
 <div class="fixed-inventory-header">
   <div class="container-fluid">
     <div class="row w-100">
@@ -154,6 +180,16 @@
           {% endfor %}
         </select>
       </div>
+      {% if rams %}
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <select name="ram" class="form-select rounded-pill" onchange="this.form.submit()">
+          <option value="">Filter by RAM</option>
+          {% for r in rams %}
+            <option value="{{ r }}" {% if request.args.get('ram') == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="col-12 col-md-3 mb-2 mb-md-0">
         <select name="location_id" class="form-select rounded-pill" onchange="this.form.submit()">
           <option value="">All Locations</option>
@@ -164,6 +200,16 @@
           {% endfor %}
         </select>
       </div>
+      {% if disk1sizes %}
+      <div class="col-12 col-md-3 mb-2 mb-md-0">
+        <select name="disk1size" class="form-select rounded-pill" onchange="this.form.submit()">
+          <option value="">Filter by Disk Size</option>
+          {% for d in disk1sizes %}
+            <option value="{{ d }}" {% if request.args.get('disk1size') == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="col-12 col-md-3 mb-2 mb-md-0">
         <input type="text" name="serial_search" value="{{ request.args.get('serial_search', '') }}" class="form-control rounded-pill" placeholder="Search Serial...">
       </div>
@@ -188,9 +234,17 @@
           <thead>
             <tr>
               <th><input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked;"></th>
+              {% set key_map = {
+                'model_number': 'model',
+                'product': 'item_name',
+                'processor': 'cpu',
+                'video_card': 'gpu1',
+                'resolution': 'display'
+              } %}
               {% for key in column_order %}
+                {% set normalized_key = key_map.get(key, key) %}
                 {% if settings['show_column_' ~ key] == 'true' %}
-                  <th>{{ settings['label_' ~ key]|default(key|replace('_', ' ')|title) }}</th>
+                  <th>{{ settings['label_' ~ key]|default(normalized_key|replace('_', ' ')|title) }}</th>
                 {% endif %}
               {% endfor %}
             </tr>
@@ -199,52 +253,62 @@
             {% for i in instances %}
               <tr>
                 <td><input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}"></td>
+                {% set key_map = {
+                  'model_number': 'model',
+                  'product': 'item_name',
+                  'processor': 'cpu',
+                  'video_card': 'gpu1',
+                  'resolution': 'display'
+                } %}
                 {% for key in column_order %}
+                  {% set normalized_key = key_map.get(key, key) %}
                   {% if settings['show_column_' ~ key] == 'true' %}
-                    {% if key == 'asset' %}
+                    {% if normalized_key == 'asset' %}
                       <td>{{ i.asset }}</td>
-                    {% elif key == 'serial' %}
+                    {% elif normalized_key == 'serial' %}
                       <td>{{ i.serial }}</td>
-                    {% elif key == 'item_name' %}
+                    {% elif normalized_key == 'item_name' %}
                       <td>{{ i.product.item_name if i.product else '' }}</td>
-                    {% elif key == 'make' %}
+                    {% elif normalized_key == 'make' %}
                       <td>{{ i.product.make if i.product else '' }}</td>
-                    {% elif key == 'model' %}
+                    {% elif normalized_key == 'model' %}
                       <td>{{ i.product.model if i.product else '' }}</td>
-                    {% elif key == 'cpu' %}
+                    {% elif normalized_key == 'cpu' %}
                       <td>{{ i.product.cpu if i.product else '' }}</td>
-                    {% elif key == 'ram' %}
+                    {% elif normalized_key == 'ram' %}
                       <td>{{ i.product.ram if i.product else '' }}</td>
-                    {% elif key == 'gpu1' %}
+                    {% elif normalized_key == 'gpu1' %}
                       <td>{{ i.product.gpu1 if i.product else '' }}</td>
-                    {% elif key == 'gpu2' %}
+                    {% elif normalized_key == 'gpu2' %}
                       <td>{{ i.product.gpu2 if i.product else '' }}</td>
-                    {% elif key == 'display' %}
+                    {% elif normalized_key == 'display' %}
                       <td>{{ i.product.display if i.product else '' }}</td>
-                    {% elif key == 'disk1size' %}
+                    {% elif normalized_key == 'disk1size' %}
                       <td>{{ i.product.disk1size if i.product else '' }}</td>
-                    {% elif key == 'grade' %}
+                    {% elif normalized_key == 'grade' %}
                       <td>{{ i.product.grade if i.product else '' }}</td>
-                    {% elif key == 'location' %}
+                    {% elif normalized_key == 'location' %}
                       <td>{{ i.location.name if i.location else '' }}</td>
-                    {% elif key == 'status' %}
+                    {% elif normalized_key == 'status' %}
                       <td>{{ i.status }}</td>
-                    {% elif key == 'process_stage' %}
+                    {% elif normalized_key == 'process_stage' %}
                       <td>{{ i.process_stage or '' }}</td>
-                    {% elif key == 'team_assigned' %}
+                    {% elif normalized_key == 'team_assigned' %}
                       <td>{{ i.team_assigned or '' }}</td>
-                    {% elif key == 'shelf_bin' %}
+                    {% elif normalized_key == 'shelf_bin' %}
                       <td>{{ i.shelf_bin or '' }}</td>
-                    {% elif key == 'is_sold' %}
+                    {% elif normalized_key == 'is_sold' %}
                       <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
-                    {% elif key == 'label' %}
+                    {% elif normalized_key == 'label' %}
                       <td>
-                        <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">🖨️ Print Label</a>
+                        <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-outline-dark rounded-pill px-4 text-nowrap" style="min-width: 140px;" target="_blank">🖨️ Print Label</a>
                       </td>
-                    {% elif key == 'action' %}
+                    {% elif normalized_key == 'action' %}
                       <td>
                         <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
                       </td>
+                    {% else %}
+                      <td>-</td>
                     {% endif %}
                   {% endif %}
                 {% endfor %}
@@ -284,6 +348,37 @@
           }
         });
     }, 180);
+  });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const table = $('.comfortable-table').DataTable({ pageLength: 50 });
+
+    document.getElementById("select-all-labels").addEventListener("change", function () {
+      const checked = this.checked;
+      table.rows().every(function () {
+        const row = this.node();
+        const checkbox = row.querySelector('.batch-label-checkbox');
+        if (checkbox) checkbox.checked = checked;
+      });
+    });
+
+    const form = document.getElementById("batch-print-form");
+    form.addEventListener("submit", function () {
+      // remove any previously added hidden inputs
+      document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+
+      table.rows().every(function () {
+        const row = this.node();
+        const checkbox = row.querySelector('.batch-label-checkbox');
+        if (checkbox && checkbox.checked) {
+          const hiddenInput = document.createElement("input");
+          hiddenInput.type = "hidden";
+          hiddenInput.name = "instance_ids";
+          hiddenInput.value = checkbox.value;
+          form.appendChild(hiddenInput);
+        }
+      });
+    });
   });
 </script>
 {% endblock %}

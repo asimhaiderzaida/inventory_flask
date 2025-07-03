@@ -136,8 +136,7 @@ def register_tenant():
         flash("✅ Tenant and admin account created successfully. You can now log in.", "success")
         return redirect(url_for('auth_bp.login'))
 
-    csrf_token = generate_csrf()
-    return render_template("register_tenant.html", settings={}, csrf_token=csrf_token)
+    return render_template("register_tenant.html", settings={})
 
 
 # Edit user route (admin only)

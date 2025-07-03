@@ -74,13 +74,6 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                  {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-2">{{ message }}</div>
-                  {% endfor %}
-                {% endif %}
-              {% endwith %}
               <div style="overflow-x:auto;">
                 <p class="text-muted small mb-2">
                   This preview includes all uploaded fields such as Serial, Asset, and more. Confirm to proceed with import.

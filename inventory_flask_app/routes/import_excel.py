@@ -33,6 +33,7 @@ def upload_excel():
 
         # If this is a confirmation step (user clicked Confirm Import)
         if request.form.get('confirm') == 'yes':
+            location_id = request.form.get('location_id')
             import io, base64
             excel_data = request.form.get('excel_data')
             if not excel_data or not vendor_id:
@@ -95,7 +96,7 @@ def upload_excel():
 
                     existing_instance.asset = asset
                     existing_instance.status = 'unprocessed'
-                    existing_instance.location_id = product.location_id
+                    existing_instance.location_id = int(location_id) if location_id else product.location_id
                     existing_instance.updated_at = get_now_for_tenant()
 
                     db.session.add(product)
@@ -117,7 +118,7 @@ def upload_excel():
                     disk1size=row.get('disk1size'),
                     stock=0,
                     vendor_id=int(vendor_id),
-                    location_id=get_location_id(row.get('location')) if row.get('location') else None,
+                    location_id=int(location_id) if location_id else get_location_id(row.get('location')) if row.get('location') else None,
                     created_at=get_now_for_tenant(),
                     tenant_id=current_user.tenant_id
                 )
@@ -202,8 +203,6 @@ def upload_excel():
                 Product.tenant_id == current_user.tenant_id
             ).first():
                 existing_serials.add(str(serial))
-        if existing_serials:
-            flash(f"Duplicate serial(s) already in inventory: {', '.join(existing_serials)}", 'error')
         import io, base64
         excel_io = io.BytesIO()
         df.to_excel(excel_io, index=False)

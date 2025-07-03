@@ -20,7 +20,10 @@ def create_app():
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SECRET_KEY'] = 'your-secret-key'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'inventory.db')
+    from dotenv import load_dotenv
+    load_dotenv()
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    print("Flask app is using DB:", app.config['SQLALCHEMY_DATABASE_URI'])
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
@@ -99,7 +102,7 @@ def create_app():
             tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
             settings = {s.key: s.value for s in tenant_settings}
             if not settings.get("column_order_instance_table"):
-                settings["column_order_instance_table"] = "asset_tag,serial_number,model_number,product,vendor,status,process_stage,team,shelf_bin,screen_size,resolution,video_card,ram,processor,storage,is_sold,label,action"
+                settings["column_order_instance_table"] = "asset,serial,model,product,vendor,status,process_stage,team,shelf_bin,screen_size,resolution,video_card,ram,processor,storage,is_sold,label,action"
             print("LOADED COLUMN ORDER:", settings.get("column_order_instance_table"))
             return {'settings': settings}
         except:
