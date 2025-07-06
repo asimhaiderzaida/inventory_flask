@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Return Management</h2>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('returns_bp.lookup_return') }}" class="btn btn-outline-primary">🔍 Lookup Return</a>
+      <a href="#" class="btn btn-primary">+ Create New Return</a>
+    </div>
+  </div>
+
+  {% if returns %}
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th>Reason</th>
+            <th>Condition</th>
+            <th>Action</th>
+            <th>Date</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in returns %}
+            <tr>
+              <td>{{ r.instance.serial if r.instance else 'N/A' }}</td>
+              <td>{{ r.reason }}</td>
+              <td>{{ r.condition }}</td>
+              <td>{{ r.action }}</td>
+              <td>{{ r.return_date.strftime('%Y-%m-%d') }}</td>
+              <td>{{ r.notes }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No returns recorded yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

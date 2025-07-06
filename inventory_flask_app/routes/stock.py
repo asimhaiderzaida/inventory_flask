@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location
 from inventory_flask_app.models import CustomerOrderTracking
 from flask import jsonify
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, joinedload
 from datetime import datetime
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
@@ -111,6 +111,7 @@ def stock_receiving_scan():
         return redirect(url_for('dashboard_bp.main_dashboard'))
     po = PurchaseOrder.query.filter_by(id=po_id, tenant_id=current_user.tenant_id).first_or_404()
     expected_serials = [s.strip() for s in po.expected_serials.split(',') if s.strip()]
+    expected_serials_set = set(s.strip().lower() for s in expected_serials)
     scanned = list(set(session.get('scanned', [])))  # Ensure uniqueness
 
     if request.method == 'POST':
@@ -126,43 +127,38 @@ def stock_receiving_scan():
 
     # Matching logic: allow scanning serial or asset, and map asset to correct serial for PO logic
     po_spec_data = session.get('po_spec_data', [])
+    # Build asset_to_serial and serial_to_row maps (cleaned)
     asset_to_serial = {
-        str(row.get('asset')).strip(): str(row.get('serial')).strip()
+        str(row.get('asset')).strip().lower(): str(row.get('serial')).strip().lower()
         for row in po_spec_data
+        if row.get('asset') and row.get('serial')
+    }
+    serial_to_row = {
+        str(r.get('serial')).strip().lower(): r for r in po_spec_data
     }
 
-    matched_serials = set()
-    # The following block is refactored to ensure full row data is passed for all scanned items:
-    po_spec_data = session.get('po_spec_data', [])
     scanned_rows = []
-
     for s in scanned:
-        s_clean = s.strip()
-        matched_serial = None
-        if s_clean in expected_serials:
-            matched_serial = s_clean
-        elif s_clean in asset_to_serial:
-            matched_serial = asset_to_serial[s_clean]
-
-        if matched_serial:
-            row = next((r for r in po_spec_data if str(r.get('serial')).strip() == matched_serial), None)
-            if row:
-                row['serial'] = row.get('serial', '')
-                row['asset'] = row.get('asset', '')
-                scanned_rows.append(row)
+        s_clean = s.strip().lower()
+        matched_serial = s_clean if s_clean in expected_serials_set else asset_to_serial.get(s_clean)
+        if matched_serial and matched_serial in serial_to_row:
+            row = serial_to_row[matched_serial]
+            row['serial'] = row.get('serial', '')
+            row['asset'] = row.get('asset', '')
+            scanned_rows.append(row)
         else:
-            scanned_rows.append({'serial': s_clean, 'asset': '', 'status': 'extra'})
+            scanned_rows.append({'serial': s, 'asset': '', 'status': 'extra'})
 
     # Compute matched, extra, missing using the original logic:
     matched = []
     for s in scanned:
-        s_clean = s.strip()
-        if s_clean in expected_serials:
-            matched.append(s_clean)
+        s_clean = s.strip().lower()
+        if s_clean in expected_serials_set:
+            matched.append(s.strip())
         elif s_clean in asset_to_serial:
-            matched.append(asset_to_serial[s_clean])
+            matched.append(po_spec_data[0]['serial'] if asset_to_serial[s_clean] in serial_to_row and po_spec_data[0]['serial'] else asset_to_serial[s_clean])
     matched = list(set(matched))
-    extra = [s for s in scanned if s not in expected_serials and s not in asset_to_serial]
+    extra = [s for s in scanned if s.strip().lower() not in expected_serials_set and s.strip().lower() not in asset_to_serial]
     missing = list(set(expected_serials) - set(matched))
 
     return render_template(
@@ -461,6 +457,12 @@ def under_process():
             query = query.filter(ProductInstance.status == 'disputed', ProductInstance.is_sold == False)
         else:
             query = query.filter(ProductInstance.status == status_filter)
+
+    # Eager load related product and location data for performance
+    query = query.options(
+        joinedload(ProductInstance.product),
+        joinedload(ProductInstance.location)
+    )
 
     # Low stock filter (for /stock/under_process?low_stock=1)
     low_stock = request.args.get('low_stock')
@@ -944,33 +946,39 @@ def export_instances():
 @stock_bp.route('/scan_move', methods=['GET', 'POST'])
 @login_required
 def scan_move():
-    # Use session to keep batch list between requests
+    from sqlalchemy import or_, func
+    from datetime import datetime
+
     if 'batch_serials' not in session:
         session['batch_serials'] = []
 
     batch_serials = session.get('batch_serials', [])
-    instances = []
-    serial_number = ""
-
-    # Ensure serial is always defined
     serial = None
 
-    # Handle serial scan
+    # Handle serial scan or update
     if request.method == 'POST':
-        # Remove serial (if user clicked 'remove')
+        if request.form.get("reset_scanned") == "1":
+            batch_serials = []
+            session['batch_serials'] = batch_serials
+            session.modified = True
+            flash("Scanned list has been cleared.", "info")
+            return redirect(url_for('stock_bp.scan_move'))
+        # Remove serial
         remove_serial = request.form.get('remove_serial')
         if remove_serial:
             batch_serials = [s for s in batch_serials if s != remove_serial]
             session['batch_serials'] = batch_serials
             session.modified = True
-        # Add serial (on scan/submit)
+
+        # Add serial
         elif 'serial' in request.form and request.form.get('serial').strip():
             serial = request.form.get('serial').strip()
             if serial not in batch_serials:
                 batch_serials.append(serial)
                 session['batch_serials'] = batch_serials
                 session.modified = True
-        # Handle "Move/Assign All"
+
+        # Apply bulk updates
         elif 'move_all' in request.form:
             status = request.form.get('status')
             process_stage = request.form.get('process_stage')
@@ -978,22 +986,17 @@ def scan_move():
             location_id = request.form.get('location_id')
             shelf_bin = request.form.get('shelf_bin', '').strip()
             updated = 0
-            for serial in batch_serials:
-                if status not in ['unprocessed', 'under_process', 'processed', 'sold']:
-                    flash("Invalid status selected.", "danger")
-                    break
-                from sqlalchemy import or_
-                # --- Tenant scoping: only allow update of ProductInstances for current tenant ---
+            for s in batch_serials:
+                clean = s.strip()
                 instance = ProductInstance.query.join(Product).filter(
                     or_(
-                        ProductInstance.serial == serial,
-                        ProductInstance.asset == serial
+                        ProductInstance.serial == clean,
+                        ProductInstance.asset == clean
                     ),
                     Product.tenant_id == current_user.tenant_id
                 ).first()
-                # --------------------------------------------------------------------
                 if instance:
-                    if status:
+                    if status in ['unprocessed', 'under_process', 'processed', 'sold']:
                         instance.status = status
                     if process_stage:
                         instance.process_stage = process_stage
@@ -1003,7 +1006,6 @@ def scan_move():
                         instance.location_id = int(location_id)
                     if shelf_bin:
                         instance.shelf_bin = shelf_bin
-                    from datetime import datetime
                     instance.updated_at = datetime.utcnow()
                     updated += 1
             db.session.commit()
@@ -1012,18 +1014,30 @@ def scan_move():
             session['batch_serials'] = batch_serials
             session.modified = True
 
-    # Build instances list for display (show info for each scanned serial)
-    from sqlalchemy import or_
+    # ✅ Optimized bulk query for displaying scanned instances
+    serials_upper = [s.strip().upper() for s in batch_serials]
+    instances = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id
+    ).filter(
+        or_(
+            func.upper(ProductInstance.serial).in_(serials_upper),
+            func.upper(ProductInstance.asset).in_(serials_upper)
+        )
+    ).all()
+
+    # Build map for fast lookup
+    instance_map = {}
+    for i in instances:
+        if i.serial:
+            instance_map[i.serial.strip().upper()] = i
+        if i.asset:
+            instance_map[i.asset.strip().upper()] = i
+
+    # Build unified display list in scan order
     unified_instances = []
     for s in batch_serials:
-        clean_serial = s.strip().upper()
-        instance = ProductInstance.query.join(Product).filter(
-            or_(
-                db.func.upper(ProductInstance.serial) == clean_serial,
-                db.func.upper(ProductInstance.asset) == clean_serial
-            ),
-            Product.tenant_id == current_user.tenant_id
-        ).first()
+        key = s.strip().upper()
+        instance = instance_map.get(key)
         unified_instances.append({
             "serial": instance.serial if instance else s,
             "asset": instance.asset if instance else "",

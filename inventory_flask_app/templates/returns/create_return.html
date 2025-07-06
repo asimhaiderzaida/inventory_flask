@@ -1,0 +1,48 @@
+
+
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Submit Product Return</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label"><strong>Serial:</strong></label>
+      <p class="form-control-plaintext">{{ instance.serial }}</p>
+    </div>
+
+    <div class="mb-3">
+      <label for="reason" class="form-label">Reason for Return</label>
+      <input type="text" class="form-control" id="reason" name="reason" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="condition" class="form-label">Condition</label>
+      <select class="form-select" id="condition" name="condition" required>
+        <option value="">-- Select --</option>
+        <option value="Good">Good</option>
+        <option value="Damaged">Damaged</option>
+        <option value="Broken">Broken</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="action" class="form-label">Action</label>
+      <select class="form-select" id="action" name="action" required>
+        <option value="">-- Select --</option>
+        <option value="Restock">Restock</option>
+        <option value="Repair">Repair</option>
+        <option value="Scrap">Scrap</option>
+        <option value="Refund">Refund</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="notes" class="form-label">Additional Notes</label>
+      <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Submit Return</button>
+    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

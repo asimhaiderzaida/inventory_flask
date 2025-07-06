@@ -256,6 +256,20 @@ class PartMovement(db.Model):
     to_location = db.relationship('Location', foreign_keys=[to_location_id], backref='parts_moved_to')
     user = db.relationship('User', backref='part_movements')
 
+class Return(db.Model):
+    __tablename__ = 'returns'
+    id = db.Column(db.Integer, primary_key=True)
+    instance_id = db.Column(db.Integer, db.ForeignKey('product_instance.id'), nullable=False)
+    return_date = db.Column(db.DateTime, default=datetime.utcnow)
+    reason = db.Column(db.String(255))
+    condition = db.Column(db.String(50))  # e.g. Good, Damaged
+    action = db.Column(db.String(50))     # e.g. Restock, Refund, Scrap
+    notes = db.Column(db.Text)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+
+    instance = db.relationship('ProductInstance', backref='returns')
+    tenant = db.relationship('Tenant', backref='returns')
+
 class TenantSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=False)

@@ -69,6 +69,7 @@ def create_app():
     from .routes.import_excel import import_excel_bp
     from .routes.exports import exports_bp
     from .routes.parts import parts_bp
+    from .routes.returns import returns_bp
 
     app.register_blueprint(parts_bp)
     app.register_blueprint(auth_bp)
@@ -82,6 +83,7 @@ def create_app():
     app.register_blueprint(invoices_bp)
     app.register_blueprint(import_excel_bp)
     app.register_blueprint(exports_bp)
+    app.register_blueprint(returns_bp)
 
     from .routes.reports import reports_bp
     app.register_blueprint(reports_bp)
@@ -113,5 +115,6 @@ def create_app():
     def inject_csrf_token():
         from flask_wtf.csrf import generate_csrf
         return dict(csrf_token=generate_csrf)
+
 
     return app

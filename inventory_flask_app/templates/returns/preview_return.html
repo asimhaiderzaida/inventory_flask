@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Confirm Return</h2>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Product Info</h5>
+      <p><strong>Asset:</strong> {{ instance.asset }}</p>
+      <p><strong>Serial:</strong> {{ instance.serial }}</p>
+      <p><strong>Model:</strong> {{ instance.product.model if instance.product else '' }}</p>
+      <p><strong>Item:</strong> {{ instance.product.item_name if instance.product else '' }}</p>
+      <p><strong>CPU:</strong> {{ instance.product.cpu if instance.product else '' }}</p>
+      <p><strong>RAM:</strong> {{ instance.product.ram if instance.product else '' }}</p>
+      <p><strong>Storage:</strong> {{ instance.product.disk1size if instance.product else '' }}</p>
+      <p><strong>Sold:</strong> {{ 'Yes' if instance.is_sold else 'No' }}</p>
+      {% if sale and sale.customer %}
+        <p><strong>Customer:</strong> {{ sale.customer.name }}</p>
+      {% endif %}
+      {% if sale and sale.sale_date %}
+        <p><strong>Sale Date:</strong> {{ sale.sale_date.strftime('%Y-%m-%d') }}</p>
+      {% endif %}
+      {% if sale and sale.price_at_sale %}
+        <p><strong>Sale Price:</strong> {{ sale.price_at_sale }}</p>
+      {% endif %}
+      {% if sale and sale.sale_transaction and sale.sale_transaction.invoice_number %}
+        <p><strong>Invoice #:</strong> {{ sale.sale_transaction.invoice_number }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <a href="{{ url_for('returns_bp.create_return', instance_id=instance.id) }}" class="btn btn-success">Proceed with Return</a>
+  <a href="{{ url_for('returns_bp.lookup_return') }}" class="btn btn-secondary">Cancel</a>
+</div>
+{% endblock %}

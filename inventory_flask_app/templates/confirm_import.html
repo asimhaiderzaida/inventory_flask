@@ -5,6 +5,14 @@
     <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.4rem;">
       <i class="bi bi-search me-2"></i>Preview Products to Import
     </h2>
+    <div class="d-flex gap-2 flex-column flex-md-row">
+      <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
+        <i class="bi bi-check2-circle me-1"></i>Confirm Import
+      </button>
+      <a href="/upload_excel" class="btn btn-outline-secondary rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
+        <i class="bi bi-arrow-left-circle me-1"></i>Back to Upload
+      </a>
+    </div>
     <form action="/confirm_import" method="POST">
       <div id="loadingSpinner" class="text-center my-3" style="display:none;">
         <div class="spinner-border text-primary" role="status">
@@ -32,14 +40,6 @@
             {% endfor %}
           </tbody>
         </table>
-      </div>
-      <div class="d-flex gap-2 flex-column flex-md-row">
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
-          <i class="bi bi-check2-circle me-1"></i>Confirm Import
-        </button>
-        <a href="/upload_excel" class="btn btn-outline-secondary rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i>Back to Upload
-        </a>
       </div>
     </form>
   </div>

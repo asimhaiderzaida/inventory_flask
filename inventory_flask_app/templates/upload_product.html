@@ -104,7 +104,7 @@
                 <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
                 <input type="hidden" name="excel_data" value="{{ excel_data }}">
                 <input type="hidden" name="confirm" value="yes">
-                <button type="submit" class="btn btn-success rounded-pill fw-semibold mt-2 btn-lg w-100">
+                <button type="submit" id="confirm-import-btn" class="btn btn-success rounded-pill fw-semibold mt-2 btn-lg w-100">
                   <i class="bi bi-check2-circle me-1"></i>Confirm Import
                 </button>
               </form>
@@ -118,6 +118,18 @@
           {% if preview_data %}
             document.getElementById('previewModalTrigger').click();
           {% endif %}
+        });
+      </script>
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const confirmBtn = document.getElementById("confirm-import-btn");
+          if (confirmBtn) {
+            confirmBtn.addEventListener("click", function () {
+              confirmBtn.disabled = true;
+              confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Importing...';
+              confirmBtn.form.submit();
+            });
+          }
         });
       </script>
     {% endif %}

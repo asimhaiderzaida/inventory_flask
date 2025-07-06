@@ -1,0 +1,16 @@
+
+
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Lookup Return by Serial</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label for="serial" class="form-label">Enter Serial Number</label>
+      <input type="text" class="form-control" id="serial" name="serial" placeholder="Scan or type serial..." required>
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -130,6 +130,17 @@ def confirm_sale():
         # Commit sales first to get their IDs
         db.session.commit()
 
+        # --- Ensure each sold unit is recorded in SaleItem ---
+        from ..models import SaleItem
+        # Create SaleItem for each sale
+        for sale in sale_transactions:
+            db.session.add(SaleItem(
+                sale_transaction_id=sale.id,
+                product_instance_id=sale.product_instance_id
+            ))
+        db.session.commit()
+        # --- End SaleItem recording ---
+
         # Create a new invoice and link sale transactions to it
         invoice = Invoice(
             customer_id=customer.id,
