@@ -1,0 +1,81 @@
+<form method="post" action="{{ url_for('stock_bp.export_instances') }}" id="export-group-form">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <span id="modal-selected-count" class="text-muted small">0 selected</span>
+    <button type="submit" class="btn btn-sm btn-outline-dark rounded-pill">Export Selected</button>
+  </div>
+  <div style="overflow-x: auto;">
+    <table class="table table-bordered table-sm comfortable-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="modal-select-all"></th>
+          {% for key in settings.column_order_instance_table.split(',') %}
+            {% if settings['show_column_' ~ key] == 'true' %}
+              <th>{{ settings['label_' ~ key]|default(key|replace('_', ' ')|title) }}</th>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in instances %}
+          <tr>
+            <td><input type="checkbox" class="modal-checkbox" name="instance_ids" value="{{ i.id }}"></td>
+            {% for key in settings.column_order_instance_table.split(',') %}
+              {% if settings['show_column_' ~ key] == 'true' %}
+                <td>
+                  {% if key == 'asset' %}{{ i.asset }}
+                  {% elif key == 'serial' %}{{ i.serial }}
+                  {% elif key == 'item_name' %}{{ i.product.item_name if i.product else '' }}
+                  {% elif key == 'make' %}{{ i.product.make if i.product else '' }}
+                  {% elif key == 'model' %}{{ i.product.model if i.product else '' }}
+                  {% elif key == 'cpu' %}{{ i.product.cpu if i.product else '' }}
+                  {% elif key == 'ram' %}{{ i.product.ram if i.product else '' }}
+                  {% elif key == 'gpu1' %}{{ i.product.gpu1 if i.product else '' }}
+                  {% elif key == 'gpu2' %}{{ i.product.gpu2 if i.product else '' }}
+                  {% elif key == 'display' %}{{ i.product.display if i.product else '' }}
+                  {% elif key == 'disk1size' %}{{ i.product.disk1size if i.product else '' }}
+                  {% elif key == 'grade' %}{{ i.product.grade if i.product else '' }}
+                  {% elif key == 'location' %}{{ i.location.name if i.location else '' }}
+                  {% elif key == 'status' %}{{ i.status }}
+                  {% elif key == 'process_stage' %}{{ i.process_stage or '' }}
+                  {% elif key == 'team_assigned' %}{{ i.team_assigned or '' }}
+                  {% elif key == 'shelf_bin' %}{{ i.shelf_bin or '' }}
+                  {% elif key == 'is_sold' %}{{ 'Yes' if i.is_sold else 'No' }}
+                  {% elif key == 'label' %}
+                    <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-sm btn-outline-dark" target="_blank">🖨️</a>
+                  {% elif key == 'action' %}
+                    <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info">Edit</a>
+                  {% endif %}
+                </td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+<script>
+  const modalCheckboxes = document.querySelectorAll(".modal-checkbox");
+  const modalSelectAll = document.getElementById("modal-select-all");
+  const modalCount = document.getElementById("modal-selected-count");
+
+  modalCheckboxes.forEach(cb => {
+    cb.addEventListener("change", updateModalCount);
+  });
+
+  function updateModalCount() {
+    const selected = document.querySelectorAll(".modal-checkbox:checked").length;
+    modalCount.textContent = `${selected} selected`;
+  }
+
+  if (modalSelectAll) {
+    modalSelectAll.addEventListener("change", function () {
+      const check = this.checked;
+      modalCheckboxes.forEach(cb => {
+        cb.checked = check;
+      });
+      updateModalCount();
+    });
+  }
+</script>

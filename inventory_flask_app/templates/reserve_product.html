@@ -184,4 +184,22 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+
+<audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+
+<script>
+  function playBeep() {
+    const beep = document.getElementById("beep-sound");
+    if (beep) beep.play();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const serialInput = document.querySelector('input[name="serial_input"]');
+    if (serialInput) {
+      serialInput.addEventListener("change", function () {
+        playBeep();
+      });
+    }
+  });
+</script>
 {% endblock %}

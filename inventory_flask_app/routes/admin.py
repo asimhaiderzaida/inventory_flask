@@ -65,10 +65,11 @@ def admin_settings():
         settings['column_order_instance_table'] = ",".join(unified_column_order)
 
     from inventory_flask_app.models import User
-    users = User.query.filter_by(tenant_id=tenant_id).all()
+    page = request.args.get('page', 1, type=int)
+    users = User.query.filter_by(tenant_id=tenant_id).paginate(page=page, per_page=25)
     tenant_timezone = current_user.tenant.timezone
 
-    return render_template('admin_settings.html', settings=settings, users=users, tenant_timezone=tenant_timezone)
+    return render_template('admin_settings.html', settings=settings, users=users.items, tenant_timezone=tenant_timezone, pagination=users)
 
 @admin_bp.app_errorhandler(CSRFError)
 def handle_csrf_error(e):

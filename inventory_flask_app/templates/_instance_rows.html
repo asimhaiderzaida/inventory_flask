@@ -1,0 +1,53 @@
+
+
+{% for i in instances %}
+  <tr>
+    <td><input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}"></td>
+    {% for key in column_order %}
+      {% set normalized_key = key_map.get(key, key) %}
+      {% if settings['show_column_' ~ key] == 'true' %}
+        {% if normalized_key == 'asset' %}
+          <td>{{ i.asset }}</td>
+        {% elif normalized_key == 'serial' %}
+          <td>{{ i.serial }}</td>
+        {% elif normalized_key == 'model' %}
+          <td>{{ i.product.model if i.product else '' }}</td>
+        {% elif normalized_key == 'product' %}
+          <td>{{ i.product.item_name if i.product else '' }}</td>
+        {% elif normalized_key == 'vendor' %}
+          <td>{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
+        {% elif normalized_key == 'status' %}
+          <td>{{ i.status }}</td>
+        {% elif normalized_key == 'process_stage' %}
+          <td>{{ i.process_stage }}</td>
+        {% elif normalized_key == 'team' %}
+          <td>{{ i.team_assigned }}</td>
+        {% elif normalized_key == 'shelf_bin' %}
+          <td>{{ i.shelf_bin }}</td>
+        {% elif normalized_key == 'screen_size' %}
+          <td>{{ i.product.display if i.product else '' }}</td>
+        {% elif normalized_key == 'resolution' %}
+          <td>{{ i.product.resolution if i.product else '' }}</td>
+        {% elif normalized_key == 'video_card' %}
+          <td>{{ i.product.gpu1 if i.product else '' }}</td>
+        {% elif normalized_key == 'ram' %}
+          <td>{{ i.product.ram if i.product else '' }}</td>
+        {% elif normalized_key == 'processor' %}
+          <td>{{ i.product.cpu if i.product else '' }}</td>
+        {% elif normalized_key == 'storage' %}
+          <td>{{ i.product.disk1size if i.product else '' }}</td>
+        {% elif normalized_key == 'is_sold' %}
+          <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
+        {% elif normalized_key == 'label' %}
+          <td>
+            <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">🖨️ Print Label</a>
+          </td>
+        {% elif normalized_key == 'action' %}
+          <td>
+            <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
+          </td>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </tr>
+{% endfor %}

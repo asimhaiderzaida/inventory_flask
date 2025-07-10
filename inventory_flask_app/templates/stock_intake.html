@@ -72,5 +72,22 @@
     </div>
   </div>
   <!-- Optional: Add quick stats, instructions, or a recent actions list here -->
+
+  <!-- Audio feedback for serial scan -->
+  <audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+  <script>
+    function playBeep() {
+      const beep = document.getElementById("beep-sound");
+      if (beep) beep.play();
+    }
+
+    // Listen for changes in serial input if present
+    const serialInput = document.querySelector('input[name="serial"]');
+    if (serialInput) {
+      serialInput.addEventListener('change', function () {
+        playBeep();
+      });
+    }
+  </script>
 </div>
 {% endblock %}

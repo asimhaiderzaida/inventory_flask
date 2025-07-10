@@ -45,6 +45,20 @@ table.table th {
   }
 }
 </style>
+<audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+
+<script>
+  function playBeep() {
+    const beep = document.getElementById("beep-sound");
+    if (beep) beep.play();
+  }
+
+  document.getElementById('scanSerialInput').addEventListener('change', function () {
+    if (this.value.trim()) {
+      playBeep();
+    }
+  });
+</script>
 {% endblock %}
 {% block content %}
 

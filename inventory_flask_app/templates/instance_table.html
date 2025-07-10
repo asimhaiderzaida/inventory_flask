@@ -1,57 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
+/* --- Inventory unified fixed header --- */
 .fixed-inventory-header {
   position: fixed;
   top: 0;
   left: 240px;
   right: 0;
-  background: #fff;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
   z-index: 1051;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
   border-bottom: 1px solid #eee;
-  padding: 24px 0 12px 0;
+  padding: 12px 0 8px 0;
 }
 @media (max-width: 991px) {
   .fixed-inventory-header { left: 0; }
 }
-.fixed-inventory-header .row {
-  width: 100%;
-}
-.inventory-actions {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-}
-.inventory-actions .btn {
-  min-width: 200px;
-  width: 100%;
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.55rem 1.25rem;
-  border-radius: 2rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-@media (max-width: 767px) {
-  .inventory-actions {
-    flex-direction: column;
-    width: 100%;
-  }
-  .inventory-actions .btn {
-    min-width: 100% !important;
-    margin-bottom: 8px;
-  }
-}
 .inventory-main-content {
-  margin-top: 120px;
+  margin-top: 85px;
   padding: 0 16px;
-  width: 100%;
 }
+/* .comfortable-table: main table styling */
 .comfortable-table {
   border-collapse: separate;
   border-spacing: 0 6px;
+  width: 100%;
+  min-width: 100%;
+  overflow-x: auto;
 }
-
 .comfortable-table th {
   padding: 10px 12px;
   font-size: 13px;
@@ -59,8 +35,9 @@
   background: #f0f2f5;
   border: none;
   color: #333;
+  text-transform: uppercase;
+  font-weight: bold;
 }
-
 .comfortable-table td {
   padding: 8px 12px;
   font-size: 13px;
@@ -71,11 +48,9 @@
   border-bottom: 1px solid #eee;
   box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
-
 .comfortable-table tbody tr:hover td {
   background-color: #f1f2f5;
 }
-
 .comfortable-table .btn {
   font-size: 12px;
   padding: 4px 10px;
@@ -94,6 +69,7 @@
   box-shadow: 0 2px 12px #0057b710;
   border: none;
   padding: 2.3rem 1.2rem 1.4rem 1.2rem;
+  margin-top: 1.2rem;
 }
 .batch-action-bar .btn {
   border-radius: 2rem !important;
@@ -121,15 +97,9 @@
   max-width: 180px;
 }
 
-.comfortable-table th:nth-child(1),
-.comfortable-table td:nth-child(1) {
-  width: 40px;
-}
+/* Remove fixed width/min-width for first and second columns to allow horizontal scrolling */
 
-.comfortable-table th:nth-child(2),
-.comfortable-table td:nth-child(2) {
-  min-width: 100px;
-}
+/* .comfortable-table width, min-width, overflow-x, display moved to main style above */
 
 .comfortable-table td a.btn {
   white-space: nowrap;
@@ -137,181 +107,82 @@
 </style>
 <div class="fixed-inventory-header">
   <div class="container-fluid">
-    <div class="row w-100">
-      <div class="col d-flex flex-column justify-content-start">
-        <h2 class="mb-2">
-          <i class="bi bi-list-ul me-2"></i>{{ title }}
-        </h2>
+    <form method="get">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <h4 class="mb-0"><i class="bi bi-list-ul me-2"></i>{{ title }}</h4>
+        </div>
+        <div class="col">
+          <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
+            <option value="unprocessed" {% if request.args.get('status') == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
+            <option value="under_process" {% if request.args.get('status') == 'under_process' %}selected{% endif %}>Under Process</option>
+            <option value="processed" {% if request.args.get('status') == 'processed' %}selected{% endif %}>Processed</option>
+            <option value="disputed" {% if request.args.get('status') == 'disputed' %}selected{% endif %}>Disputed</option>
+          </select>
+        </div>
+        <div class="col">
+          <input type="text" name="model" value="{{ request.args.get('model', '') }}" class="form-control form-control-sm" placeholder="Model">
+        </div>
+        <div class="col">
+          <select name="processor" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Processor</option>
+            {% for p in processors %}
+              <option value="{{ p }}" {% if request.args.get('processor') == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
+          <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+        </div>
       </div>
-      <div class="col-auto inventory-actions align-items-center">
-        <a href="{{ url_for('stock_bp.export_instances', **request.args) }}" class="btn btn-outline-dark btn-lg rounded-pill">Export to Excel</a>
-        <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-outline-primary btn-lg rounded-pill">
-          Move Units
-        </a>
-        <a href="{{ url_for('stock_bp.bin_lookup') }}" class="btn btn-outline-secondary btn-lg rounded-pill">
-          <i class="bi bi-upc-scan me-1"></i>Scan/Lookup Bin
-        </a>
-      </div>
-    </div>
+    </form>
   </div>
 </div>
 <div class="inventory-main-content">
-  <div class="instances-card mt-4">
-    <p class="text-muted small mb-3">    
-  <form method="get" class="row g-2 mb-4">
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="status" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
-          <option value="unprocessed" {% if request.args.get('status') == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
-          <option value="under_process" {% if request.args.get('status') == 'under_process' %}selected{% endif %}>Under Process</option>
-          <option value="processed" {% if request.args.get('status') == 'processed' %}selected{% endif %}>Processed</option>
-          <option value="disputed" {% if request.args.get('status') == 'disputed' %}selected{% endif %}>Disputed</option>
-        </select>
-      </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <input type="text" name="model" id="model-search" value="{{ request.args.get('model', '') }}" class="form-control rounded-pill" placeholder="Search Model..." autocomplete="off" list="model-suggestions" />
-        <datalist id="model-suggestions"></datalist>
-      </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="processor" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="">Filter by Processor</option>
-          {% for p in processors %}
-            <option value="{{ p }}" {% if request.args.get('processor') == p %}selected{% endif %}>{{ p }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% if rams %}
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="ram" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="">Filter by RAM</option>
-          {% for r in rams %}
-            <option value="{{ r }}" {% if request.args.get('ram') == r %}selected{% endif %}>{{ r }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="location_id" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="">All Locations</option>
-          {% for loc in locations %}
-            <option value="{{ loc.id }}" {% if request.args.get('location_id') == loc.id|string %}selected{% endif %}>
-              {{ loc.name }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-      {% if disk1sizes %}
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="disk1size" class="form-select rounded-pill" onchange="this.form.submit()">
-          <option value="">Filter by Disk Size</option>
-          {% for d in disk1sizes %}
-            <option value="{{ d }}" {% if request.args.get('disk1size') == d %}selected{% endif %}>{{ d }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <input type="text" name="serial_search" value="{{ request.args.get('serial_search', '') }}" class="form-control rounded-pill" placeholder="Search Serial...">
-      </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <input type="text" name="bin_search" value="{{ request.args.get('bin_search', '') }}" class="form-control rounded-pill" placeholder="Search Bin #...">
-      </div>
-      <div class="col-12 col-md-auto d-flex gap-2 align-items-end">
-        <button class="btn btn-outline-primary rounded-pill shadow-sm" type="submit" style="min-height: 42px;">Apply Filters</button>
-        <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-outline-secondary rounded-pill shadow-sm" style="min-height: 42px;">Clear Filters</a>
-      </div>
-    </form>
-    <div class="mb-2 text-start">
-      <strong>{{ instances|length }} item{{ 's' if instances|length != 1 else '' }} found</strong>
-    </div>
+  <div class="instances-card mt-3">
     <form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form">
-      <div class="mb-2 w-100">
-        <button type="submit" class="btn btn-outline-dark rounded-pill batch-action-bar">🖨️ Print Selected Labels</button>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+          {% set total = total_units if total_units is defined and total_units is not none else 0 %}
+          <strong>{{ "{:,}".format(total) }} units in inventory across {{ grouped_instances|length }} model{{ 's' if grouped_instances|length != 1 else '' }}</strong>
+          <span class="text-muted small ms-3" id="selected-count">0 selected</span>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-outline-success btn-sm rounded-pill">Scan & Move</a>
+          <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill">🖨️ Print Selected</button>
+          <button type="submit" form="export-excel-form" class="btn btn-outline-dark btn-sm rounded-pill">Export Selected</button>
+        </div>
       </div>
-      <div style="overflow-x:auto;">
+      <div style="overflow-x:auto; width: 100%;">
         {% set column_order = (settings.column_order_instance_table or '').split(',') %}
-        <table class="table table-striped comfortable-table">
+        <table class="table table-sm align-middle table-hover comfortable-table w-100">
           <thead>
             <tr>
-              <th><input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked;"></th>
-              {% set key_map = {
-                'model_number': 'model',
-                'product': 'item_name',
-                'processor': 'cpu',
-                'video_card': 'gpu1',
-                'resolution': 'display'
-              } %}
-              {% for key in column_order %}
-                {% set normalized_key = key_map.get(key, key) %}
-                {% if settings['show_column_' ~ key] == 'true' %}
-                  <th>{{ settings['label_' ~ key]|default(normalized_key|replace('_', ' ')|title) }}</th>
-                {% endif %}
-              {% endfor %}
+              <th class="text-uppercase fw-bold bg-light" style="width: 40px;">
+                <input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked; updateSelectedFromCheckboxes();">
+              </th>
+              <th class="text-uppercase fw-bold bg-light">Model</th>
+              <th class="text-uppercase fw-bold bg-light">Processor</th>
+              <th class="text-uppercase fw-bold bg-light">Count</th>
+              <th class="text-uppercase fw-bold bg-light">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {% for i in instances %}
-              <tr>
-                <td><input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}"></td>
-                {% set key_map = {
-                  'model_number': 'model',
-                  'product': 'item_name',
-                  'processor': 'cpu',
-                  'video_card': 'gpu1',
-                  'resolution': 'display'
-                } %}
-                {% for key in column_order %}
-                  {% set normalized_key = key_map.get(key, key) %}
-                  {% if settings['show_column_' ~ key] == 'true' %}
-                    {% if normalized_key == 'asset' %}
-                      <td>{{ i.asset }}</td>
-                    {% elif normalized_key == 'serial' %}
-                      <td>{{ i.serial }}</td>
-                    {% elif normalized_key == 'item_name' %}
-                      <td>{{ i.product.item_name if i.product else '' }}</td>
-                    {% elif normalized_key == 'make' %}
-                      <td>{{ i.product.make if i.product else '' }}</td>
-                    {% elif normalized_key == 'model' %}
-                      <td>{{ i.product.model if i.product else '' }}</td>
-                    {% elif normalized_key == 'cpu' %}
-                      <td>{{ i.product.cpu if i.product else '' }}</td>
-                    {% elif normalized_key == 'ram' %}
-                      <td>{{ i.product.ram if i.product else '' }}</td>
-                    {% elif normalized_key == 'gpu1' %}
-                      <td>{{ i.product.gpu1 if i.product else '' }}</td>
-                    {% elif normalized_key == 'gpu2' %}
-                      <td>{{ i.product.gpu2 if i.product else '' }}</td>
-                    {% elif normalized_key == 'display' %}
-                      <td>{{ i.product.display if i.product else '' }}</td>
-                    {% elif normalized_key == 'disk1size' %}
-                      <td>{{ i.product.disk1size if i.product else '' }}</td>
-                    {% elif normalized_key == 'grade' %}
-                      <td>{{ i.product.grade if i.product else '' }}</td>
-                    {% elif normalized_key == 'location' %}
-                      <td>{{ i.location.name if i.location else '' }}</td>
-                    {% elif normalized_key == 'status' %}
-                      <td>{{ i.status }}</td>
-                    {% elif normalized_key == 'process_stage' %}
-                      <td>{{ i.process_stage or '' }}</td>
-                    {% elif normalized_key == 'team_assigned' %}
-                      <td>{{ i.team_assigned or '' }}</td>
-                    {% elif normalized_key == 'shelf_bin' %}
-                      <td>{{ i.shelf_bin or '' }}</td>
-                    {% elif normalized_key == 'is_sold' %}
-                      <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
-                    {% elif normalized_key == 'label' %}
-                      <td>
-                        <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-outline-dark rounded-pill px-4 text-nowrap" style="min-width: 140px;" target="_blank">🖨️ Print Label</a>
-                      </td>
-                    {% elif normalized_key == 'action' %}
-                      <td>
-                        <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
-                      </td>
-                    {% else %}
-                      <td>-</td>
-                    {% endif %}
-                  {% endif %}
-                {% endfor %}
+          <tbody id="instance-rows">
+            {% for group in grouped_instances %}
+              <tr class="table-light" style="margin-bottom: 6px;">
+                <td>
+                  <input type="checkbox" class="batch-label-checkbox" value="group_{{ loop.index0 }}" data-model="{{ group.model }}" data-cpu="{{ group.cpu }}">
+                </td>
+                <td><strong>{{ group.model }}</strong></td>
+                <td><span class="text-muted small">{{ group.cpu }}</span></td>
+                <td><span class="badge bg-primary">{{ group.count }} unit{{ 's' if group.count != 1 else '' }}</span></td>
+                <td>
+                  <a href="{{ url_for('stock_bp.group_view_page') }}?model={{ group.model }}&cpu={{ group.cpu }}" class="btn btn-sm btn-outline-secondary">
+                    View Units
+                  </a>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -321,65 +192,180 @@
   </div>
 </div>
 <script>
-  const modelInput = document.getElementById('model-search');
-  const modelDatalist = document.getElementById('model-suggestions');
-  let lastFetch = '';
-  let fetchTimeout = null;
+  // Track selected groups by their checkbox values
+  let selectedInstances = new Set();
 
-  modelInput.addEventListener('input', function(e) {
-    const query = this.value;
-    if (query.length < 2) {
-      modelDatalist.innerHTML = '';
+  function updateSelectedCount() {
+    document.getElementById("selected-count").textContent = `${selectedInstances.size} selected`;
+  }
+
+  function updateSelectedFromCheckboxes() {
+    selectedInstances.clear();
+    document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
+      if(cb.checked) selectedInstances.add(cb.value);
+    });
+    updateSelectedCount();
+  }
+
+  // On checkbox change, update selectedInstances set
+  document.addEventListener("change", function (e) {
+    if (e.target.classList && e.target.classList.contains("batch-label-checkbox")) {
+      if (e.target.checked) {
+        selectedInstances.add(e.target.value);
+      } else {
+        selectedInstances.delete(e.target.value);
+      }
+      // Update select-all checkbox state
+      const allCheckboxes = document.querySelectorAll('.batch-label-checkbox');
+      const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+      document.getElementById("select-all-labels").checked = allChecked;
+      updateSelectedCount();
+    }
+  });
+
+  // On select-all checkbox change
+  document.getElementById("select-all-labels").addEventListener("change", function () {
+    const checked = this.checked;
+    document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
+      cb.checked = checked;
+      if (checked) {
+        selectedInstances.add(cb.value);
+      } else {
+        selectedInstances.delete(cb.value);
+      }
+    });
+    updateSelectedCount();
+  });
+
+  // Inject selected IDs on print form submit
+  const printForm = document.getElementById("batch-print-form");
+  printForm.addEventListener("submit", function (e) {
+    // Remove any previously added hidden inputs scoped to this form
+    printForm.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+
+    if(selectedInstances.size === 0){
+      e.preventDefault();
+      alert("Please select at least one group to print labels.");
       return;
     }
-    if (query === lastFetch) return;
-    lastFetch = query;
 
-    clearTimeout(fetchTimeout);
-    fetchTimeout = setTimeout(() => {
-      fetch(`/stock/api/model_suggestions?q=${encodeURIComponent(query)}`)
-        .then(r => r.json())
-        .then(models => {
-          modelDatalist.innerHTML = '';
-          for (const m of models) {
-            const opt = document.createElement('option');
-            opt.value = m;
-            modelDatalist.appendChild(opt);
-          }
-        });
-    }, 180);
+    selectedInstances.forEach(id => {
+      const hiddenInput = document.createElement("input");
+      hiddenInput.type = "hidden";
+      hiddenInput.name = "instance_ids";
+      hiddenInput.value = id;
+      printForm.appendChild(hiddenInput);
+    });
   });
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const table = $('.comfortable-table').DataTable({ pageLength: 50 });
+  // Inject selected IDs on Excel export form submit
+  const exportForm = document.getElementById("export-excel-form");
+  exportForm.addEventListener("submit", function (e) {
+    // Remove any previously added hidden inputs scoped to this form
+    exportForm.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
 
-    document.getElementById("select-all-labels").addEventListener("change", function () {
-      const checked = this.checked;
-      table.rows().every(function () {
-        const row = this.node();
-        const checkbox = row.querySelector('.batch-label-checkbox');
-        if (checkbox) checkbox.checked = checked;
+    if (selectedInstances.size > 0) {
+      selectedInstances.forEach(id => {
+        const hiddenInput = document.createElement("input");
+        hiddenInput.type = "hidden";
+        hiddenInput.name = "instance_ids";
+        hiddenInput.value = id;
+        exportForm.appendChild(hiddenInput);
       });
-    });
+    } else {
+      e.preventDefault(); // cancel export
+      alert("Please select at least one group to export.");
+    }
+  });
 
-    const form = document.getElementById("batch-print-form");
-    form.addEventListener("submit", function () {
-      // remove any previously added hidden inputs
-      document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+  // Infinite scroll and other scripts remain unchanged
 
-      table.rows().every(function () {
-        const row = this.node();
-        const checkbox = row.querySelector('.batch-label-checkbox');
-        if (checkbox && checkbox.checked) {
-          const hiddenInput = document.createElement("input");
-          hiddenInput.type = "hidden";
-          hiddenInput.name = "instance_ids";
-          hiddenInput.value = checkbox.value;
-          form.appendChild(hiddenInput);
+  let currentPage = 2;
+  let loading = false;
+  let noMoreData = false;
+
+  window.addEventListener('scroll', () => {
+    if (loading || noMoreData) return;
+
+    const scrollBottom = window.scrollY + window.innerHeight;
+    const docHeight = document.body.scrollHeight;
+
+    if (scrollBottom >= docHeight - 200) {
+      loadMoreRows();
+    }
+  });
+
+  function loadMoreRows() {
+    loading = true;
+    const loader = document.getElementById('infinite-loading');
+    loader.style.display = 'block';
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', currentPage);
+    url.searchParams.set('partial', '1');
+
+    fetch(url)
+      .then(r => r.text())
+      .then(html => {
+        if (html.trim()) {
+          const tbody = document.getElementById('instance-rows');
+          tbody.insertAdjacentHTML('beforeend', html);
+          // After new rows are injected, update checkboxes and counter for infinite scroll
+          document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
+            if (selectedInstances.has(cb.value)) cb.checked = true;
+          });
+          updateSelectedCount();
+          currentPage += 1;
+          loading = false;
+        } else {
+          noMoreData = true;
+          loader.innerHTML = '<span class="text-muted">All units loaded.</span>';
         }
+      })
+      .catch(() => {
+        loader.innerHTML = '<span class="text-danger">Failed to load more.</span>';
+        loading = false;
       });
+  }
+</script>
+<div id="infinite-loading" class="text-center my-4">
+  <span class="text-muted small">Loading more units...</span>
+</div>
+
+<script>
+  function toggleGroup(id) {
+    // No-op: legacy, replaced by modal.
+  }
+</script>
+
+<!-- Modal for group units -->
+<div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="groupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="groupModalLabel">Units for Group</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="groupModalContent">
+        <div class="text-center text-muted">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function loadGroupModal(model, cpu) {
+  const modal = new bootstrap.Modal(document.getElementById('groupModal'));
+  document.getElementById("groupModalLabel").textContent = `${model} — ${cpu}`;
+  document.getElementById("groupModalContent").innerHTML = '<div class="text-center text-muted">Loading...</div>';
+  modal.show();
+
+  fetch(`/stock/api/group_detail?model=${encodeURIComponent(model)}&cpu=${encodeURIComponent(cpu)}`)
+    .then(response => response.text())
+    .then(html => {
+      document.getElementById("groupModalContent").innerHTML = html;
     });
-  });
+}
 </script>
 {% endblock %}
 .sidebar .nav-link:hover {

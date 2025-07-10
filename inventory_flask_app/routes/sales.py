@@ -56,8 +56,9 @@ def create_sale_form():
 def confirm_sale():
     try:
         from ..models import Invoice  # Import here to avoid circular import if needed
-        serials = request.form.getlist('serials')
-        assets = request.form.getlist('assets')
+        serials = request.form.getlist('serials[]') or request.form.getlist('serials')
+        assets = request.form.getlist('assets[]') or request.form.getlist('assets')
+        print("Received serial count:", len(serials))
         customer_id = request.form.get('customer_id')
         user_id = current_user.id
 
@@ -65,8 +66,8 @@ def confirm_sale():
             return jsonify({"error": "No products or customer selected."})
 
         serial_asset_pairs = list(zip(
-            request.form.getlist('serials'),
-            request.form.getlist('assets')
+            serials,
+            assets
         ))
         instances = []
         for serial, asset in serial_asset_pairs:

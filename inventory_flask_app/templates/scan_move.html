@@ -121,4 +121,20 @@
     {% endif %}
   </div>
 </div>
+
+<audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+
+<script>
+  function playBeep() {
+    const beep = document.getElementById("beep-sound");
+    if (beep) beep.play();
+  }
+
+  const scanForm = document.querySelector('form input[name="serial"]');
+  if (scanForm) {
+    scanForm.addEventListener("change", () => {
+      playBeep();
+    });
+  }
+</script>
 {% endblock %}

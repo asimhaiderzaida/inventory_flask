@@ -48,7 +48,10 @@ def customer_center():
             (Customer.phone.ilike(f"%{search}%")) |
             (Customer.email.ilike(f"%{search}%"))
         )
-    customers = query.order_by(Customer.name).all()
+    page = request.args.get('page', 1, type=int)
+    per_page = 25
+    paginated = query.order_by(Customer.name).paginate(page=page, per_page=per_page)
+    customers = paginated.items
 
     # Annotate each customer with their latest invoice ID
     from inventory_flask_app.models import Invoice, SaleTransaction
@@ -63,7 +66,7 @@ def customer_center():
     tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
     settings = {s.key: s.value for s in tenant_settings}
 
-    return render_template('customer_center.html', customers=customers, search=search, settings=settings)
+    return render_template('customer_center.html', customers=customers, search=search, settings=settings, pagination=paginated)
 
 @customers_bp.route('/customers/<int:customer_id>/profile')
 @login_required

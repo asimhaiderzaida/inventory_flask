@@ -5,15 +5,21 @@ __pycache__/
 # Ignore virtual environments
 venv/
 
-# Ignore SQLite DB
-instance/*.db
-
-# Ignore export files
-*.xlsx
+# Ignore local databases and test data
+*.db
+*.sqlite3
 *.csv
+*.log
+*.bak
+*.xlsx
 
-# Optional editor/OS stuff
+# Flask instance folder (contains DB or secrets)
+instance/
+inventory_flask_app/instance/
+
+# Ignore environment files
+.env
+
+# Editor/OS generated files
 .vscode/
 .DS_Store
-
-inventory_flask_app/instance/inventory.db

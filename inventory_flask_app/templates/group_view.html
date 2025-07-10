@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .comfortable-table td,
+  .comfortable-table th {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    font-size: 0.87rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 200px;
+  }
+
+  .comfortable-table td a.btn {
+    white-space: nowrap;
+  }
+</style>
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>{{ model }} — {{ cpu }}</h4>
+  </div>
+
+  <form method="post" action="{{ url_for('stock_bp.export_instances') }}" id="export-group-form">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="text-muted small" id="page-selected-count">0 selected</div>
+          <div>
+            <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill">📤 Export Selected</button>
+            <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-outline-secondary btn-sm rounded-pill ms-2">← Back</a>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle comfortable-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="page-select-all"></th>
+                {% for key in settings.column_order_instance_table.split(',') %}
+                  {% if settings['show_column_' ~ key] == 'true' %}
+                    <th>{{ settings['label_' ~ key]|default(key|replace('_', ' ')|title) }}</th>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in instances %}
+              <tr>
+                <td><input type="checkbox" class="page-checkbox" name="instance_ids" value="{{ i.id }}"></td>
+                {% for key in settings.column_order_instance_table.split(',') %}
+                  {% if settings['show_column_' ~ key] == 'true' %}
+                    <td>
+                      {% if key == 'asset' %}{{ i.asset }}
+                      {% elif key == 'serial' %}{{ i.serial }}
+                      {% elif key == 'item_name' %}{{ i.product.item_name if i.product else '' }}
+                      {% elif key == 'make' %}{{ i.product.make if i.product else '' }}
+                      {% elif key == 'model' %}{{ i.product.model if i.product else '' }}
+                      {% elif key == 'cpu' %}{{ i.product.cpu if i.product else '' }}
+                      {% elif key == 'ram' %}{{ i.product.ram if i.product else '' }}
+                      {% elif key == 'gpu1' %}{{ i.product.gpu1 if i.product else '' }}
+                      {% elif key == 'gpu2' %}{{ i.product.gpu2 if i.product else '' }}
+                      {% elif key == 'display' %}{{ i.product.display if i.product else '' }}
+                      {% elif key == 'disk1size' %}{{ i.product.disk1size if i.product else '' }}
+                      {% elif key == 'grade' %}{{ i.product.grade if i.product else '' }}
+                      {% elif key == 'location' %}{{ i.location.name if i.location else '' }}
+                      {% elif key == 'status' %}{{ i.status }}
+                      {% elif key == 'process_stage' %}{{ i.process_stage or '' }}
+                      {% elif key == 'team_assigned' %}{{ i.team_assigned or '' }}
+                      {% elif key == 'shelf_bin' %}{{ i.shelf_bin or '' }}
+                      {% elif key == 'is_sold' %}{{ 'Yes' if i.is_sold else 'No' }}
+                      {% elif key == 'label' %}
+                        <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill">🖨️</a>
+                      {% elif key == 'action' %}
+                        <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">Edit</a>
+                      {% endif %}
+                    </td>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+  </form>
+</div>
+
+<script>
+  const pageCheckboxes = document.querySelectorAll(".page-checkbox");
+  const pageSelectAll = document.getElementById("page-select-all");
+  const pageCount = document.getElementById("page-selected-count");
+
+  pageCheckboxes.forEach(cb => cb.addEventListener("change", updatePageCount));
+  if (pageSelectAll) {
+    pageSelectAll.addEventListener("change", function () {
+      pageCheckboxes.forEach(cb => cb.checked = this.checked);
+      updatePageCount();
+    });
+  }
+
+  function updatePageCount() {
+    const selected = document.querySelectorAll(".page-checkbox:checked").length;
+    pageCount.textContent = `${selected} selected`;
+  }
+</script>
+{% endblock %}

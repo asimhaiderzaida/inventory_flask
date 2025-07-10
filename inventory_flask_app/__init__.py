@@ -20,6 +20,7 @@ def create_app():
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SECRET_KEY'] = 'your-secret-key'
+    app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024  # Allow up to 300 MB uploads
     from dotenv import load_dotenv
     load_dotenv()
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
@@ -57,10 +58,10 @@ def create_app():
         return User.query.get(int(user_id))
 
     # ✅ Register blueprints with relative imports
+    from .routes.stock import stock_bp
     from .routes.auth import auth_bp
     from .routes.dashboard import dashboard_bp
     from .routes.instances import instances_bp
-    from .routes.stock import stock_bp
     from .routes.vendors import vendors_bp
     from .routes.customers import customers_bp
     from .routes.order_tracking_routes import order_bp

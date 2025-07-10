@@ -1,21 +1,73 @@
-from datetime import timedelta
-import qrcode
-from io import BytesIO
-import base64
-from inventory_flask_app.utils.utils import get_instance_id
+from inventory_flask_app import csrf
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, make_response
 from flask_login import login_required, current_user
 from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location
 from inventory_flask_app.models import CustomerOrderTracking
 from flask import jsonify
 from sqlalchemy.orm import aliased, joinedload
-from datetime import datetime
+from datetime import datetime, timedelta
+import qrcode
+from io import BytesIO, StringIO
+import base64
+from inventory_flask_app.utils.utils import get_instance_id
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
-from io import StringIO
-from inventory_flask_app import csrf
 
 stock_bp = Blueprint('stock_bp', __name__, url_prefix='/stock')
+
+@csrf.exempt
+@stock_bp.route('/api/group_detail')
+@login_required
+def api_group_detail():
+    model = request.args.get("model", "").strip()
+    cpu = request.args.get("cpu", "").strip()
+    if not model or not cpu:
+        return "Invalid group parameters", 400
+
+    instances = ProductInstance.query.join(Product).filter(
+        Product.model == model,
+        Product.cpu == cpu,
+        Product.tenant_id == current_user.tenant_id
+    ).options(
+        joinedload(ProductInstance.product),
+        joinedload(ProductInstance.location)
+    ).all()
+
+    from inventory_flask_app.models import TenantSettings
+    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings_dict = {s.key: s.value for s in tenant_settings}
+    column_order = settings_dict.get("column_order_instance_table")
+
+    default_columns = [
+        "asset", "serial", "Item Name", "make", "model", "display", "cpu", "ram",
+        "gpu1", "gpu2", "Grade", "location", "status", "process_stage",
+        "team_assigned", "shelf_bin", "is_sold", "label", "action"
+    ]
+
+    if column_order:
+        for old, new in {
+            "model_number": "model",
+            "product": "Item Name",
+            "processor": "cpu",
+            "video_card": "gpu1",
+            "resolution": "display"
+        }.items():
+            column_order = column_order.replace(old, new)
+        existing = column_order.split(",")
+        for col in default_columns:
+            if col not in existing:
+                existing.append(col)
+        column_order = ",".join(existing)
+    else:
+        column_order = ",".join(default_columns)
+
+    settings_dict["column_order_instance_table"] = column_order
+
+    return render_template(
+        "partials/modal_group_instances.html",
+        instances=instances,
+        settings=settings_dict
+    )
 
 # Simple stock_intake page route
 @csrf.exempt
@@ -512,12 +564,30 @@ def under_process():
     query = query.filter(Product.tenant_id == current_user.tenant_id)
     # --------------------------------------------------------------------
 
-    instances = query.all()
-    all_models = list({i.product.model for i in instances if i.product and i.product.model})
-    all_processors = list({i.product.cpu for i in instances if i.product and i.product.cpu})
-    # Rebuild all_rams and all_disks for dropdowns based on filtered instances
-    all_rams = list({i.product.ram for i in instances if i.product and i.product.ram})
-    all_disks = list({i.product.disk1size for i in instances if i.product and i.product.disk1size})
+    # Query all matching instances (no pagination since we're grouping)
+    all_instances = query.all()
+
+    # Group instances by (model + cpu)
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for instance in all_instances:
+        key = (instance.product.model if instance.product else "", instance.product.cpu if instance.product else "")
+        grouped[key].append(instance)
+
+    grouped_instances = [
+        {
+            "model": key[0],
+            "cpu": key[1],
+            "count": len(instances),
+            "instances": instances
+        }
+        for key, instances in grouped.items()
+    ]
+
+    all_models = sorted({i.product.model for i in all_instances if i.product and i.product.model})
+    all_processors = sorted({i.product.cpu for i in all_instances if i.product and i.product.cpu})
+    all_rams = sorted({i.product.ram for i in all_instances if i.product and i.product.ram})
+    all_disks = sorted({i.product.disk1size for i in all_instances if i.product and i.product.disk1size})
     distinct_stages = db.session.query(ProductInstance.process_stage).distinct().all()
     distinct_teams = db.session.query(ProductInstance.team_assigned).distinct().all()
 
@@ -557,9 +627,19 @@ def under_process():
     settings_dict["column_order_instance_table"] = column_order
     # --- END Unified column structure logic ---
 
+    if request.args.get("partial") == "1":
+        return render_template(
+            "_instance_rows.html",
+            grouped_instances=grouped_instances,
+            settings=settings_dict
+        )
+
+    # Compute total unit count across all groups
+    total_units = sum(len(g["instances"]) for g in grouped_instances)
+
     return render_template(
-        'instance_table.html',
-        instances=instances,
+        "instance_table.html",
+        grouped_instances=grouped_instances,
         models=sorted(all_models),
         processors=sorted(all_processors),
         rams=sorted(all_rams),
@@ -577,7 +657,9 @@ def under_process():
             else "Inventory"
         ),
         locations=Location.query.all(),
-        settings=settings_dict
+        settings=settings_dict,
+        pagination=None,  # No pagination since grouped
+        total_units=total_units
     )
 
 @csrf.exempt
@@ -850,7 +932,7 @@ def checkin_checkout():
     return redirect(request.referrer or url_for('stock_bp.process_stage_update'))
 
 @csrf.exempt
-@stock_bp.route('/export_instances')
+@stock_bp.route('/export_instances', methods=['GET', 'POST'])
 @login_required
 def export_instances():
     from openpyxl import Workbook
@@ -1313,4 +1395,149 @@ def aged_inventory_view():
         "aged_inventory.html",
         instances=instances,
         threshold_days=aged_days
+    )
+# --- Export grouped summary as Excel ---
+@csrf.exempt
+@stock_bp.route('/export_grouped_summary')
+@login_required
+def export_grouped_summary():
+    from openpyxl import Workbook
+    from io import BytesIO
+    from flask import send_file
+    from sqlalchemy import or_
+
+    # Reuse the filters used in under_process route
+    status = request.args.get('status')
+    model = request.args.get('model')
+    processor = request.args.get('processor')
+    serial_search = request.args.get('serial_search', '').strip()
+    stage_filter = request.args.get('stage')
+    team_filter = request.args.get('team')
+    location_id = request.args.get('location_id')
+    bin_search = request.args.get('bin_search', '').strip()
+    ram_filter = request.args.get('ram')
+    disk_filter = request.args.get('disk1size')
+
+    if not status or status == 'all':
+        query = ProductInstance.query
+    else:
+        if status == 'unprocessed':
+            query = ProductInstance.query.filter_by(status='unprocessed', is_sold=False)
+        elif status == 'under_process':
+            query = ProductInstance.query.filter_by(status='under_process', is_sold=False)
+        elif status == 'processed':
+            query = ProductInstance.query.filter_by(status='processed', is_sold=False)
+        else:
+            query = ProductInstance.query.filter(ProductInstance.status == status)
+
+    # Join and apply filters
+    query = query.join(Product)
+    if model:
+        query = query.filter(Product.model.ilike(f"%{model}%"))
+    if processor:
+        query = query.filter(Product.cpu == processor)
+    if ram_filter:
+        query = query.filter(Product.ram == ram_filter)
+    if disk_filter:
+        query = query.filter(Product.disk1size == disk_filter)
+    if serial_search:
+        query = query.filter(or_(
+            ProductInstance.serial.ilike(f"%{serial_search}%"),
+            ProductInstance.asset.ilike(f"%{serial_search}%")
+        ))
+    if stage_filter:
+        query = query.filter(ProductInstance.process_stage == stage_filter)
+    if team_filter:
+        query = query.filter(ProductInstance.team_assigned.ilike(f"%{team_filter}%"))
+    if location_id:
+        query = query.filter(ProductInstance.location_id == int(location_id))
+    if bin_search:
+        query = query.filter(ProductInstance.shelf_bin.ilike(f"%{bin_search}%"))
+
+    query = query.filter(Product.tenant_id == current_user.tenant_id)
+
+    all_instances = query.options(
+        joinedload(ProductInstance.product)
+    ).all()
+
+    # Group by (model, cpu)
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for instance in all_instances:
+        if instance.product:
+            key = (instance.product.model, instance.product.cpu)
+            grouped[key].append(instance)
+
+    # Prepare Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Grouped Summary"
+    ws.append(["Model", "CPU", "Count"])
+
+    for (model, cpu), instances in grouped.items():
+        ws.append([model, cpu, len(instances)])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        download_name="grouped_inventory_summary.xlsx",
+        as_attachment=True
+    )
+@stock_bp.route('/group_view')
+@login_required
+def group_view_page():
+    model = request.args.get("model", "").strip()
+    cpu = request.args.get("cpu", "").strip()
+    if not model or not cpu:
+        flash("Invalid group view request.", "danger")
+        return redirect(url_for('stock_bp.under_process'))
+
+    instances = ProductInstance.query.join(Product).filter(
+        Product.model == model,
+        Product.cpu == cpu,
+        Product.tenant_id == current_user.tenant_id
+    ).options(
+        joinedload(ProductInstance.product),
+        joinedload(ProductInstance.location)
+    ).all()
+
+    from inventory_flask_app.models import TenantSettings
+    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings_dict = {s.key: s.value for s in tenant_settings}
+    column_order = settings_dict.get("column_order_instance_table")
+
+    default_columns = [
+        "asset", "serial", "Item Name", "make", "model", "display", "cpu", "ram",
+        "gpu1", "gpu2", "Grade", "location", "status", "process_stage",
+        "team_assigned", "shelf_bin", "is_sold", "label", "action"
+    ]
+
+    if column_order:
+        for old, new in {
+            "model_number": "model",
+            "product": "Item Name",
+            "processor": "cpu",
+            "video_card": "gpu1",
+            "resolution": "display"
+        }.items():
+            column_order = column_order.replace(old, new)
+        existing = column_order.split(",")
+        for col in default_columns:
+            if col not in existing:
+                existing.append(col)
+        column_order = ",".join(existing)
+    else:
+        column_order = ",".join(default_columns)
+
+    settings_dict["column_order_instance_table"] = column_order
+
+    return render_template(
+        "group_view.html",
+        model=model,
+        cpu=cpu,
+        instances=instances,
+        settings=settings_dict
     )
