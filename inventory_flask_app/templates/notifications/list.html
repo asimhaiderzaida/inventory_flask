@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Notifications</h1>
+    <div class="page-subtitle">{{ total }} notification{{ 's' if total != 1 else '' }}</div>
+  </div>
+  <div class="page-actions">
+    {% if total %}
+    <form method="POST" action="{{ url_for('notifications_bp.read_all') }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost">
+        <i class="bi bi-check2-all"></i> Mark all read
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Filter tabs -->
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+    {% for label, key in [('All', ''), ('Reassigned', 'reassigned'), ('SLA Breach', 'sla_breach'), ('Stage Move', 'stage_move'), ('Disputed', 'disputed')] %}
+    <a href="{{ url_for('notifications_bp.notifications_list', type=key) }}"
+       class="btn btn-sm {% if filter_type == key %}btn-primary{% else %}btn-ghost{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="table-card animate-fade-up">
+  {% if notifs.items %}
+  <div>
+    {% for n in notifs.items %}
+    {% set _icons = {'reassigned': 'bi-person-fill-gear', 'sla_breach': 'bi-clock-fill', 'stage_move': 'bi-arrow-right-circle-fill', 'disputed': 'bi-exclamation-triangle-fill'} %}
+    {% set _colors = {'reassigned': '#6366f1', 'sla_breach': '#ef4444', 'stage_move': '#06b6d4', 'disputed': '#f59e0b'} %}
+    <a href="{{ url_for('notifications_bp.mark_read', notif_id=n.id) }}{% if n.link %}?next={{ n.link | urlencode }}{% endif %}"
+       style="display:flex;align-items:flex-start;gap:0.85rem;padding:0.9rem 1.25rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.12s;{% if not n.is_read %}background:rgba(99,102,241,0.04);{% endif %}">
+      <div style="width:34px;height:34px;border-radius:50%;background:{{ _colors.get(n.type, '#6b7280') }}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:0.1rem;">
+        <i class="bi {{ _icons.get(n.type, 'bi-bell') }}" style="color:{{ _colors.get(n.type, '#6b7280') }};font-size:0.9rem;"></i>
+      </div>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">
+          <span style="font-size:0.88rem;font-weight:{% if not n.is_read %}700{% else %}500{% endif %};color:var(--text-primary);">{{ n.title }}</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</span>
+          {% if not n.is_read %}
+          <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);background:rgba(99,102,241,0.1);padding:0.1rem 0.45rem;border-radius:20px;">New</span>
+          {% endif %}
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.15rem;">{{ n.message }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% if notifs.pages > 1 %}
+  <div class="table-footer">
+    <span style="font-size:0.82rem;color:var(--text-muted);">Page {{ notifs.page }} of {{ notifs.pages }}</span>
+    <div style="display:flex;gap:0.35rem;">
+      {% if notifs.has_prev %}
+      <a href="{{ url_for('notifications_bp.notifications_list', page=notifs.prev_num, type=filter_type) }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+      {% if notifs.has_next %}
+      <a href="{{ url_for('notifications_bp.notifications_list', page=notifs.next_num, type=filter_type) }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-bell-slash"></i>
+    <p>No notifications{% if filter_type %} of this type{% endif %}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

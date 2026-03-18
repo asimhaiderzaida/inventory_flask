@@ -1,157 +1,407 @@
 {% extends "base.html" %}
 {% block title %}Upload Excel{% endblock %}
+{% block page_title %}Upload Excel{% endblock %}
+
+{% block extra_head %}
+<style>
+.upload-zone {
+  border: 2px dashed #E5E7EB;
+  border-radius: 12px;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  background: #F9FAFB;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-zone:hover {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+}
+.upload-zone.dragover {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+}
+.upload-zone.has-file {
+  border-color: #10B981;
+  background: #F0FDF4;
+}
+.vendor-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1050;
+  background: var(--surface-2, #fff);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.vendor-result-item {
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: background 0.15s;
+}
+.vendor-result-item:hover { background: var(--surface-3, #F3F4F6); }
+.format-table th { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.format-table td { font-size: 0.78rem; white-space: nowrap; }
+.badge-required { background: #DCFCE7; color: #166534; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; font-weight: 600; }
+.badge-optional  { background: #F3F4F6; color: #6B7280; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 90vh;">
-  <div class="card shadow border-0 rounded-4 p-4" style="width: 100%; max-width: 520px; background: #f3f4f8;">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ 'danger' if category == 'error' else category }} mt-3">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-    <div class="mb-3 text-center">
-      <h3 class="fw-bold mb-2" style="letter-spacing:0.01em;">
-        <i class="bi bi-file-earmark-arrow-up text-primary me-2"></i>Upload Product Excel
-      </h3>
-      <div class="text-muted" style="font-size:0.98rem;">Import inventory in bulk from Excel</div>
-    </div>
-    <form method="POST" enctype="multipart/form-data">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="mb-3">
-        <label class="form-label">Select Vendor:</label>
-        <div class="input-group">
-          <select id="vendorSelect" name="vendor_id" class="form-select rounded-pill px-3 form-control-lg" required>
-            <option value="">-- Select Vendor --</option>
-            {% for vendor in vendors %}
-              <option value="{{ vendor.id }}">{{ vendor.name }}</option>
-            {% endfor %}
-          </select>
-          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill btn-lg">
-            <i class="bi bi-plus-circle"></i> Add Vendor
-          </a>
-        </div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Select Location:</label>
-        <div class="input-group">
-          <select name="location_id" class="form-select rounded-pill px-3 form-control-lg" required>
-            <option value="">-- Select Location --</option>
-            {% for location in locations %}
-              <option value="{{ location.id }}">{{ location.name }}</option>
-            {% endfor %}
-          </select>
-          <a href="{{ url_for('stock_bp.add_location') }}" target="_blank" class="btn btn-outline-success ms-2 rounded-pill btn-lg">
-            <i class="bi bi-plus-circle"></i> Add Location
-          </a>
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Upload Excel File:</label>
-        <input type="file" name="file" class="form-control rounded-pill px-3 form-control-lg" accept=".xlsx,.xls" required>
-      </div>
-      <button type="submit" class="btn btn-success rounded-pill w-100 fw-semibold btn-lg mt-2">
-        <i class="bi bi-upload me-1"></i> Upload & Preview
-      </button>
-    </form>
-
-    {% if error %}
-      <div class="alert alert-danger mt-4">{{ error }}</div>
-    {% endif %}
-
-    {% if preview_data %}
-      <!-- Button to trigger modal (auto-clicked by script below) -->
-      <button type="button" id="previewModalTrigger" class="d-none" data-bs-toggle="modal" data-bs-target="#previewModal"></button>
-
-      <!-- Preview Modal -->
-      <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="previewModalLabel">Preview Products to Import</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div style="overflow-x:auto;">
-                <p class="text-muted small mb-2">
-                  This preview includes all uploaded fields such as Serial, Asset, and more. Confirm to proceed with import.
-                </p>
-                <div class="table-responsive w-100">
-                  <table class="table table-sm table-hover align-middle bg-white rounded-4 overflow-hidden w-100">
-                    <thead>
-                      <tr>
-                        {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
-                          <th class="text-nowrap">{{ col|title }}</th>
-                        {% endfor %}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for row in preview_data %}
-                        <tr>
-                          {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
-                            <td>{{ row[col] }}</td>
-                          {% endfor %}
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
-                <input type="hidden" name="excel_data" value="{{ excel_data }}">
-                <input type="hidden" name="confirm" value="yes">
-                <button type="submit" id="confirm-import-btn" class="btn btn-success rounded-pill fw-semibold mt-2 btn-lg w-100">
-                  <i class="bi bi-check2-circle me-1"></i>Confirm Import
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <script>
-        document.addEventListener("DOMContentLoaded", function() {
-          {% if preview_data %}
-            document.getElementById('previewModalTrigger').click();
-          {% endif %}
-        });
-      </script>
-      <script>
-        document.addEventListener("DOMContentLoaded", function () {
-          const confirmBtn = document.getElementById("confirm-import-btn");
-          if (confirmBtn) {
-            confirmBtn.addEventListener("click", function () {
-              confirmBtn.disabled = true;
-              confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Importing...';
-              confirmBtn.form.submit();
-            });
-          }
-        });
-      </script>
-    {% endif %}
-
-    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-link mt-3 btn-lg w-100">
-      <i class="bi bi-arrow-left-circle me-1"></i> Back to Dashboard
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Upload Excel</h1>
+    <div class="page-subtitle">Import inventory in bulk from an Excel file</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
     </a>
   </div>
 </div>
 
-<!-- Select2 Live Search -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<div class="animate-fade-up">
+  <form method="POST" enctype="multipart/form-data" id="uploadForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="vendor_id" id="vendorIdInput">
 
+    <div class="row g-4">
+
+      <!-- LEFT COLUMN -->
+      <div class="col-lg-7">
+        <div class="card mb-4">
+          <div class="card-body" style="padding:1.75rem;">
+            <h6 style="font-weight:700;margin-bottom:1.25rem;">Import Settings</h6>
+
+            <!-- Vendor Search -->
+            <div class="mb-3">
+              <label class="form-label">Vendor <span style="color:var(--color-danger,#EF4444);">*</span></label>
+              <div style="display:flex;gap:0.5rem;align-items:flex-start;">
+                <div style="flex:1;position:relative;" id="vendorSearchWrap">
+                  <input type="text" id="vendorSearch" class="form-control"
+                         placeholder="Search vendor by name…" autocomplete="off">
+                  <div id="vendorResults" class="vendor-dropdown" style="display:none;"></div>
+                  <div id="vendorPill" style="display:none;margin-top:0.5rem;">
+                    <span id="vendorPillText" style="font-size:0.88rem;font-weight:600;color:var(--text-primary,#111);"></span>
+                    <span id="vendorPillSub"  style="font-size:0.78rem;color:var(--text-muted,#6B7280);margin-left:0.4rem;"></span>
+                    <a href="#" id="vendorClear" onclick="clearVendorSelection();return false;"
+                       style="font-size:0.78rem;color:var(--primary,#3B82F6);margin-left:0.75rem;">Change</a>
+                  </div>
+                </div>
+                <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-ghost" style="white-space:nowrap;" target="_blank">
+                  <i class="bi bi-plus-lg"></i> Add
+                </a>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="mb-3">
+              <label class="form-label">Location</label>
+              <div class="d-flex gap-2">
+                <select name="location_id" class="form-select">
+                  <option value="">Select location…</option>
+                  {% for location in locations %}
+                    <option value="{{ location.id }}">{{ location.name }}</option>
+                  {% endfor %}
+                </select>
+                <a href="{{ url_for('stock_bp.add_location') }}" class="btn btn-ghost" style="white-space:nowrap;" target="_blank">
+                  <i class="bi bi-plus-lg"></i> Add
+                </a>
+              </div>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="mb-4">
+              <label class="form-label">Excel File <span style="color:var(--color-danger,#EF4444);">*</span></label>
+              <div class="upload-zone" id="uploadZone">
+                <i class="bi bi-file-earmark-excel" style="font-size:3rem;color:#10B981;display:block;margin-bottom:0.75rem;"></i>
+                <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary,#111);margin-bottom:0.25rem;">
+                  Drag &amp; drop your Excel file here
+                </div>
+                <div style="font-size:0.82rem;color:var(--text-muted,#6B7280);">or click to browse</div>
+                <div id="fileInfo" style="display:none;margin-top:0.75rem;">
+                  <i class="bi bi-check-circle-fill" style="color:#10B981;"></i>
+                  <span id="fileName" style="font-weight:600;font-size:0.88rem;margin-left:0.3rem;"></span>
+                  <span id="fileSize" style="font-size:0.78rem;color:var(--text-muted,#6B7280);margin-left:0.5rem;"></span>
+                </div>
+              </div>
+              <input type="file" name="file" id="excelInput" accept=".xlsx,.xls" style="display:none;" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="uploadBtn">
+              <i class="bi bi-upload"></i> Upload &amp; Preview
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-lg-5">
+        <div class="card mb-4">
+          <div class="card-body" style="padding:1.5rem;">
+            <h6 style="font-weight:700;margin-bottom:1rem;">Excel Format Guide</h6>
+            <div style="overflow-x:auto;">
+              <table class="table table-sm format-table mb-3">
+                <thead>
+                  <tr>
+                    <th>Column</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>serial</td><td><span class="badge-required">✅ Required</span></td></tr>
+                  <tr><td>asset</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>item_name</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>make</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>model</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>cpu</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>ram</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>grade</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>display</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>gpu1</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>gpu2</td><td><span class="badge-optional">Optional</span></td></tr>
+                  <tr><td>disk1size</td><td><span class="badge-optional">Optional</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <a href="{{ url_for('import_excel_bp.template_download') }}" class="btn btn-success w-100">
+              <i class="bi bi-download"></i> Download Template
+            </a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="padding:1.5rem;">
+            <h6 style="font-weight:700;margin-bottom:0.75rem;">💡 Tips</h6>
+            <ul style="font-size:0.84rem;color:var(--text-muted,#6B7280);padding-left:1.2rem;margin:0;line-height:1.8;">
+              <li>Serial is the only required column</li>
+              <li>Column names are case-insensitive</li>
+              <li>First row must be headers</li>
+              <li>Supports .xlsx and .xls formats</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+{% if preview_data %}
+  <button type="button" id="previewModalTrigger" class="d-none" data-bs-toggle="modal" data-bs-target="#previewModal"></button>
+
+  <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content" style="background:var(--surface-2);border:1px solid var(--border);">
+        <div class="modal-header" style="border-bottom:1px solid var(--border);">
+          <h5 class="modal-title" style="font-weight:600;">Preview Products to Import</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+            Review all uploaded fields. Confirm to proceed with import.
+          </p>
+          <div style="overflow-x:auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
+                    <th>{{ col|title }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in preview_data %}
+                  <tr>
+                    {% for col in ['asset', 'serial', 'item_name', 'make', 'model', 'display', 'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location'] %}
+                      <td>{{ row[col] or '—' }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <form method="POST" style="margin-top:1rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
+            <input type="hidden" name="location_id" value="{{ location_id }}">
+            <input type="hidden" name="import_token" value="{{ import_token }}">
+            <input type="hidden" name="confirm" value="yes">
+            <button type="submit" id="confirm-import-btn" class="btn btn-primary w-100">
+              <i class="bi bi-check2-circle"></i> Confirm Import
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-  $(document).ready(function() {
-    $('#vendorSelect').select2({
-      placeholder: "Search or select a vendor",
-      allowClear: true,
-      width: 'resolve'
+(function() {
+  // ── Vendor AJAX Search ────────────────────────────────────────────────────
+  var _vendorCache = {};
+  var _vendorTimer = null;
+  var _addVendorUrl = "{{ url_for('vendors_bp.add_vendor') }}";
+
+  function escH(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function clearVendorSelection() {
+    document.getElementById('vendorIdInput').value = '';
+    document.getElementById('vendorPill').style.display = 'none';
+    var inp = document.getElementById('vendorSearch');
+    inp.value = '';
+    inp.style.display = '';
+    inp.focus();
+  }
+
+  function selectVendor(obj) {
+    document.getElementById('vendorIdInput').value = obj.id;
+    document.getElementById('vendorPillText').textContent = obj.name;
+    document.getElementById('vendorPillSub').textContent  = obj.phone || obj.email || '';
+    document.getElementById('vendorPill').style.display   = 'block';
+    document.getElementById('vendorSearch').style.display = 'none';
+    document.getElementById('vendorResults').style.display = 'none';
+  }
+
+  function _renderVendorResults(results) {
+    var dropdown = document.getElementById('vendorResults');
+    var addBtn = '<div class="vendor-result-item" style="border-top:1px solid #E5E7EB;"'
+      + ' onclick="window.location.href=' + escH(JSON.stringify(_addVendorUrl)) + '">'
+      + '<i class="bi bi-building-add me-2" style="color:var(--primary);"></i>'
+      + '<span style="color:var(--primary);font-weight:600;">Add New Vendor</span>'
+      + '</div>';
+    if (!results.length) {
+      dropdown.innerHTML = '<div class="vendor-result-item" style="color:var(--text-muted);">No vendors found</div>' + addBtn;
+      dropdown.style.display = 'block';
+      return;
+    }
+    var html = '';
+    results.forEach(function(v) {
+      _vendorCache[v.id] = v;
+      html += '<div class="vendor-result-item" onclick="selectVendor(_vendorCache[' + v.id + '])">'
+        + '<span style="font-weight:600;">' + escH(v.name) + '</span>';
+      if (v.phone || v.email) {
+        html += '<span style="color:var(--text-muted);font-size:0.78rem;margin-left:0.5rem;">'
+          + escH(v.phone || v.email) + '</span>';
+      }
+      html += '</div>';
     });
+    html += addBtn;
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+  }
+
+  function initVendorSearch() {
+    var inp = document.getElementById('vendorSearch');
+    if (!inp) return;
+    inp.addEventListener('input', function() {
+      var q = inp.value.trim();
+      clearTimeout(_vendorTimer);
+      if (q.length < 2) { document.getElementById('vendorResults').style.display = 'none'; return; }
+      _vendorTimer = setTimeout(function() {
+        fetch('/vendors/api/search?q=' + encodeURIComponent(q))
+          .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(_renderVendorResults)
+          .catch(function(err) {
+            console.error('Vendor search error:', err);
+            document.getElementById('vendorResults').style.display = 'none';
+          });
+      }, 300);
+    });
+    document.addEventListener('click', function(e) {
+      if (!document.getElementById('vendorSearchWrap').contains(e.target)) {
+        document.getElementById('vendorResults').style.display = 'none';
+      }
+    });
+  }
+
+  // ── Drag & Drop Upload Zone ───────────────────────────────────────────────
+  function initUploadZone() {
+    var zone  = document.getElementById('uploadZone');
+    var input = document.getElementById('excelInput');
+    if (!zone || !input) return;
+
+    zone.addEventListener('click', function() { input.click(); });
+
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', function() {
+      zone.classList.remove('dragover');
+    });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      var f = e.dataTransfer.files[0];
+      if (!f) return;
+      var dt = new DataTransfer();
+      dt.items.add(f);
+      input.files = dt.files;
+      _showFile(f);
+    });
+
+    input.addEventListener('change', function() {
+      if (input.files[0]) _showFile(input.files[0]);
+    });
+  }
+
+  function _showFile(f) {
+    var zone = document.getElementById('uploadZone');
+    zone.classList.add('has-file');
+    document.getElementById('fileInfo').style.display = 'block';
+    document.getElementById('fileName').textContent = f.name;
+    var kb = Math.round(f.size / 1024);
+    document.getElementById('fileSize').textContent = kb < 1024
+      ? kb + ' KB' : (kb / 1024).toFixed(1) + ' MB';
+  }
+
+  // ── Form Validation ───────────────────────────────────────────────────────
+  function initFormValidation() {
+    var form = document.getElementById('uploadForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+      var vid   = document.getElementById('vendorIdInput').value;
+      var files = document.getElementById('excelInput').files.length;
+      if (!vid) {
+        e.preventDefault();
+        showToast('Please select a vendor before uploading.', 'warning');
+        document.getElementById('vendorSearch').focus();
+        return;
+      }
+      if (!files) {
+        e.preventDefault();
+        showToast('Please select an Excel file.', 'warning');
+        return;
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    initVendorSearch();
+    initUploadZone();
+    initFormValidation();
+    {% if preview_data %}
+      document.getElementById('previewModalTrigger').click();
+    {% endif %}
   });
+
+  // Expose for inline onclick
+  window.clearVendorSelection = clearVendorSelection;
+  window.selectVendor = selectVendor;
+  window._vendorCache = _vendorCache;
+})();
 </script>
 {% endblock %}

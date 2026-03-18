@@ -1,34 +1,114 @@
 {% extends "public_base.html" %}
-{% block content %}
-<div class="d-flex justify-content-center align-items-center vh-100 bg-light">
-    <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
-        {% if settings.dashboard_logo %}
-          <div class="text-center mb-4">
-            <img src="{{ settings.dashboard_logo }}" alt="Logo" class="img-fluid" style="max-width: 140px;">
-          </div>
-        {% endif %}
-        <h4 class="mb-4 fw-semibold text-primary text-center">🔐 Sign In</h4>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="text-danger fw-medium mb-3 text-center small">
-            {% for category, message in messages %}
-                {{ message }}
-            {% endfor %}
-            </div>
-        {% endif %}
-        {% endwith %}
+{% block title %}Sign In{% endblock %}
 
-        <form method="POST" action="/login">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="username" placeholder="Username" required class="form-control form-control-lg rounded-pill fw-semibold mb-3">
-            <input type="password" name="password" placeholder="Password" required class="form-control form-control-lg rounded-pill fw-semibold mb-3">
-            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-semibold w-100">Login</button>
-        </form>
-        <div class="text-center mt-4">
-            <a href="{{ url_for('auth_bp.register_tenant') }}" class="btn btn-outline-primary btn-sm rounded-pill fw-semibold w-100">
-                + Create a New Business Account
-            </a>
+{% block content %}
+<div style="width:100%;max-width:420px;animation:fade-up 0.35s ease both;">
+
+  <!-- Flash messages (inline on login page) -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category in ['error','danger'] else ('warning' if category == 'warning' else 'info') }} mb-3" role="alert">
+          {{ message }}
         </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);border-radius:var(--radius-xl);padding:2.5rem 2rem;box-shadow:var(--shadow-xl);">
+
+    <!-- Logo / Brand -->
+    <div style="text-align:center;margin-bottom:2rem;">
+      {% if settings.dashboard_logo %}
+        <img src="{{ settings.dashboard_logo }}" alt="Logo" style="height:52px;margin-bottom:1rem;">
+      {% else %}
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:var(--primary);border-radius:14px;margin-bottom:1rem;">
+          <i class="bi bi-box-seam" style="font-size:1.6rem;color:#fff;"></i>
+        </div>
+      {% endif %}
+      <h1 style="font-size:1.35rem;font-weight:700;color:#fff;margin:0 0 0.25rem;">
+        {{ settings.company_name or settings.dashboard_name or 'PCMart' }}
+      </h1>
+      <p style="font-size:0.82rem;color:rgba(255,255,255,0.45);margin:0;">Sign in to your account</p>
     </div>
+
+    <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Username</label>
+        <input
+          type="text"
+          name="username"
+          placeholder="Enter your username"
+          required
+          autofocus
+          class="form-control"
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;"
+        >
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Password</label>
+        <div style="position:relative;">
+          <input
+            type="password"
+            name="password"
+            id="passwordInput"
+            placeholder="Enter your password"
+            required
+            class="form-control"
+            style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;padding-right:2.8rem;"
+          >
+          <button type="button" onclick="togglePassword()" tabindex="-1"
+            style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;padding:0;line-height:1;">
+            <i class="bi bi-eye" id="eyeIcon" style="font-size:1rem;"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" style="font-size:0.95rem;min-height:46px;justify-content:center;">
+        <span class="btn-spinner" id="loginSpinner"></span>
+        <span id="loginText">Sign In</span>
+      </button>
+    </form>
+
+    <div style="margin-top:1.5rem;text-align:center;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08);">
+      <a href="{{ url_for('auth.register_user') }}"
+        style="font-size:0.84rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.12s;"
+        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+        Create a new business account &rarr;
+      </a>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function togglePassword() {
+  const inp = document.getElementById('passwordInput');
+  const ico = document.getElementById('eyeIcon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'bi bi-eye-slash';
+  } else {
+    inp.type = 'password';
+    ico.className = 'bi bi-eye';
+  }
+}
+
+document.getElementById('loginForm').addEventListener('submit', function() {
+  const btn = this.querySelector('button[type="submit"]');
+  document.getElementById('loginSpinner').style.display = 'inline-block';
+  document.getElementById('loginText').textContent = 'Signing in…';
+  btn.disabled = true;
+  setTimeout(() => { btn.disabled = false; document.getElementById('loginSpinner').style.display='none'; document.getElementById('loginText').textContent='Sign In'; }, 8000);
+});
+
+/* Placeholder color fix for dark inputs */
+const style = document.createElement('style');
+style.textContent = '.form-control::placeholder { color: rgba(255,255,255,0.25) !important; }';
+document.head.appendChild(style);
+</script>
 {% endblock %}

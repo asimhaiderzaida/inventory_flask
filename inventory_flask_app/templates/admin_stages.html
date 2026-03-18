@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Processing Stages{% endblock %}
+{% block page_title %}Processing Stages{% endblock %}
+
+{% block content %}
+<style>
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+    transition: background var(--transition-fast);
+  }
+  .stage-row:last-child { border-bottom: none; }
+  .stage-row:hover { background: var(--surface-2); }
+  .stage-row.dragging { opacity: 0.4; }
+  .drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 1rem;
+    padding: 0.25rem;
+    flex-shrink: 0;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .stage-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid rgba(0,0,0,0.08);
+  }
+  .stage-name {
+    flex: 1;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  .stage-sla {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .stage-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+  .edit-form-row {
+    display: none;
+    padding: 0.75rem 1rem 1rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .edit-form-row.open { display: block; }
+</style>
+
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Processing Stages</h1>
+    <div class="page-subtitle">Define and order the stages units pass through during processing</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('admin_bp.admin_settings') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Settings
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:680px;">
+
+  <!-- Stage list -->
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-list-ol me-2"></i>Configured Stages</span>
+      <span style="font-size:0.78rem;color:var(--text-muted);">Drag to reorder</span>
+    </div>
+
+    <div id="stage-list">
+      {% for stage in stages %}
+      <div class="stage-row" data-id="{{ stage.id }}">
+        <span class="drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>
+        <span class="stage-swatch" style="background:{{ stage.color }};"></span>
+        <span class="stage-name">{{ stage.name }}</span>
+        <span class="stage-sla">
+          {% if stage.sla_hours > 0 %}SLA: {{ stage.sla_hours }}h{% else %}No SLA{% endif %}
+        </span>
+        <div class="stage-actions">
+          <button class="btn btn-ghost btn-sm" onclick="toggleEdit({{ stage.id }})" title="Edit">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <form method="POST" action="{{ url_for('admin_bp.delete_stage', stage_id=stage.id) }}"
+                onsubmit="return confirm('Delete stage {{ stage.name|e }}?');" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" style="color:var(--color-danger);" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="edit-form-row" id="edit-row-{{ stage.id }}">
+        <form method="POST" action="{{ url_for('admin_bp.edit_stage', stage_id=stage.id) }}" class="row g-2 align-items-end">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-5">
+            <label class="form-label form-label-sm">Stage Name</label>
+            <input type="text" name="name" class="form-control form-control-sm" value="{{ stage.name }}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label form-label-sm">Color</label>
+            <input type="color" name="color" class="form-control form-control-sm form-control-color" value="{{ stage.color }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label form-label-sm">SLA (hours, 0=none)</label>
+            <input type="number" name="sla_hours" class="form-control form-control-sm" value="{{ stage.sla_hours }}" min="0">
+          </div>
+          <div class="col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEdit({{ stage.id }})">✕</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:2rem;">
+        <i class="bi bi-list-check"></i>
+        <p>No stages configured yet. Add your first stage below.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Add stage form -->
+  <div class="card">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-plus-circle me-2"></i>Add New Stage</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <form method="POST" action="{{ url_for('admin_bp.add_stage') }}" class="row g-3 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-5">
+          <label class="form-label">Stage Name</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Data Wipe" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Color</label>
+          <input type="color" name="color" class="form-control form-control-color" value="#6b7280">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">SLA Hours (0=none)</label>
+          <input type="number" name="sla_hours" class="form-control" value="24" min="0">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus"></i> Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleEdit(id) {
+  const row = document.getElementById('edit-row-' + id);
+  if (row) row.classList.toggle('open');
+}
+
+// ── Drag-and-drop reorder ──
+(function() {
+  const list = document.getElementById('stage-list');
+  if (!list) return;
+
+  let dragged = null;
+
+  list.addEventListener('dragstart', e => {
+    dragged = e.target.closest('.stage-row');
+    if (dragged) { dragged.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+  });
+  list.addEventListener('dragend', e => {
+    if (dragged) { dragged.classList.remove('dragging'); dragged = null; saveOrder(); }
+  });
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    const target = e.target.closest('.stage-row');
+    if (target && target !== dragged) {
+      const rect = target.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      if (after) list.insertBefore(dragged, target.nextElementSibling);
+      else list.insertBefore(dragged, target);
+    }
+  });
+
+  // Make rows draggable
+  list.querySelectorAll('.stage-row').forEach(row => row.setAttribute('draggable', 'true'));
+
+  function saveOrder() {
+    const rows = list.querySelectorAll('.stage-row[data-id]');
+    const payload = Array.from(rows).map((r, i) => ({ id: parseInt(r.dataset.id), order: i }));
+    fetch('{{ url_for("admin_bp.reorder_stages") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  }
+})();
+</script>
+{% endblock %}

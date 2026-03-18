@@ -1,45 +1,51 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Export Sales</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <nav style="background-color: #007BFF; padding: 10px; color: white; display: flex; justify-content: space-between;">
-        <div><strong>📦 Inventory System</strong></div>
-        <div>
-            <a href="/main_dashboard" style="color: white; margin-right: 15px;">🏠 Dashboard</a>
-            <a href="/logout" style="color: white;">Logout</a>
-        </div>
-    </nav>
+{% extends "base.html" %}
+{% block title %}Export Sales{% endblock %}
+{% block page_title %}Export Sales{% endblock %}
 
-    <div class="container py-5 d-flex justify-content-center">
-      <div class="card shadow-sm rounded-4 p-4" style="width: 100%; max-width: 520px;">
-        <h4 class="mb-3 text-primary fw-bold"><i class="bi bi-download me-2"></i>Export Sales Report</h4>
-        <p class="text-muted small mb-3">Use filters below to refine the export. Includes Serial, Asset, Product, and more.</p>
-        <form action="/sales/export" method="GET">
-          <div class="mb-3">
-            <label class="form-label">Filter by Customer:</label>
-            <select name="customer_id" class="form-select form-select-lg rounded-pill px-3">
-              <option value="">-- All Customers --</option>
-              {% for customer in customers %}
-                <option value="{{ customer.id }}">{{ customer.name }}</option>
-              {% endfor %}
-            </select>
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Export Sales Report</h1>
+    <div class="page-subtitle">Download filtered sales data to Excel</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:480px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
+        Includes Serial, Asset, Product details, and more. Use filters to refine the export.
+      </p>
+      <form action="/sales/export" method="GET">
+        <div class="mb-3">
+          <label class="form-label">Filter by Customer</label>
+          <select name="customer_id" class="form-select">
+            <option value="">All Customers</option>
+            {% for customer in customers %}
+              <option value="{{ customer.id }}">{{ customer.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col">
+            <label class="form-label">From Date</label>
+            <input type="date" name="start_date" class="form-control">
           </div>
-          <div class="mb-3">
-            <label class="form-label">From Date:</label>
-            <input type="date" name="start_date" class="form-control form-control-lg rounded-pill px-3">
+          <div class="col">
+            <label class="form-label">To Date</label>
+            <input type="date" name="end_date" class="form-control">
           </div>
-          <div class="mb-3">
-            <label class="form-label">To Date:</label>
-            <input type="date" name="end_date" class="form-control form-control-lg rounded-pill px-3">
-          </div>
-          <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill mt-2">
-            <i class="bi bi-download me-1"></i> Download Excel
-          </button>
-        </form>
-      </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-download"></i> Download Excel
+        </button>
+      </form>
     </div>
-</body>
-</html>
+  </div>
+</div>
+{% endblock %}

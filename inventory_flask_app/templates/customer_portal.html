@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Orders{% if settings.invoice_title %} — {{ settings.invoice_title }}{% endif %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary:       #3b82f6;
+      --primary-dark:  #2563eb;
+      --primary-light: rgba(59,130,246,0.10);
+      --success:       #10b981;
+      --warning:       #f59e0b;
+      --danger:        #ef4444;
+      --surface:       #ffffff;
+      --surface-2:     #f8fafc;
+      --border:        #e2e8f0;
+      --text-primary:  #0f172a;
+      --text-secondary:#475569;
+      --text-muted:    #94a3b8;
+      --radius-xl:     20px;
+      --radius-lg:     14px;
+      --radius-md:     10px;
+      --radius-sm:     6px;
+      --shadow:        0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-lg:     0 10px 25px rgba(0,0,0,0.10);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--surface-2);
+      color: var(--text-primary);
+      min-height: 100vh;
+      margin: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header bar ── */
+    .portal-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .portal-header-logo {
+      height: 36px;
+      width: auto;
+      border-radius: 8px;
+    }
+    .portal-header-icon {
+      width: 36px; height: 36px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .portal-header-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+    .portal-header-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Hero section ── */
+    .portal-hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 45%, #1e40af 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+    .portal-hero-inner {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .portal-hero-greeting {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.35rem;
+      line-height: 1.2;
+    }
+    .portal-hero-sub {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.65);
+    }
+    .portal-hero-stats {
+      display: flex;
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .hero-stat {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius-md);
+      padding: 0.6rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+    .hero-stat-value {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      line-height: 1;
+    }
+    .hero-stat-label {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.55);
+      font-weight: 500;
+    }
+
+    /* ── Main body ── */
+    .portal-body {
+      max-width: 680px;
+      margin: -1.75rem auto 0;
+      padding: 0 1rem 3rem;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin: 1.5rem 0 0.65rem;
+      padding: 0 0.25rem;
+    }
+    .section-header i { font-size: 0.9rem; }
+
+    /* ── Cards ── */
+    .portal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .portal-card-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      background: var(--surface-2);
+    }
+    .portal-card-header i { color: var(--primary); font-size: 1rem; }
+    .portal-card-count {
+      margin-left: auto;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 20px;
+      padding: 0.1rem 0.55rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    /* ── Status pills ── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.22rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .pill-reserved   { background: #eff6ff; color: #1d4ed8; }
+    .pill-pending    { background: #fefce8; color: #854d0e; }
+    .pill-sold,
+    .pill-delivered  { background: #f0fdf4; color: #15803d; }
+    .pill-processing { background: #fdf4ff; color: #7e22ce; }
+    .pill-success    { background: #f0fdf4; color: #15803d; }
+
+    /* ── Progress stepper ── */
+    .stepper {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin: 0.85rem 0 0.5rem;
+    }
+    .stepper-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .stepper-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: calc(50% + 10px);
+      right: calc(-50% + 10px);
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .stepper-step.done:not(:last-child)::after {
+      background: var(--primary);
+    }
+    .stepper-dot {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.6rem;
+      z-index: 1;
+      flex-shrink: 0;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .stepper-step.done   .stepper-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .stepper-step.active .stepper-dot { border-color: var(--primary); background: var(--primary-light); }
+    .stepper-step.active .stepper-dot::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid rgba(59,130,246,0.3);
+    }
+    .stepper-label {
+      font-size: 0.58rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .stepper-step.done   .stepper-label { color: var(--primary); font-weight: 600; }
+    .stepper-step.active .stepper-label { color: var(--text-primary); font-weight: 600; }
+
+    /* ── Tracking item ── */
+    .tracking-item {
+      padding: 1.1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .tracking-item:last-child { border-bottom: none; }
+    .tracking-item-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.4rem;
+    }
+    .tracking-product-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+    .tracking-product-specs {
+      font-size: 0.77rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+    .tracking-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.6rem;
+    }
+    .tracking-date {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Order history ── */
+    .order-item {
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .order-item:last-child { border-bottom: none; }
+    .order-header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast, 0.12s);
+    }
+    .order-header:hover { background: var(--surface-2); }
+    .order-number {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text-primary);
+    }
+    .order-date {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 0.1rem;
+    }
+    .order-chevron {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .order-item.open .order-chevron { transform: rotate(180deg); }
+    .order-units {
+      display: none;
+      padding: 0 1.25rem 1rem;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .order-item.open .order-units { display: flex; }
+    .order-unit-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+    }
+    .order-unit-name { font-weight: 600; color: var(--text-primary); }
+    .order-unit-spec { color: var(--text-muted); font-size: 0.76rem; }
+    .order-unit-serial {
+      font-family: 'Courier New', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-left: auto;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Empty state ── */
+    .portal-empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .portal-empty i {
+      font-size: 2.5rem;
+      display: block;
+      margin-bottom: 0.75rem;
+      opacity: 0.5;
+    }
+    .portal-empty p { font-size: 0.88rem; margin: 0; }
+
+    /* ── Footer ── */
+    .portal-footer {
+      text-align: center;
+      padding: 2rem 1rem 2.5rem;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: 1rem;
+    }
+    .portal-footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .portal-footer a:hover { color: var(--primary); }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .portal-hero  { padding: 1.75rem 1rem 3rem; }
+      .portal-body  { padding: 0 0.75rem 2rem; }
+      .portal-card-header, .tracking-item, .order-header { padding-left: 1rem; padding-right: 1rem; }
+      .order-units { padding-left: 1rem; padding-right: 1rem; }
+      .portal-hero-greeting { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="portal-header">
+  {% if settings.invoice_logo %}
+    <img src="{{ settings.invoice_logo }}" alt="logo" class="portal-header-logo">
+  {% else %}
+    <div class="portal-header-icon">
+      {{ (settings.invoice_title or settings.dashboard_name or 'P')[0]|upper }}
+    </div>
+  {% endif %}
+  <div>
+    <div class="portal-header-name">{{ settings.invoice_title or settings.dashboard_name or 'Customer Portal' }}</div>
+    <div class="portal-header-subtitle">Order Tracking</div>
+  </div>
+</header>
+
+<!-- ── Hero ── -->
+<div class="portal-hero">
+  <div class="portal-hero-inner">
+    <div class="portal-hero-greeting">Hello, {{ customer.name.split()[0] }} 👋</div>
+    <div class="portal-hero-sub">Track your reservations and order history below.</div>
+    <div class="portal-hero-stats">
+      {% if tracking %}
+      <div class="hero-stat">
+        <div class="hero-stat-value">{{ tracking|length }}</div>
+        <div class="hero-stat-label">Active Reservation{{ 's' if tracking|length != 1 else '' }}</div>
+      </div>
+      {% endif %}
+      {% if order_rows %}
+      <div class="hero-stat">
+        <div class="hero-stat-value">{{ order_rows|length }}</div>
+        <div class="hero-stat-label">Completed Order{{ 's' if order_rows|length != 1 else '' }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Body ── -->
+<div class="portal-body">
+
+  <!-- Active Reservations -->
+  {% if tracking %}
+  <div class="section-header">
+    <i class="bi bi-clock-history"></i> Active Reservations
+  </div>
+  <div class="portal-card">
+    <div class="portal-card-header">
+      <i class="bi bi-bookmark-heart"></i>
+      Reserved Units
+      <span class="portal-card-count">{{ tracking|length }}</span>
+    </div>
+
+    {% for t in tracking %}
+    {% set pi   = t.product_instance %}
+    {% set prod = pi.product if pi else None %}
+
+    {# Stepper: 0=Reserved, 1=Processing, 2=Ready for Pickup, 3=Collected #}
+    {% set step_map = {'reserved': 0, 'pending': 1, 'delivered': 2, 'sold': 3} %}
+    {% set current_step = step_map.get(t.status, 0) %}
+
+    <div class="tracking-item">
+      <div class="tracking-item-header">
+        <div>
+          <div class="tracking-product-name">{{ prod.item_name if prod else 'Unit' }}</div>
+          {% if prod %}
+          <div class="tracking-product-specs">
+            {% if prod.model %}{{ prod.model }}{% endif %}
+            {% if prod.cpu %} &middot; {{ prod.cpu }}{% endif %}
+            {% if prod.ram %} &middot; {{ prod.ram }}{% endif %}
+            {% if prod.disk1size %} &middot; {{ prod.disk1size }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% if t.status == 'delivered' %}
+        <span class="pill pill-success" style="background:#d1fae5;color:#065f46;">
+          <i class="bi bi-bag-check-fill"></i> Ready for Pickup
+        </span>
+        {% elif t.status == 'reserved' %}
+        <span class="pill pill-reserved">
+          <i class="bi bi-bookmark-fill"></i> Reserved
+        </span>
+        {% elif t.status == 'pending' %}
+        <span class="pill pill-pending">
+          <i class="bi bi-hourglass-split"></i> Pending
+        </span>
+        {% else %}
+        <span class="pill" style="background:var(--surface-2);color:var(--text-muted);">
+          <i class="bi bi-tools"></i> {{ t.status|title }}
+        </span>
+        {% endif %}
+      </div>
+
+      <!-- Progress stepper -->
+      <div class="stepper">
+        {% set steps = [('Reserved','bi-bookmark'), ('Processing','bi-tools'), ('Ready','bi-box-seam'), ('Delivered','bi-check2-circle')] %}
+        {% for label, icon in steps %}
+          {% set idx = loop.index0 %}
+          <div class="stepper-step {% if idx < current_step %}done{% elif idx == current_step %}active{% endif %}">
+            <div class="stepper-dot">
+              {% if idx < current_step %}<i class="bi bi-check-lg" style="font-size:0.55rem;"></i>{% endif %}
+            </div>
+            <div class="stepper-label">{{ label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="tracking-meta">
+        {% if t.process_stage %}
+        <span class="pill pill-processing">
+          <i class="bi bi-tools"></i> {{ t.process_stage }}
+        </span>
+        {% endif %}
+        <span class="tracking-date">
+          <i class="bi bi-calendar3"></i>
+          Since {{ t.reserved_date.strftime('%d %b %Y') if t.reserved_date else '—' }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Order History -->
+  {% if order_rows %}
+  <div class="section-header">
+    <i class="bi bi-bag-check"></i> Order History
+  </div>
+  <div class="portal-card">
+    <div class="portal-card-header">
+      <i class="bi bi-receipt"></i>
+      Completed Orders
+      <span class="portal-card-count" style="background:var(--success);">{{ order_rows|length }}</span>
+    </div>
+
+    {% for order in order_rows %}
+    <div class="order-item" id="order-{{ loop.index }}">
+      <div class="order-header" onclick="toggleOrder('order-{{ loop.index }}')">
+        <div>
+          <div class="order-number">{{ order.order_number }}</div>
+          <div class="order-date">{{ order.created_at.strftime('%d %B %Y') if order.created_at else '—' }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+          <span class="pill pill-delivered">
+            <i class="bi bi-check-circle-fill"></i> Delivered
+          </span>
+          <i class="bi bi-chevron-down order-chevron"></i>
+        </div>
+      </div>
+
+      {% if order.items %}
+      <div class="order-units">
+        {% for item in order.items %}
+        <div class="order-unit-row">
+          <span class="order-unit-name">{{ item.item_name }}</span>
+          <span class="order-unit-spec">
+            {% if item.cpu %}{{ item.cpu }}{% endif %}
+            {% if item.ram %} &middot; {{ item.ram }}{% endif %}
+          </span>
+          {% if item.serial %}
+          <span class="order-unit-serial">
+            ··· {{ item.serial[-6:] if item.serial|length > 6 else item.serial }}
+          </span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% elif not tracking %}
+  <!-- No data at all -->
+  <div class="section-header">
+    <i class="bi bi-inbox"></i> Your Orders
+  </div>
+  <div class="portal-card">
+    <div class="portal-empty">
+      <i class="bi bi-bag"></i>
+      <p>No orders or reservations found for your account yet.</p>
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /portal-body -->
+
+<!-- ── Footer ── -->
+<div class="portal-footer">
+  Powered by {{ settings.company_name or settings.invoice_title or settings.dashboard_name or 'PCMart' }}
+  {% if settings.company_website %}
+  &nbsp;&middot;&nbsp;
+  <a href="{{ settings.company_website }}">{{ settings.company_website }}</a>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleOrder(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+</script>
+</body>
+</html>

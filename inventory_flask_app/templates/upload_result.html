@@ -1,153 +1,209 @@
 {% extends "base.html" %}
 {% block title %}Upload Result{% endblock %}
+{% block page_title %}Upload Result{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4 px-4">
-  <style>
-    th { white-space: nowrap; background-color: #f8f9fa; }
-    .table-responsive-sm { border-radius: 0.5rem; overflow-x: auto; }
-    .form-select-sm, .btn-sm, .form-control-sm { font-size: 0.87rem; }
-  </style>
-
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-semibold text-primary mb-0">
-      <i class="bi bi-upload me-2"></i>Inventory Uploaded for {{ vendor.name }}
-    </h4>
-    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill">
-      <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Inventory Uploaded — {{ vendor.name }}</h1>
+    <div class="page-subtitle">{{ created_count + updated_count }} units added or updated</div>
+  </div>
+  <div class="page-actions">
+    <button type="button" onclick="batchPrint()" class="btn btn-ghost">
+      <i class="bi bi-printer"></i> Print Labels
+    </button>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
     </a>
   </div>
-
-  <form method="post" action="{{ url_for('stock_bp.batch_update_status') }}">
-    <div class="d-flex flex-wrap gap-2 mb-3 justify-content-start align-items-center">
-      <button type="submit" class="btn btn-success btn-sm rounded-pill px-4 fw-semibold">
-        <i class="bi bi-check-circle me-1"></i>Assign Status
-      </button>
-      <button type="button" onclick="batchPrint()" class="btn btn-outline-dark btn-sm rounded-pill px-4 fw-semibold">
-        <i class="bi bi-printer me-1"></i>Print Labels
-      </button>
-      <select name="status" class="form-select form-select-sm d-inline w-auto mx-2 rounded-pill">
-        <option value="">-- Select Status --</option>
-        <option value="unprocessed">Unprocessed</option>
-        <option value="under_process">Under Process</option>
-        <option value="processed">Processed</option>
-      </select>
-      <select name="location_id" class="form-select form-select-sm d-inline w-auto mx-2 rounded-pill">
-        <option value="">-- Select Location --</option>
-        {% for loc in locations %}
-        <option value="{{ loc.id }}">{{ loc.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="table-responsive-sm">
-      <table class="table table-striped table-sm align-middle rounded-4 overflow-hidden shadow-sm bg-white">
-        <thead>
-          <tr>
-            <th class="text-nowrap"><input type="checkbox" id="select-all"></th>
-            <th class="text-nowrap">Serial</th>
-            <th class="text-nowrap">Asset</th>
-            <th class="text-nowrap">Item Name</th>
-            <th class="text-nowrap">Make</th>
-            <th class="text-nowrap">Model</th>
-            <th class="text-nowrap">CPU</th>
-            <th class="text-nowrap">RAM</th>
-            <th class="text-nowrap">Disk 1 Size</th>
-            <th class="text-nowrap">Location</th>
-            <th class="text-nowrap">Display</th>
-            <th class="text-nowrap">GPU 1</th>
-            <th class="text-nowrap">GPU 2</th>
-            <th class="text-nowrap">Grade</th>
-            <th class="text-nowrap">Status</th>
-            <th class="text-nowrap">Label</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for i in instances %}
-          <tr>
-            <td class="text-nowrap">
-              <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ i.id }}">
-            </td>
-            <td class="text-nowrap">{{ i.serial }}</td>
-            <td class="text-nowrap">{{ i.asset }}</td>
-            <td class="text-nowrap">{{ i.product.item_name if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.make if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.model if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.cpu if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.ram if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.disk1size if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.location.name if i.location else '' }}</td>
-            <td class="text-nowrap">{{ i.product.display if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.gpu1 if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.gpu2 if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.product.grade if i.product else '' }}</td>
-            <td class="text-nowrap">{{ i.status }}</td>
-            <td class="text-nowrap">
-              <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
-                 class="btn btn-sm btn-outline-dark" target="_blank">
-                🖨️ Print Label
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </form>
-  <form id="batchPrintForm" method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" style="display:none;">
-    <input type="hidden" name="instance_ids" id="batchPrintIds">
-  </form>
-
-  <script>
-  function batchPrint() {
-    let ids = [];
-    document.querySelectorAll('.batch-checkbox:checked').forEach(cb => ids.push(cb.value));
-    if (ids.length === 0) {
-      alert("Select at least one item to print.");
-      return;
-    }
-    document.getElementById('batchPrintIds').value = ids.join(',');
-    document.getElementById('batchPrintForm').submit();
-  }
-  </script>
-
-  <!-- jQuery (needed for DataTables) -->
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const table = $('.table').DataTable({ pageLength: 50 });
-
-      document.getElementById("select-all").addEventListener("change", function () {
-        const checked = this.checked;
-        table.rows().every(function () {
-          const row = this.node();
-          const checkbox = row.querySelector('.batch-checkbox');
-          if (checkbox) checkbox.checked = checked;
-        });
-      });
-
-      // Ensure all checked checkboxes across all DataTables pages are included in batch update form submit
-      const form = document.querySelector("form[action='{{ url_for('stock_bp.batch_update_status') }}']");
-      form.addEventListener("submit", function (e) {
-        // Remove any previously added hidden inputs
-        document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
-
-        // Append checked rows across all pages
-        table.rows().every(function () {
-          const row = this.node();
-          const checkbox = row.querySelector('.batch-checkbox');
-          if (checkbox && checkbox.checked) {
-            const hiddenInput = document.createElement("input");
-            hiddenInput.type = "hidden";
-            hiddenInput.name = "instance_ids";
-            hiddenInput.value = checkbox.value;
-            form.appendChild(hiddenInput);
-          }
-        });
-      });
-    });
-  </script>
 </div>
+
+<!-- Summary stats -->
+<div class="animate-fade-up" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+  <div style="background:rgba(34,197,94,0.08);border:1px solid var(--color-success);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--color-success);">{{ created_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Created (new)</div>
+  </div>
+  <div style="background:rgba(59,130,246,0.08);border:1px solid var(--primary);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--primary);">{{ updated_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Updated (specs changed)</div>
+  </div>
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--text-muted);">{{ skipped_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Skipped (up to date)</div>
+  </div>
+  {% if failed_count %}
+  <div style="background:rgba(239,68,68,0.08);border:1px solid var(--color-danger);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--color-danger);">{{ failed_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Failed (errors)</div>
+  </div>
+  {% endif %}
+</div>
+
+{% set actionable = result_rows | selectattr('instance') | list %}
+
+<div class="animate-fade-up">
+  <form method="post" action="{{ url_for('stock_bp.batch_update_status') }}" id="batch-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <!-- Batch controls (for created/updated instances only) -->
+    {% if actionable %}
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;">
+      <div>
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select" style="width:160px;">
+          <option value="">Select status…</option>
+          <option value="unprocessed">Unprocessed</option>
+          <option value="under_process">Under Process</option>
+          <option value="processed">Processed</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Location</label>
+        <select name="location_id" class="form-select" style="width:180px;">
+          <option value="">Select location…</option>
+          {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="align-self:flex-end;">
+        <i class="bi bi-check-circle"></i> Assign Status
+      </button>
+    </div>
+    {% endif %}
+
+    <div class="table-card">
+      <div style="overflow-x:auto;">
+        <table class="table" id="result-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="select-all" style="cursor:pointer;"></th>
+              <th>Outcome</th>
+              <th>Serial</th>
+              <th>Asset</th>
+              <th>Item</th>
+              <th>Make</th>
+              <th>Model</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>Grade</th>
+              <th>Location</th>
+              <th>Changes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in result_rows %}
+            <tr>
+              <td>
+                {% if row.instance %}
+                  <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ row.instance.id }}">
+                {% endif %}
+              </td>
+              <td>
+                {% if row.outcome == 'created' %}
+                  <span class="status-pill status-processed" style="font-size:0.75rem;">Created</span>
+                {% elif row.outcome == 'updated' %}
+                  <span class="status-pill" style="background:rgba(59,130,246,0.12);color:var(--primary);font-size:0.75rem;">Updated</span>
+                {% elif row.outcome == 'skipped' %}
+                  <span class="status-pill status-idle" style="font-size:0.75rem;">Skipped</span>
+                {% else %}
+                  <span class="status-pill status-disputed" style="font-size:0.75rem;">Failed</span>
+                {% endif %}
+              </td>
+              <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial }}</span></td>
+              {% if row.instance %}
+                <td>{{ row.instance.asset or '—' }}</td>
+                <td>{{ (row.instance.product.item_name if row.instance.product else None) | nonan }}</td>
+                <td>{{ (row.instance.product.make if row.instance.product else None) | nonan }}</td>
+                <td>{{ (row.instance.product.model if row.instance.product else None) | nonan }}</td>
+                <td>{{ (row.instance.product.cpu if row.instance.product else None) | nonan }}</td>
+                <td>{{ (row.instance.product.ram if row.instance.product else None) | nonan }}</td>
+                <td>{{ (row.instance.product.grade if row.instance.product else None) | nonan }}</td>
+                <td>{{ row.instance.location.name if row.instance.location else '—' }}</td>
+              {% else %}
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+              {% endif %}
+              <td style="max-width:260px;">
+                {% if row.changes %}
+                  <ul style="margin:0;padding-left:1rem;font-size:0.78rem;color:var(--text-muted);">
+                    {% for field, diff in row.changes.items() %}
+                      <li>
+                        <strong>{{ field }}</strong>:
+                        <span style="color:var(--color-danger);text-decoration:line-through;">{{ diff.old or '—' }}</span>
+                        <i class="bi bi-arrow-right" style="font-size:0.7rem;"></i>
+                        <span style="color:var(--color-success);">{{ diff.new }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% elif row.outcome == 'failed' %}
+                  <span style="font-size:0.78rem;color:var(--color-danger);">{{ row.error | default('Unknown error') }}</span>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if row.instance %}
+                  <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance.id) }}" class="btn btn-ghost btn-sm" target="_blank">
+                    <i class="bi bi-printer"></i>
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+</div>
+
+<form id="batchPrintForm" method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="instance_ids" id="batchPrintIds">
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const table = $('.table').DataTable({ pageLength: 50 });
+
+  document.getElementById('select-all').addEventListener('change', function() {
+    const checked = this.checked;
+    table.rows().every(function() {
+      const cb = this.node().querySelector('.batch-checkbox');
+      if (cb) cb.checked = checked;
+    });
+  });
+
+  const form = document.getElementById('batch-form');
+  form.addEventListener('submit', function() {
+    document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+    table.rows().every(function() {
+      const cb = this.node().querySelector('.batch-checkbox');
+      if (cb && cb.checked) {
+        const h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'instance_ids'; h.value = cb.value;
+        form.appendChild(h);
+      }
+    });
+  });
+});
+
+function batchPrint() {
+  let ids = [];
+  document.querySelectorAll('.batch-checkbox:checked').forEach(cb => ids.push(cb.value));
+  if (ids.length === 0) {
+    showToast('Select at least one item to print.', 'warning');
+    return;
+  }
+  document.getElementById('batchPrintIds').value = ids.join(',');
+  document.getElementById('batchPrintForm').submit();
+}
+</script>
 {% endblock %}

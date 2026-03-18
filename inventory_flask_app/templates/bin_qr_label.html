@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}QR Label — {{ bin.name }}{% endblock %}
+{% block page_title %}Bin Label{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">QR Label: {{ bin.name }}</h1>
+    <div class="page-subtitle">{{ location.name }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Bins
+    </a>
+    <button class="btn btn-primary" onclick="window.print()">
+      <i class="bi bi-printer"></i> Print Label
+    </button>
+  </div>
+</div>
+
+<style>
+  @media print {
+    .sidebar, .navbar, .page-header, .page-actions, .btn { display: none !important; }
+    body { background: white !important; }
+    .bin-label { margin: 0 auto; }
+  }
+  .bin-label {
+    display: inline-block;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    text-align: center;
+    background: #fff;
+    font-family: 'Inter', sans-serif;
+    min-width: 220px;
+  }
+  .bin-label-location {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+  }
+  .bin-label-name {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+    font-family: monospace;
+  }
+  .bin-label-qr img {
+    display: block;
+    margin: 0 auto;
+    width: 160px;
+    height: 160px;
+  }
+  .bin-label-url {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 0.6rem;
+    word-break: break-all;
+  }
+</style>
+
+<div class="animate-fade-up" style="padding:2rem 0;">
+  <div class="bin-label">
+    <div class="bin-label-location">{{ location.name }}</div>
+    <div class="bin-label-name">{{ bin.name }}</div>
+    <div class="bin-label-qr">
+      <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code for {{ bin.name }}">
+    </div>
+    {% if bin.description %}
+    <div style="font-size:0.8rem;color:#555;margin-top:0.5rem;">{{ bin.description }}</div>
+    {% endif %}
+    <div class="bin-label-url">{{ bin_url }}</div>
+  </div>
+</div>
+{% endblock %}

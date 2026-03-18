@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% block title %}{{ txn.invoice_number }} — Parts Invoice{% endblock %}
+{% block page_title %}Parts Invoice{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Invoice card constraint ── */
+  .invoice-outer { max-width: 860px; }
+
+  /* ── Items table ── */
+  .inv-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  .inv-table thead tr {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+  }
+  .inv-table th {
+    padding: 0.65rem 0.8rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .inv-table th.right, .inv-table td.right { text-align: right; }
+  .inv-table th.center, .inv-table td.center { text-align: center; }
+  .inv-table tbody tr { border-bottom: 1px solid var(--border); }
+  .inv-table tbody tr:last-child { border-bottom: none; }
+  .inv-table td { padding: 0.7rem 0.8rem; vertical-align: middle; }
+  .inv-table td.currency { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── Totals block ── */
+  .totals-table { border-collapse: collapse; min-width: 280px; font-size: 0.875rem; }
+  .totals-table td { padding: 0.3rem 0.75rem; }
+  .totals-table .grand-row { border-top: 2px solid var(--border); }
+  .totals-table .grand-row td { padding-top: 0.55rem; }
+
+  /* ── Invoice header layout ── */
+  .invoice-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .invoice-head-right { text-align: right; }
+  .invoice-word {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  /* ── Bill-to block ── */
+  .bill-to-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+  .bill-to-name { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+  .bill-to-detail { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; }
+
+  /* ── Section label ── */
+  .section-lbl {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  @media (max-width: 575px) {
+    .invoice-head { flex-direction: column; align-items: stretch; }
+    .invoice-head-right { text-align: left; }
+    .invoice-word { font-size: 1.5rem; }
+  }
+
+  /* ── Print / Save as PDF ── */
+  @media print {
+    /* Hide chrome */
+    .sidebar,
+    .top-navbar,
+    .page-header,
+    .page-actions,
+    .btn,
+    .no-print { display: none !important; }
+
+    /* Full-width layout */
+    body { margin: 0; padding: 0; background: white !important; }
+    .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+
+    /* Invoice card: remove shadow/border, fill page */
+    .invoice-outer { max-width: 100% !important; }
+    .card { box-shadow: none !important; border: none !important; border-radius: 0 !important; margin: 0 !important; }
+    .card-body { padding: 0 !important; }
+
+    /* Make CSS variables resolve to readable values for print */
+    .inv-table th { color: #6b7280 !important; background: #f3f4f6 !important; }
+    .inv-table tbody tr { border-bottom: 1px solid #e2e8f0 !important; }
+    .totals-table .grand-row { border-top: 2px solid #0f172a !important; }
+    .bill-to-label, .section-lbl { color: #6b7280 !important; }
+    .bill-to-name { color: #0f172a !important; }
+    .bill-to-detail { color: #475569 !important; }
+    .invoice-head { border-bottom: 1px solid #e2e8f0 !important; }
+
+    /* Status pills print cleanly */
+    .status-pill { border: 1px solid #ccc !important; }
+
+    /* Don't break inside table rows */
+    tr { page-break-inside: avoid; }
+
+    /* Page settings */
+    @page { margin: 1.5cm; size: A4; }
+  }
+</style>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">
+      {{ txn.invoice_number }}
+      {% if txn.payment_status == 'paid' %}
+        <span class="status-pill status-processed" style="font-size:0.7rem;vertical-align:middle;margin-left:0.5rem;">Paid</span>
+      {% else %}
+        <span class="status-pill status-idle" style="font-size:0.7rem;vertical-align:middle;margin-left:0.5rem;">Pending</span>
+      {% endif %}
+    </h1>
+    <div class="page-subtitle">
+      {% if txn.customer %}{{ txn.customer.name }}{% else %}{{ txn.customer_name or 'Walk-in' }}{% endif %}
+      &nbsp;&middot;&nbsp;
+      {{ txn.sold_at.strftime('%d %b %Y') if txn.sold_at else '—' }}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sales_list') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Sales History
+    </a>
+    <button onclick="window.print()" class="btn btn-ghost">
+      <i class="bi bi-printer"></i> Print / Save PDF
+    </button>
+    {% if txn.payment_status == 'pending' %}
+    <form method="post" action="{{ url_for('parts_bp.sale_pay', txn_id=txn.id) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-success"
+              onclick="return confirm('Mark this sale as paid?');">
+        <i class="bi bi-check-circle"></i> Record Payment
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% set inv_accent  = settings.invoice_accent_color or '#3b82f6' %}
+{% set inv_show_logo = settings.invoice_show_logo != 'false' %}
+{% set currency    = settings.currency or 'AED' %}
+
+<!-- Invoice card -->
+<div class="card animate-fade-up invoice-outer" style="border-top:4px solid {{ inv_accent }};">
+  <div class="card-body" style="padding:2rem 2rem 1.75rem;">
+
+    <!-- ── Invoice header ── -->
+    <div class="invoice-head">
+      <!-- Left: company branding -->
+      <div>
+        {% if inv_show_logo %}
+          {% if settings.invoice_logo %}
+          <img src="{{ settings.invoice_logo }}" alt="Logo"
+               style="max-height:54px;margin-bottom:0.65rem;display:block;">
+          {% elif settings.dashboard_logo %}
+          <img src="{{ settings.dashboard_logo }}" alt="Logo"
+               style="max-height:54px;margin-bottom:0.65rem;display:block;">
+          {% endif %}
+        {% endif %}
+        {% if settings.company_name or settings.invoice_title %}
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text-primary);">
+          {{ settings.company_name or settings.invoice_title }}
+        </div>
+        {% endif %}
+        {% if settings.invoice_header_note %}
+        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.2rem;">{{ settings.invoice_header_note }}</div>
+        {% endif %}
+        {% if settings.company_address %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;white-space:pre-line;">{{ settings.company_address }}</div>
+        {% endif %}
+        {% if settings.company_phone %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">
+          <i class="bi bi-telephone me-1"></i>{{ settings.company_phone }}
+        </div>
+        {% endif %}
+        {% if settings.company_email %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">
+          <i class="bi bi-envelope me-1"></i>{{ settings.company_email }}
+        </div>
+        {% endif %}
+        {% if settings.company_website %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ settings.company_website }}</div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ── Bill To + Invoice Details ── -->
+    <div class="row mb-4">
+      <!-- Left: PARTS INVOICE title + Bill To -->
+      <div class="col-6">
+        <h1 style="font-size:2rem;font-weight:900;color:{{ inv_accent }};letter-spacing:2px;line-height:1;margin-bottom:0.5rem;">
+          PARTS INVOICE
+        </h1>
+        <hr style="margin:0.75rem 0 1rem;">
+        <div class="bill-to-label">Bill To</div>
+        {% if txn.customer %}
+          <div class="bill-to-name">{{ txn.customer.name }}</div>
+          <div class="bill-to-detail">
+            {% if txn.customer.company %}<div>{{ txn.customer.company }}</div>{% endif %}
+            {% if txn.customer.phone   %}<div>{{ txn.customer.phone }}</div>{% endif %}
+            {% if txn.customer.email   %}<div>{{ txn.customer.email }}</div>{% endif %}
+            {% if txn.customer.address %}<div>{{ txn.customer.address }}</div>{% endif %}
+          </div>
+        {% else %}
+          <div class="bill-to-name">{{ txn.customer_name or 'Walk-in Customer' }}</div>
+        {% endif %}
+      </div>
+      <!-- Right: Invoice details (right-aligned) -->
+      <div class="col-6 text-end">
+        <div class="fw-bold fs-5">{{ txn.invoice_number }}</div>
+        <div class="text-muted small mb-3">{{ txn.sold_at.strftime('%d %B %Y') if txn.sold_at else '—' }}</div>
+        <table class="ms-auto" style="border-collapse:collapse;font-size:0.84rem;text-align:right;">
+          <tr>
+            <td style="color:var(--text-muted);padding:0.3rem 0.75rem 0.3rem 0;white-space:nowrap;">Invoice #</td>
+            <td style="font-weight:700;padding:0.3rem 0;">{{ txn.invoice_number }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);padding:0.3rem 0.75rem 0.3rem 0;white-space:nowrap;">Date</td>
+            <td style="padding:0.3rem 0;">{{ txn.sold_at.strftime('%d %b %Y') if txn.sold_at else '—' }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);padding:0.3rem 0.75rem 0.3rem 0;">Payment</td>
+            <td style="padding:0.3rem 0;">
+              {% if txn.payment_method == 'cash' %}
+                <span class="status-pill" style="background:#d1fae5;color:#065f46;"><i class="bi bi-cash-coin me-1"></i>Cash</span>
+              {% elif txn.payment_method == 'card' %}
+                <span class="status-pill" style="background:#dbeafe;color:#1e40af;"><i class="bi bi-credit-card me-1"></i>Card</span>
+              {% elif txn.payment_method == 'transfer' %}
+                <span class="status-pill" style="background:#e0e7ff;color:#3730a3;"><i class="bi bi-bank me-1"></i>Bank Transfer</span>
+              {% elif txn.payment_method == 'credit' %}
+                <span class="status-pill" style="background:#fef3c7;color:#92400e;"><i class="bi bi-person-check me-1"></i>Credit</span>
+              {% elif txn.payment_method %}
+                <span class="status-pill">{{ txn.payment_method | capitalize }}</span>
+              {% else %}
+                <span class="status-pill">Cash</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);padding:0.3rem 0.75rem 0.3rem 0;">Status</td>
+            <td style="padding:0.3rem 0;">
+              {% if txn.payment_status == 'paid' %}
+                <span class="badge bg-success">PAID</span>
+              {% else %}
+                <span class="status-pill status-idle">Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Items table ── -->
+    <div class="section-lbl">Items</div>
+    <div style="overflow-x:auto;margin-bottom:1.75rem;">
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Part Name</th>
+            <th>Part No.</th>
+            <th>Location / Bin</th>
+            <th class="center" style="width:60px;">Qty</th>
+            <th class="right" style="width:110px;">Unit Price</th>
+            <th class="right" style="width:110px;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in txn.line_items %}
+          <tr>
+            <td style="font-weight:600;">{{ item.part.name if item.part else '—' }}</td>
+            <td>
+              <code style="font-size:0.81rem;color:var(--text-secondary);">
+                {{ item.part.part_number if item.part else '—' }}
+              </code>
+            </td>
+            <td style="font-size:0.83rem;color:var(--text-secondary);">
+              {{ item.location.name if item.location else '—' }}{% if item.bin %} / {{ item.bin.name }}{% endif %}
+            </td>
+            <td class="center">{{ item.quantity }}</td>
+            <td class="right currency">{{ '%.2f'|format(item.unit_price|float) }} {{ currency }}</td>
+            <td class="right currency" style="font-weight:600;">{{ '%.2f'|format(item.subtotal|float) }} {{ currency }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Totals ── -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1.5rem;">
+      <table class="totals-table">
+        <tr>
+          <td style="color:var(--text-secondary);">Subtotal</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;">
+            {{ '%.2f'|format(txn.subtotal|float) }} {{ currency }}
+          </td>
+        </tr>
+        {% if txn.tax and txn.tax|float > 0 %}
+        <tr>
+          <td style="color:var(--text-secondary);">VAT ({{ settings.vat_rate or '5' }}%)</td>
+          <td style="text-align:right;color:var(--text-secondary);font-variant-numeric:tabular-nums;">
+            {{ '%.2f'|format(txn.tax|float) }} {{ currency }}
+          </td>
+        </tr>
+        {% endif %}
+        <tr class="grand-row">
+          <td style="font-weight:700;font-size:0.95rem;">Grand Total</td>
+          <td style="text-align:right;font-weight:800;font-size:1.1rem;color:{{ inv_accent }};font-variant-numeric:tabular-nums;">
+            {{ '%.2f'|format(txn.total_amount|float) }} {{ currency }}
+          </td>
+        </tr>
+        {% if txn.payment_method %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:0.82rem;padding-top:0.5rem;">Payment</td>
+          <td style="text-align:right;padding-top:0.5rem;">
+            {% if txn.payment_method == 'cash' %}
+              <span class="status-pill" style="background:#d1fae5;color:#065f46;"><i class="bi bi-cash-coin me-1"></i>Cash</span>
+            {% elif txn.payment_method == 'card' %}
+              <span class="status-pill" style="background:#dbeafe;color:#1e40af;"><i class="bi bi-credit-card me-1"></i>Card</span>
+            {% elif txn.payment_method == 'transfer' %}
+              <span class="status-pill" style="background:#e0e7ff;color:#3730a3;"><i class="bi bi-bank me-1"></i>Bank Transfer</span>
+            {% elif txn.payment_method == 'credit' %}
+              <span class="status-pill" style="background:#fef3c7;color:#92400e;"><i class="bi bi-person-check me-1"></i>Credit</span>
+            {% else %}
+              <span class="status-pill">{{ txn.payment_method | capitalize }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- ── Notes ── -->
+    {% if txn.notes %}
+    <div style="padding:0.875rem 1rem;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:1.25rem;border:1px solid var(--border);">
+      <div class="section-lbl" style="margin-bottom:0.35rem;">Notes</div>
+      <p style="font-size:0.85rem;margin:0;white-space:pre-wrap;color:var(--text-secondary);">{{ txn.notes }}</p>
+    </div>
+    {% endif %}
+
+    <!-- ── Bank Details ── -->
+    {% if settings.invoice_show_bank_details == 'true' and settings.invoice_bank_details %}
+    <div style="padding:1rem;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:1.25rem;border:1px solid var(--border);">
+      <div class="section-lbl" style="margin-bottom:0.5rem;">Bank Transfer Details</div>
+      <pre style="font-size:0.78rem;color:var(--text-secondary);white-space:pre-wrap;margin:0;font-family:inherit;">{{ settings.invoice_bank_details }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- ── Footer / Terms ── -->
+    {% if settings.invoice_footer or settings.invoice_terms or settings.invoice_footer_note %}
+    <div style="padding-top:1rem;border-top:1px solid var(--border);">
+      {% if settings.invoice_footer %}
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.35rem;">{{ settings.invoice_footer }}</p>
+      {% endif %}
+      {% if settings.invoice_terms %}
+      <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.35rem;">
+        <strong>Terms:</strong> {{ settings.invoice_terms }}
+      </p>
+      {% endif %}
+      {% if settings.invoice_footer_note %}
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0;font-style:italic;">{{ settings.invoice_footer_note }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Quick actions ── -->
+    <div style="padding-top:1.25rem;margin-top:1.25rem;border-top:1px solid var(--border);display:flex;gap:0.75rem;flex-wrap:wrap;">
+      <button onclick="window.print()" class="btn btn-ghost btn-sm">
+        <i class="bi bi-printer"></i> Print / Save PDF
+      </button>
+      <a href="{{ url_for('parts_bp.sell') }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-plus-circle"></i> New Parts Sale
+      </a>
+      <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-cpu"></i> Parts Inventory
+      </a>
+      {% if txn.linked_sale %}
+      <a href="{{ url_for('sales_bp.sold_units_view') }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-link-45deg"></i> Linked Sale #{{ txn.linked_sale.id }}
+      </a>
+      {% endif %}
+    </div>
+
+  </div><!-- /card-body -->
+</div><!-- /card -->
+{% endblock %}

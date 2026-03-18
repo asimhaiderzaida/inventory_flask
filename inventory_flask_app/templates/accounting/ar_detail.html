@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}AR — {{ ar.customer.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Receivable — {{ ar.customer.name }}</h1>
+    <p class="page-subtitle">
+      {% if ar.invoice %}Invoice #{{ ar.invoice.invoice_number or ar.invoice_id }}{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('accounting_bp.receivables') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="row g-3 animate-fade-up">
+  <!-- Summary card -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header fw-semibold">Summary</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5">Customer</dt>
+          <dd class="col-7">
+            <a href="{{ url_for('customers_bp.customer_profile', customer_id=ar.customer_id) }}"
+               class="text-decoration-none">{{ ar.customer.name }}</a>
+          </dd>
+
+          <dt class="col-5">Invoice</dt>
+          <dd class="col-7">
+            {% if ar.invoice %}
+            <a href="{{ url_for('invoices_bp.invoice_view', invoice_id=ar.invoice_id) }}"
+               class="text-decoration-none">
+              #{{ ar.invoice.invoice_number or ar.invoice_id }}
+            </a>
+            {% else %}—{% endif %}
+          </dd>
+
+          <dt class="col-5">Due Date</dt>
+          <dd class="col-7 {% if ar.is_overdue %}text-danger fw-semibold{% endif %}">
+            {{ ar.due_date.strftime('%d %b %Y') if ar.due_date else '—' }}
+            {% if ar.is_overdue %}
+            <span class="badge bg-danger">{{ ar.days_overdue }}d overdue</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-5">Amount Due</dt>
+          <dd class="col-7 fw-semibold">{{ currency }} {{ '{:,.2f}'.format(ar.amount_due) }}</dd>
+
+          <dt class="col-5">Amount Paid</dt>
+          <dd class="col-7 text-success">{{ currency }} {{ '{:,.2f}'.format(ar.amount_paid) }}</dd>
+
+          <dt class="col-5">Balance</dt>
+          <dd class="col-7 fw-bold {% if ar.balance > 0 %}text-warning{% else %}text-success{% endif %}">
+            {{ currency }} {{ '{:,.2f}'.format(ar.balance) }}
+          </dd>
+
+          <dt class="col-5">Status</dt>
+          <dd class="col-7">
+            {% if ar.status == 'open' %}
+            <span class="status-pill" style="background:rgba(59,130,246,.15);color:#3b82f6;">Open</span>
+            {% elif ar.status == 'partial' %}
+            <span class="status-pill" style="background:rgba(245,158,11,.15);color:#d97706;">Partial</span>
+            {% elif ar.status == 'overdue' %}
+            <span class="status-pill status-disputed">Overdue</span>
+            {% elif ar.status == 'paid' %}
+            <span class="status-pill status-processed">Paid</span>
+            {% elif ar.status == 'written_off' %}
+            <span class="status-pill status-idle">Written Off</span>
+            {% else %}
+            <span class="status-pill">{{ ar.status }}</span>
+            {% endif %}
+          </dd>
+
+          {% if ar.notes %}
+          <dt class="col-5">Notes</dt>
+          <dd class="col-7 text-muted small">{{ ar.notes }}</dd>
+          {% endif %}
+        </dl>
+
+        {% if ar.status not in ('paid', 'written_off') and current_user.role == 'admin' %}
+        <hr>
+        <form method="post"
+              action="{{ url_for('accounting_bp.write_off_ar', ar_id=ar.id) }}"
+              onsubmit="return confirm('Write off this receivable? This cannot be undone.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+            <i class="bi bi-x-circle me-1"></i> Write Off
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Payments + record payment -->
+  <div class="col-md-7">
+    {% if ar.status not in ('paid', 'written_off') %}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Record Payment</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('accounting_bp.record_payment', ar_id=ar.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label small">Amount ({{ currency }}) *</label>
+              <input type="number" name="amount" class="form-control form-control-sm"
+                     step="0.01" min="0.01" max="{{ ar.balance }}"
+                     value="{{ '{:.2f}'.format(ar.balance) }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Date *</label>
+              <input type="date" name="payment_date" class="form-control form-control-sm"
+                     value="{{ today }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Method</label>
+              <select name="payment_method" class="form-select form-select-sm">
+                {% for val, label in payment_methods %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">Reference</label>
+              <input type="text" name="reference" class="form-control form-control-sm"
+                     placeholder="e.g. bank transfer ref">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">Notes</label>
+              <input type="text" name="notes" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-sm btn-success">
+                <i class="bi bi-check-lg me-1"></i> Record Payment
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Payment history -->
+    <div class="card">
+      <div class="card-header fw-semibold">Payment History</div>
+      {% if ar.payments %}
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Date</th>
+              <th>Method</th>
+              <th>Ref</th>
+              <th class="text-end pe-3">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pay in ar.payments %}
+            <tr>
+              <td class="ps-3 text-muted small">{{ pay.payment_date.strftime('%d %b %Y') }}</td>
+              <td class="small">{{ pay.payment_method | replace('_', ' ') | title }}</td>
+              <td class="small text-muted">{{ pay.reference or '—' }}</td>
+              <td class="text-end pe-3 fw-semibold text-success">
+                {{ currency }} {{ '{:,.2f}'.format(pay.amount) }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body">
+        <p class="text-muted small mb-0">No payments recorded yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

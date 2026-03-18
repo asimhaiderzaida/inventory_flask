@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Application Self-Test{% endblock %}
+{% block page_title %}Application Self-Test{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Application Self-Test</h1>
+    <div class="page-subtitle">Tenant: {{ results.meta.tenant_id }} · {{ results.meta.time }}</div>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:860px;">
+
+  <!-- Config -->
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Configuration</span>
+    </div>
+    <div class="card-body" style="padding:1rem 1.25rem;">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:0.4rem 1rem;font-size:0.88rem;">
+        <span style="color:var(--text-muted);">CSRF Enabled</span><span><strong>{{ results.config.csrf_enabled }}</strong></span>
+        <span style="color:var(--text-muted);">SECRET_KEY Present</span><span><strong>{{ results.config.secret_key_present }}</strong></span>
+        <span style="color:var(--text-muted);">Debug Mode</span><span><strong>{{ results.config.debug_mode }}</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core pages -->
+  <div class="table-card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Core Pages</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr><th>Method</th><th>URL</th><th>Status</th><th>OK</th><th>Time (ms)</th></tr>
+        </thead>
+        <tbody>
+          {% for r in results.routes %}
+          <tr {% if not r.ok %}style="background:rgba(239,68,68,0.06);"{% endif %}>
+            <td>{{ r.method }}</td>
+            <td><code style="font-size:0.8rem;">{{ r.url }}</code></td>
+            <td>{{ r.status }}</td>
+            <td>
+              {% if r.ok %}
+                <span style="color:var(--color-success);">✓</span>
+              {% else %}
+                <span style="color:var(--color-danger);">✗</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.82rem;color:var(--text-muted);">{{ r.ms }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Assets -->
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Assets</span>
+    </div>
+    <div class="card-body" style="padding:0.75rem 1.25rem;">
+      {% for a in results.assets %}
+        <div style="font-size:0.85rem;padding:0.25rem 0;display:flex;gap:0.75rem;align-items:center;">
+          {% if a.exists %}
+            <span style="color:var(--color-success);">✓</span>
+          {% else %}
+            <span style="color:var(--color-danger);">✗</span>
+          {% endif %}
+          <code style="font-size:0.8rem;">{{ a.path }}</code>
+          <span style="color:var(--text-muted);font-size:0.78rem;">{% if a.exists %}present{% else %}missing{% endif %}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Group checks -->
+  <div class="table-card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Group vs Detail Consistency</span>
+    </div>
+    {% if results.group_checks.samples and results.group_checks.samples|length > 0 %}
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr><th>Model</th><th>CPU</th><th>Grouped</th><th>Detail</th><th>Match</th><th>Time (ms)</th></tr>
+          </thead>
+          <tbody>
+            {% for s in results.group_checks.samples %}
+            {% set match = (s.group_count == s.detail_count) %}
+            <tr {% if not match %}style="background:rgba(245,158,11,0.06);"{% endif %}>
+              <td>{{ s.model }}</td>
+              <td style="font-size:0.82rem;color:var(--text-muted);">{{ s.cpu }}</td>
+              <td>{{ s.group_count }}</td>
+              <td>{{ s.detail_count }}</td>
+              <td>{{ '✓' if match else '✗' }}</td>
+              <td style="font-size:0.82rem;color:var(--text-muted);">{{ s.ms_detail }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding:1.25rem;font-size:0.85rem;color:var(--text-muted);">No group samples to verify.</div>
+    {% endif %}
+  </div>
+
+  {% if results.timing and results.timing|length > 0 %}
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Timing</span>
+    </div>
+    <div class="card-body" style="padding:0.75rem 1.25rem;">
+      {% for t in results.timing %}
+        <div style="font-size:0.85rem;padding:0.25rem 0;">{{ t.name }}: <strong>{{ t.ms }} ms</strong></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.problems and results.problems|length > 0 %}
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-md);padding:1rem 1.25rem;">
+      <div style="font-weight:600;margin-bottom:0.5rem;color:var(--color-warning);">Problems Found</div>
+      <ul style="margin:0;padding-left:1.25rem;font-size:0.88rem;">
+        {% for p in results.problems %}
+          <li>{{ p }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-md);padding:1rem 1.25rem;font-size:0.88rem;color:var(--color-success);">
+      <i class="bi bi-check-circle-fill" style="margin-right:0.5rem;"></i> No problems detected.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

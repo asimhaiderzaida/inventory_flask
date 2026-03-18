@@ -1,43 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Preview Upload{% endblock %}
+{% block page_title %}Preview Upload{% endblock %}
 
 {% block content %}
-<div class="card shadow p-4">
-    <h2 class="mb-4 text-primary">🔍 Preview Products to Import</h2>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Preview Products to Import</h1>
+    <div class="page-subtitle">Review before confirming</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('import_excel_bp.upload_excel') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Upload
+    </a>
+  </div>
+</div>
 
-    {% if data and columns|length > 0 %}
-    <p class="text-muted small mb-2">
-      The preview below includes all uploaded fields such as Serial, Asset, Item Name, and more.
-    </p>
-    <div style="overflow-x:auto;">
-        <table class="table table-bordered table-striped table-hover align-middle">
-            <thead class="table-primary">
-                <tr>
-                    {% for col in columns %}
-                    <th class="text-nowrap">{{ col|capitalize }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in data %}
-                <tr>
-                    {% for col in columns %}
-                    <td>{{ row.get(col, '') }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
+<div class="animate-fade-up">
+  {% if data and columns|length > 0 %}
+    <div class="table-card mb-4">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.82rem;color:var(--text-muted);">Preview includes all uploaded fields including Serial, Asset, Item Name, and more.</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              {% for col in columns %}
+                <th>{{ col|capitalize }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in data %}
+            <tr>
+              {% for col in columns %}
+                <td>{{ row.get(col, '') or '—' }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
         </table>
+      </div>
     </div>
-    {% else %}
-    <p>No data available for preview.</p>
-    {% endif %}
 
-    <div class="mt-4">
-        <form method="POST" action="/confirm_import">
-            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">✅ Confirm Import</button>
-            <a href="/upload_excel" class="btn btn-secondary btn-lg w-100 mt-2">⬅ Back to Upload</a>
-        </form>
+    <form method="POST" action="/confirm_import">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2-circle"></i> Confirm Import
+      </button>
+    </form>
+
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-file-earmark-x"></i>
+      <p>No data available for preview.</p>
     </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,581 @@
+{% extends "base.html" %}
+{% block title %}Locations{% endblock %}
+{% block page_title %}Locations{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Locations</h1>
+    <div class="page-subtitle">
+      {{ locations|length }} warehouse location{{ 's' if locations|length != 1 else '' }}
+    </div>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+      <i class="bi bi-plus-circle"></i> Add Location
+    </button>
+  </div>
+</div>
+
+<div class="animate-fade-up">
+
+  <!-- ── Universal Search ── -->
+  <div class="table-card mb-3" style="padding:1rem 1.25rem;">
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <div style="position:relative;flex:1;max-width:480px;">
+        <i class="bi bi-search" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;font-size:0.88rem;"></i>
+        <input type="text" id="locSearchInput" class="form-control"
+               placeholder="Search serial number, asset tag, or bin name…"
+               style="padding-left:2.25rem;"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn btn-ghost btn-sm" id="locSearchClear" style="display:none;" onclick="clearLocSearch()" title="Clear">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div id="locSearchResult" style="display:none;margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid var(--border);"></div>
+  </div>
+
+  {% if locations %}
+  <div class="table-card" id="locations-table-card">
+    <div style="overflow-x:auto;">
+      <table class="table" id="locations-table">
+        <thead>
+          <tr>
+            <th style="width:99%;">Location</th>
+            <th style="white-space:nowrap;text-align:center;">Units</th>
+            <th style="white-space:nowrap;text-align:center;">Bins (Units / Parts)</th>
+            <th style="white-space:nowrap;padding-right:1.25rem;"></th>
+          </tr>
+        </thead>
+        <tbody id="locations-tbody">
+          {% for loc in locations %}
+          {% set unit_cnt      = counts.get(loc.id, 0) %}
+          {% set unit_bin_cnt  = unit_bin_counts.get(loc.id, 0) %}
+          {% set parts_bin_cnt = parts_bin_counts.get(loc.id, 0) %}
+          {% set bin_cnt       = unit_bin_cnt + parts_bin_cnt %}
+          {% set sb       = status_breakdown.get(loc.id, {}) %}
+          {% set processed   = sb.get('processed', 0) %}
+          {% set under_proc  = sb.get('under_process', 0) %}
+          {% set unprocessed = sb.get('unprocessed', 0) %}
+          <tr class="location-row" id="row-{{ loc.id }}" data-loc-id="{{ loc.id }}" data-loc-name="{{ loc.name }}"
+              data-href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+              style="cursor:pointer;"
+              onclick="if(!event.target.closest('a,button,input,form')){window.location.href=this.dataset.href;}">
+
+            <!-- Name cell: view mode + edit mode overlap via display toggle -->
+            <td style="vertical-align:middle;min-width:220px;">
+
+              <!-- VIEW MODE -->
+              <div id="view-{{ loc.id }}" style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="flex:1;">
+                  <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                     style="font-weight:600;font-size:0.95rem;text-decoration:none;color:var(--text-primary);display:inline-flex;align-items:center;gap:0.4rem;">
+                    <i class="bi bi-geo-alt-fill" style="color:var(--primary);font-size:0.85rem;"></i>
+                    {{ loc.name }}
+                  </a>
+                  {% if unit_cnt > 0 %}
+                  <!-- Mini status bar -->
+                  <div style="display:flex;gap:1px;height:4px;width:min(200px,100%);border-radius:4px;overflow:hidden;margin-top:0.35rem;background:var(--border);">
+                    {% if processed %}
+                    <div style="flex:{{ processed }};background:var(--color-success);"></div>
+                    {% endif %}
+                    {% if under_proc %}
+                    <div style="flex:{{ under_proc }};background:var(--color-warning);"></div>
+                    {% endif %}
+                    {% if unprocessed %}
+                    <div style="flex:{{ unprocessed }};background:var(--text-muted);opacity:0.45;"></div>
+                    {% endif %}
+                  </div>
+                  <div style="display:flex;gap:0.75rem;margin-top:0.3rem;font-size:0.71rem;color:var(--text-muted);">
+                    {% if processed %}<span style="color:var(--color-success);">&#9632; {{ processed }} processed</span>{% endif %}
+                    {% if under_proc %}<span style="color:var(--color-warning);">&#9632; {{ under_proc }} in progress</span>{% endif %}
+                    {% if unprocessed %}<span>&#9632; {{ unprocessed }} unprocessed</span>{% endif %}
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- EDIT MODE (hidden by default) -->
+              <div id="edit-form-{{ loc.id }}"
+                   data-action="{{ url_for('stock_bp.rename_location', location_id=loc.id) }}"
+                   style="display:none;align-items:center;gap:0.5rem;">
+                <input type="text" name="name"
+                       id="edit-input-{{ loc.id }}"
+                       class="form-control form-control-sm"
+                       value="{{ loc.name }}"
+                       style="max-width:220px;font-family:monospace;text-transform:uppercase;"
+                       oninput="this.value=this.value.toUpperCase()"
+                       data-original="{{ loc.name }}">
+                <button type="button" class="btn btn-primary btn-sm"
+                        onclick="saveEdit({{ loc.id }})">
+                  <i class="bi bi-check-lg"></i> Save
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm"
+                        onclick="cancelEdit({{ loc.id }})">
+                  Cancel
+                </button>
+              </div>
+            </td>
+
+            <!-- Unit count -->
+            <td style="text-align:center;vertical-align:middle;">
+              {% if unit_cnt > 0 %}
+              <a href="{{ url_for('stock_bp.location_contents', location_id=loc.id) }}"
+                 style="display:inline-flex;align-items:center;justify-content:center;min-width:2rem;padding:0.2em 0.55em;background:rgba(var(--primary-rgb,99,102,241),0.10);color:var(--primary);border-radius:20px;font-size:0.8rem;font-weight:700;text-decoration:none;">
+                {{ unit_cnt }}
+              </a>
+              {% else %}
+              <span style="color:var(--text-muted);font-size:0.82rem;">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Bin count -->
+            <td style="text-align:center;vertical-align:middle;">
+              {% if bin_cnt > 0 %}
+              <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                 style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.2em 0.55em;background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);border-radius:20px;font-size:0.8rem;font-weight:600;text-decoration:none;white-space:nowrap;">
+                {% if unit_bin_cnt > 0 %}
+                <span title="{{ unit_bin_cnt }} unit bin{{ 's' if unit_bin_cnt != 1 else '' }}">
+                  <i class="bi bi-cpu" style="font-size:0.68rem;color:var(--primary);"></i>{{ unit_bin_cnt }}
+                </span>
+                {% endif %}
+                {% if unit_bin_cnt > 0 and parts_bin_cnt > 0 %}<span style="opacity:0.35;">|</span>{% endif %}
+                {% if parts_bin_cnt > 0 %}
+                <span title="{{ parts_bin_cnt }} parts bin{{ 's' if parts_bin_cnt != 1 else '' }}">
+                  <i class="bi bi-puzzle" style="font-size:0.68rem;color:#b45309;"></i>{{ parts_bin_cnt }}
+                </span>
+                {% endif %}
+              </a>
+              {% else %}
+              <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                 title="Add bins"
+                 style="display:inline-flex;align-items:center;justify-content:center;padding:0.2em 0.5em;border:1px dashed var(--border);border-radius:20px;font-size:0.75rem;color:var(--text-muted);text-decoration:none;">
+                <i class="bi bi-plus" style="font-size:0.7rem;"></i>
+              </a>
+              {% endif %}
+            </td>
+
+            <!-- Actions -->
+            <td style="white-space:nowrap;text-align:right;vertical-align:middle;padding-right:1.25rem;">
+              <div id="actions-{{ loc.id }}" style="display:flex;gap:0.25rem;justify-content:flex-end;">
+                <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                   class="btn btn-ghost btn-sm" title="Manage Bins">
+                  <i class="bi bi-grid-3x3-gap"></i>
+                </a>
+                <button class="btn btn-ghost btn-sm"
+                        onclick="startEdit({{ loc.id }})"
+                        title="Rename">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST"
+                      action="{{ url_for('stock_bp.delete_location', location_id=loc.id) }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Delete \'{{ loc.name }}\'?{% if unit_cnt > 0 %} Warning: {{ unit_cnt }} unit(s) are assigned here.{% endif %}');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-ghost btn-sm"
+                          style="color:{% if unit_cnt > 0 %}var(--text-muted){% else %}var(--color-danger){% endif %};"
+                          {% if unit_cnt > 0 %}title="Has {{ unit_cnt }} active unit(s)"{% else %}title="Delete"{% endif %}>
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="empty-state" id="empty-state">
+    <i class="bi bi-building"></i>
+    <p>No locations defined yet.<br>
+       <span style="font-size:0.85rem;color:var(--text-muted);">Locations represent physical warehouses or storage areas where units are kept.</span>
+    </p>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+      <i class="bi bi-plus-circle"></i> Create Your First Location
+    </button>
+  </div>
+  {% endif %}
+
+</div><!-- /animate-fade-up -->
+
+
+<!-- ── Add Location Modal ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="addLocationModal" tabindex="-1" aria-labelledby="addLocationLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="addLocationLabel">
+          <i class="bi bi-geo-alt-fill me-2" style="color:var(--primary);"></i>New Location
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <label class="form-label fw-semibold" style="font-size:0.84rem;">
+          Location Name <span style="color:var(--color-danger);">*</span>
+        </label>
+        <input type="text" id="new-loc-name" class="form-control"
+               placeholder="e.g. WAREHOUSE A, RACK 3"
+               style="font-family:monospace;text-transform:uppercase;font-size:0.95rem;"
+               oninput="this.value=this.value.toUpperCase()"
+               autocomplete="off">
+        <div id="new-loc-error" style="font-size:0.8rem;color:var(--color-danger);margin-top:0.4rem;display:none;"></div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">
+          Names are automatically uppercased and must be unique within your account.
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-loc-btn">
+          <i class="bi bi-check-lg me-1"></i>Add Location
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_scripts %}
+<script>
+// ── Universal Search ───────────────────────────────────────────────────────────
+(function () {
+  const input     = document.getElementById('locSearchInput');
+  const resultDiv = document.getElementById('locSearchResult');
+  const clearBtn  = document.getElementById('locSearchClear');
+  let searchTimeout = null;
+
+  if (!input) return;
+
+  input.addEventListener('input', function () {
+    clearTimeout(searchTimeout);
+    const q = this.value.trim();
+    clearBtn.style.display = q ? '' : 'none';
+    if (!q) { hideResult(); return; }
+    searchTimeout = setTimeout(function () { doSearch(q); }, 400);
+  });
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimeout);
+      const q = this.value.trim();
+      if (q) doSearch(q);
+    }
+    if (e.key === 'Escape') { clearLocSearch(); }
+  });
+
+  function hideResult() {
+    resultDiv.style.display = 'none';
+    resultDiv.innerHTML = '';
+  }
+
+  function doSearch(q) {
+    resultDiv.style.display = '';
+    resultDiv.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);"><span class="spinner-border spinner-border-sm me-2"></span>Searching…</div>';
+
+    fetch('/stock/api/lookup_unit?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.found) {
+          showUnitResult(data);
+        } else {
+          return fetch('/stock/api/lookup_bin?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (binData) {
+              if (binData.found) {
+                showBinResult(binData);
+              } else {
+                showNotFound(q);
+              }
+            });
+        }
+      })
+      .catch(function () {
+        resultDiv.innerHTML = '<div style="color:var(--color-danger);font-size:0.85rem;"><i class="bi bi-exclamation-triangle me-1"></i>Network error — please try again.</div>';
+      });
+  }
+
+  function showUnitResult(d) {
+    const statusLabel = (d.status || 'unknown').replace(/_/g, ' ')
+      .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    const binHtml = d.shelf_bin
+      ? '<span style="font-family:monospace;font-size:0.8rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.1em 0.45em;">' + esc(d.shelf_bin) + '</span>'
+      : '';
+    const locHtml = d.location_name && d.location_name !== '—'
+      ? '<span style="font-size:0.82rem;"><i class="bi bi-geo-alt-fill me-1" style="color:var(--primary);"></i>' + esc(d.location_name) + '</span>'
+      : '<span style="font-size:0.82rem;color:var(--text-muted);">No location assigned</span>';
+
+    resultDiv.innerHTML =
+      '<div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">' +
+        '<i class="bi bi-box-seam" style="font-size:1.35rem;color:var(--primary);flex-shrink:0;"></i>' +
+        '<div style="flex:1;min-width:180px;">' +
+          '<div style="font-weight:600;font-size:0.92rem;">' + esc(d.item_name || 'Unknown Product') + '</div>' +
+          '<div style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;margin-top:0.1rem;">SN: ' + esc(d.serial || '—') + (d.asset ? '  ·  AT: ' + esc(d.asset) : '') + '</div>' +
+        '</div>' +
+        '<span class="status-pill status-' + esc(d.status || 'unprocessed') + '">' + statusLabel + '</span>' +
+        '<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">' +
+          locHtml +
+          (binHtml ? ' &nbsp;·&nbsp; ' + binHtml : '') +
+        '</div>' +
+        '<a href="/instances/view/' + d.instance_id + '" class="btn btn-ghost btn-sm" target="_blank">' +
+          '<i class="bi bi-box-arrow-up-right"></i> View Unit' +
+        '</a>' +
+      '</div>';
+  }
+
+  function showBinResult(d) {
+    resultDiv.innerHTML =
+      '<div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">' +
+        '<i class="bi bi-grid-3x3-gap" style="font-size:1.35rem;color:var(--primary);flex-shrink:0;"></i>' +
+        '<div style="flex:1;min-width:180px;">' +
+          '<div style="font-weight:600;font-size:0.92rem;font-family:monospace;">' + esc(d.bin_name) + '</div>' +
+          '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">' +
+            '<i class="bi bi-geo-alt me-1"></i>' + esc(d.location_name) +
+            '  ·  ' + d.unit_count + ' active unit' + (d.unit_count !== 1 ? 's' : '') +
+          '</div>' +
+        '</div>' +
+        '<a href="' + esc(d.url) + '" class="btn btn-primary btn-sm">' +
+          '<i class="bi bi-grid-3x3-gap me-1"></i>View Bin' +
+        '</a>' +
+      '</div>';
+  }
+
+  function showNotFound(q) {
+    resultDiv.innerHTML =
+      '<div style="font-size:0.85rem;color:var(--text-muted);">' +
+        '<i class="bi bi-question-circle me-1"></i>No unit or bin found matching <strong>"' + esc(q) + '"</strong>.' +
+      '</div>';
+  }
+
+  window.clearLocSearch = function () {
+    input.value = '';
+    clearBtn.style.display = 'none';
+    hideResult();
+    input.focus();
+  };
+
+  function esc(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+}());
+
+// ── Inline edit ────────────────────────────────────────────────────────────────
+function startEdit(id) {
+  document.getElementById('view-' + id).style.display = 'none';
+  const editDiv = document.getElementById('edit-form-' + id);
+  editDiv.style.display = 'flex';
+  const input = document.getElementById('edit-input-' + id);
+  input.focus();
+  input.select();
+  // Allow Enter to save
+  input.onkeydown = function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); saveEdit(id); }
+    if (e.key === 'Escape') { cancelEdit(id); }
+  };
+}
+
+function cancelEdit(id) {
+  const editDiv = document.getElementById('edit-form-' + id);
+  const input   = document.getElementById('edit-input-' + id);
+  // Reset to original value in case user typed something
+  input.value = input.dataset.original;
+  editDiv.style.display = 'none';
+  document.getElementById('view-' + id).style.display = 'flex';
+}
+
+function saveEdit(id) {
+  const editDiv  = document.getElementById('edit-form-' + id);
+  const input    = document.getElementById('edit-input-' + id);
+  const saveBtn  = editDiv.querySelector('button.btn-primary');
+  const name     = input.value.trim().toUpperCase();
+  if (!name) { input.focus(); return; }
+
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  const action = editDiv.dataset.action;
+  const csrf   = document.querySelector('meta[name="csrf-token"]') ?
+    document.querySelector('meta[name="csrf-token"]').content :
+    (document.querySelector('input[name="csrf_token"]') ?
+      document.querySelector('input[name="csrf_token"]').value : '');
+
+  const body = new URLSearchParams({ name: name, csrf_token: csrf });
+  fetch(action, { method: 'POST', body: body })
+    .then(r => {
+      // rename_location redirects on success — any 2xx/3xx is fine
+      if (r.ok || r.redirected) {
+        // Update the displayed name in the view div
+        const viewDiv = document.getElementById('view-' + id);
+        const anchor  = viewDiv.querySelector('a');
+        if (anchor) {
+          anchor.innerHTML = '<i class="bi bi-geo-alt-fill" style="color:var(--primary);font-size:0.85rem;"></i> ' + name;
+        }
+        input.dataset.original = name;
+        editDiv.style.display = 'none';
+        viewDiv.style.display = 'flex';
+        showToast('Location renamed to "' + name + '".', 'success');
+      } else {
+        showToast('Could not rename — try again.', 'danger');
+      }
+    })
+    .catch(() => showToast('Network error.', 'danger'))
+    .finally(() => {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Save';
+    });
+}
+
+// ── Add Location (AJAX) ────────────────────────────────────────────────────────
+(function () {
+  const modal     = document.getElementById('addLocationModal');
+  const nameInput = document.getElementById('new-loc-name');
+  const saveBtn   = document.getElementById('save-loc-btn');
+  const errorDiv  = document.getElementById('new-loc-error');
+  const tbody     = document.getElementById('locations-tbody');
+  const emptyState= document.getElementById('empty-state');
+  const tableCard = document.getElementById('locations-table-card');
+
+  if (!modal) return;
+
+  // Clear on open
+  modal.addEventListener('show.bs.modal', function () {
+    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
+    if (errorDiv) errorDiv.style.display = 'none';
+    if (saveBtn)  { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Add Location'; }
+  });
+  // Focus input when modal is fully shown
+  modal.addEventListener('shown.bs.modal', function () {
+    if (nameInput) nameInput.focus();
+  });
+
+  // Enter key in input
+  if (nameInput) {
+    nameInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); doSave(); }
+    });
+  }
+  if (saveBtn) saveBtn.addEventListener('click', doSave);
+
+  function doSave() {
+    const name = (nameInput.value || '').trim().toUpperCase();
+    if (!name) {
+      showError('Please enter a location name.');
+      nameInput.focus();
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+    errorDiv.style.display = 'none';
+
+    fetch('/stock/locations/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name}),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        showError(data.error);
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Add Location';
+        return;
+      }
+      // Dismiss modal
+      bootstrap.Modal.getInstance(modal).hide();
+      // Inject new row
+      appendLocationRow(data.id, data.name);
+      showToast('Location "' + data.name + '" added.', 'success');
+      // Hide empty state / show table if needed
+      if (emptyState) emptyState.style.display = 'none';
+      if (tableCard) tableCard.style.display = '';
+    })
+    .catch(() => {
+      showError('Network error — please try again.');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Add Location';
+    });
+  }
+
+  function showError(msg) {
+    errorDiv.textContent = msg;
+    errorDiv.style.display = '';
+  }
+
+  function appendLocationRow(id, name) {
+    // Build a new <tr> matching the existing row structure
+    const csrfToken = document.querySelector('[name="csrf_token"]') ?
+      document.querySelector('[name="csrf_token"]').value : '';
+
+    const tr = document.createElement('tr');
+    tr.className = 'location-row';
+    tr.id = 'row-' + id;
+    tr.dataset.locId = id;
+    tr.dataset.locName = name;
+
+    tr.innerHTML = `
+      <td style="vertical-align:middle;min-width:220px;">
+        <!-- VIEW MODE -->
+        <div id="view-${id}" style="display:flex;align-items:center;gap:0.75rem;">
+          <div style="flex:1;">
+            <a href="/stock/location/${id}/bins"
+               style="font-weight:600;font-size:0.95rem;text-decoration:none;color:var(--text-primary);display:inline-flex;align-items:center;gap:0.4rem;">
+              <i class="bi bi-geo-alt-fill" style="color:var(--primary);font-size:0.85rem;"></i>
+              ${name}
+            </a>
+          </div>
+        </div>
+        <!-- EDIT MODE (hidden) -->
+        <div id="edit-form-${id}" data-action="/stock/locations/${id}/rename"
+             style="display:none;align-items:center;gap:0.5rem;">
+          <input type="text" name="name" id="edit-input-${id}" class="form-control form-control-sm"
+                 value="${name}" style="max-width:220px;font-family:monospace;text-transform:uppercase;"
+                 oninput="this.value=this.value.toUpperCase()" data-original="${name}">
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveEdit(${id})">
+            <i class="bi bi-check-lg"></i> Save
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="cancelEdit(${id})">Cancel</button>
+        </div>
+      </td>
+      <td style="text-align:center;vertical-align:middle;">
+        <span style="color:var(--text-muted);font-size:0.82rem;">—</span>
+      </td>
+      <td style="text-align:center;vertical-align:middle;">
+        <a href="/stock/location/${id}/bins" title="Add bins"
+           style="display:inline-flex;align-items:center;justify-content:center;padding:0.2em 0.5em;border:1px dashed var(--border);border-radius:20px;font-size:0.75rem;color:var(--text-muted);text-decoration:none;">
+          <i class="bi bi-plus" style="font-size:0.7rem;"></i>
+        </a>
+      </td>
+      <td style="white-space:nowrap;text-align:right;vertical-align:middle;padding-right:1.25rem;">
+        <div id="actions-${id}" style="display:flex;gap:0.25rem;justify-content:flex-end;">
+          <a href="/stock/location/${id}/bins" class="btn btn-ghost btn-sm" title="Manage Bins">
+            <i class="bi bi-grid-3x3-gap"></i>
+          </a>
+          <button class="btn btn-ghost btn-sm" onclick="startEdit(${id})" title="Rename">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <form method="POST" action="/stock/locations/${id}/delete" style="display:inline;"
+                onsubmit="return confirm('Delete \'${name}\'?');">
+            <input type="hidden" name="csrf_token" value="${csrfToken}">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--color-danger);" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </td>`;
+
+    if (tbody) {
+      tbody.appendChild(tr);
+      // Briefly highlight the new row
+      tr.style.background = 'rgba(99,102,241,0.06)';
+      setTimeout(() => { tr.style.background = ''; }, 1200);
+    }
+  }
+}());
+</script>
+{% endblock %}

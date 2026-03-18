@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Parts Sales History{% endblock %}
+{% block page_title %}Parts Sales{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Parts Sales</h1>
+    <div class="page-subtitle">
+      {{ transactions|length }} transaction{{ 's' if transactions|length != 1 }}
+      {% set pending_count = transactions | selectattr('payment_status', 'eq', 'pending') | list | length %}
+      {% if pending_count %}
+        &nbsp;·&nbsp;<span style="color:var(--color-warning);font-weight:600;">{{ pending_count }} pending payment{{ 's' if pending_count != 1 }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sales_list', search=search, status=status_filter, customer_id=customer_filter, date_from=date_from, date_to=date_to, export='csv') }}" class="btn btn-ghost">
+      <i class="bi bi-download"></i> Export CSV
+    </a>
+    <a href="{{ url_for('parts_bp.sell') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> New Parts Sale
+    </a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+    <input type="text" name="search" class="form-control" style="flex:1;min-width:160px;max-width:220px;"
+           placeholder="Invoice no…" value="{{ search }}">
+    <select name="status" class="form-select" style="max-width:160px;">
+      <option value="">All statuses</option>
+      <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+      <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+    </select>
+    <select name="customer_id" class="form-select" style="max-width:200px;">
+      <option value="">All customers</option>
+      {% for c in customers %}
+      <option value="{{ c.id }}" {% if customer_filter == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="date_from" class="form-control" style="max-width:150px;" value="{{ date_from }}">
+    <input type="date" name="date_to" class="form-control" style="max-width:150px;" value="{{ date_to }}">
+    <button type="submit" class="btn btn-ghost">Filter</button>
+    {% if search or status_filter or customer_filter or date_from or date_to %}
+    <a href="{{ url_for('parts_bp.sales_list') }}" class="btn btn-ghost" style="color:var(--color-danger);">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if transactions %}
+<div class="animate-fade-up table-card">
+  <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Invoice No</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th style="text-align:center;">Items</th>
+          <th style="text-align:right;">Total</th>
+          <th>Payment</th>
+          <th>Status</th>
+          <th style="width:1px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in transactions %}
+        <tr {% if txn.payment_status == 'pending' %}style="background:#fffbeb;"{% endif %}>
+          <td>
+            <a href="{{ url_for('parts_bp.sale_detail', txn_id=txn.id) }}"
+               style="font-family:monospace;font-weight:700;text-decoration:none;">
+              {{ txn.invoice_number }}
+            </a>
+          </td>
+          <td style="font-size:0.85rem;white-space:nowrap;">
+            {{ txn.sold_at.strftime('%d %b %Y %H:%M') if txn.sold_at else '—' }}
+          </td>
+          <td style="font-size:0.88rem;">
+            {% if txn.customer %}
+              <a href="{{ url_for('customers_bp.customer_profile', customer_id=txn.customer.id) }}" style="text-decoration:none;">
+                {{ txn.customer.name }}
+              </a>
+            {% else %}
+              {{ txn.customer_name or 'Walk-in' }}
+            {% endif %}
+          </td>
+          <td style="text-align:center;">{{ txn.line_items | length }}</td>
+          <td style="text-align:right;font-weight:700;">${{ '%.2f'|format(txn.total_amount) }}</td>
+          <td style="font-size:0.85rem;">{{ txn.payment_method.title() }}</td>
+          <td>
+            {% if txn.payment_status == 'paid' %}
+              <span class="status-pill status-processed">Paid</span>
+            {% else %}
+              <span class="status-pill status-idle">Pending</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('parts_bp.sale_detail', txn_id=txn.id) }}" class="btn btn-ghost btn-sm" title="View">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{{ url_for('parts_bp.sale_invoice_pdf', txn_id=txn.id) }}" class="btn btn-ghost btn-sm" title="PDF" target="_blank">
+                <i class="bi bi-file-pdf"></i>
+              </a>
+              {% if txn.payment_status == 'pending' %}
+              <form method="post" action="{{ url_for('parts_bp.sale_pay', txn_id=txn.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--color-success);" title="Mark Paid"
+                        onclick="return confirm('Mark {{ txn.invoice_number }} as paid?');">
+                  <i class="bi bi-check-circle"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer">
+    <span>{{ transactions|length }} transaction{{ 's' if transactions|length != 1 }}</span>
+    {% set total_paid = transactions | selectattr('payment_status', 'eq', 'paid') | sum(attribute='total_amount') %}
+    {% set total_pend = transactions | selectattr('payment_status', 'eq', 'pending') | sum(attribute='total_amount') %}
+    <span>Paid: <strong>${{ '%.2f'|format(total_paid) }}</strong></span>
+    {% if total_pend > 0 %}
+    <span style="color:var(--color-warning);">Outstanding: <strong>${{ '%.2f'|format(total_pend) }}</strong></span>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="animate-fade-up empty-state">
+  <i class="bi bi-bag-x"></i>
+  <p>No parts sales found{% if search or status_filter or customer_filter %} matching your filters{% endif %}.</p>
+  <a href="{{ url_for('parts_bp.sell') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-circle"></i> New Parts Sale
+  </a>
+</div>
+{% endif %}
+{% endblock %}

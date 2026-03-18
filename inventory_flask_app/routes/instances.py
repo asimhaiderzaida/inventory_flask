@@ -7,7 +7,6 @@ from inventory_flask_app.utils import get_now_for_tenant
 
 instances_bp = Blueprint('instances_bp', __name__)
 
-@csrf.exempt
 @instances_bp.route('/products/instances', methods=['POST'])
 @login_required
 def add_product_instance():
@@ -17,7 +16,7 @@ def add_product_instance():
 
     try:
         existing_instance = ProductInstance.query.filter_by(
-            serial=data['serial'].strip(),
+            serial=data['serial'].strip().upper(),
             tenant_id=current_user.tenant_id
         ).first()
         if existing_instance:
@@ -36,7 +35,7 @@ def add_product_instance():
 
         instance = ProductInstance(
             product_id=data['product_id'],
-            serial=data['serial'].strip(),
+            serial=data['serial'].strip().upper(),
             asset=(data.get('asset') or '').strip(),
             location_id=data['location_id'],
             tenant_id=current_user.tenant_id,

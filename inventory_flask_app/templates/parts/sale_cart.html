@@ -1,0 +1,715 @@
+{% extends "base.html" %}
+{% block title %}New Parts Sale{% endblock %}
+{% block page_title %}New Parts Sale{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Payment cards ── */
+  .payment-card {
+    border:2px solid var(--border); border-radius:12px; padding:1.25rem 1rem;
+    cursor:pointer; text-align:center; flex:1; min-width:100px;
+    transition:border-color 0.15s, background 0.15s;
+    user-select:none;
+  }
+  .payment-card:hover { border-color:#93C5FD; }
+  .payment-card.selected { border-color:var(--primary); background:#EFF6FF; }
+  .payment-card .pm-icon { font-size:1.75rem; display:block; margin-bottom:0.4rem; line-height:1; color:var(--text-secondary); }
+  .payment-card.selected .pm-icon { color:var(--primary); }
+  .payment-card .pm-label { font-size:0.75rem; font-weight:600; color:#374151; }
+
+  /* ── Price input ── */
+  .unit-price-input {
+    font-size:1rem; font-weight:600; border:2px solid var(--border);
+    border-radius:8px; padding:0.4rem 0.6rem; width:100px;
+    transition:border-color 0.15s; text-align:right;
+  }
+  .unit-price-input:focus { border-color:var(--primary); outline:none; box-shadow:none; }
+
+  /* ── Scan input ── */
+  .scan-input-large {
+    font-size:1.05rem; padding:0.7rem 1rem;
+    border:2px solid var(--border) !important;
+    transition:border-color 0.15s !important;
+  }
+  .scan-input-large:focus { border-color:var(--primary) !important; outline:none; box-shadow:none !important; }
+
+  /* ── Empty state ── */
+  .empty-units {
+    border:2px dashed var(--border); border-radius:12px; padding:2.5rem 1rem;
+    text-align:center; color:var(--text-muted);
+  }
+  .empty-units i { font-size:2rem; display:block; margin-bottom:0.5rem; }
+
+  /* ── Order summary ── */
+  .order-summary { position:sticky; top:80px; }
+  .order-total-amount { font-size:1.5rem; font-weight:800; color:var(--primary);
+                         font-variant-numeric:tabular-nums; }
+  .summary-row { display:flex; justify-content:space-between; align-items:center;
+                  font-size:0.875rem; padding:0.3rem 0; }
+  .summary-row.total-row { font-size:1rem; font-weight:700; padding-top:0.65rem;
+                             border-top:2px solid var(--border); margin-top:0.25rem; }
+
+  /* ── Section headers ── */
+  .s-num { display:inline-flex; align-items:center; justify-content:center;
+            width:22px; height:22px; border-radius:50%; background:var(--primary);
+            color:#fff; font-size:0.7rem; font-weight:800; margin-right:0.5rem; flex-shrink:0; }
+  .s-head { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em;
+             color:var(--text-muted); font-weight:700; display:flex; align-items:center;
+             margin-bottom:1rem; }
+
+  /* ── Customer pill ── */
+  .customer-pill { display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem;
+                    background:var(--surface-2); border:1px solid var(--border); border-radius:12px; }
+  .cust-avatar { width:40px; height:40px; border-radius:50%; background:var(--primary);
+                  color:#fff; font-size:0.85rem; font-weight:700;
+                  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  /* ── Summary part list ── */
+  .summary-unit-row { display:flex; justify-content:space-between; align-items:flex-start;
+                        font-size:0.8rem; padding:0.3rem 0; border-bottom:1px solid var(--border); gap:0.5rem; }
+  .summary-unit-row:last-child { border-bottom:none; }
+
+  /* ── Parts table ── */
+  .parts-table-wrap { overflow-x:auto; }
+
+  /* ── Customer search dropdown ── */
+  .customer-search-wrapper { position:relative; }
+  .customer-dropdown {
+    position:absolute; top:calc(100% + 4px); left:0; right:0;
+    background:#fff; border:1px solid #E5E7EB; border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:9999;
+    max-height:300px; overflow-y:auto;
+  }
+  .customer-result-item { padding:0.6rem 1rem; cursor:pointer; transition:background 0.1s; }
+  .customer-result-item:hover { background:var(--surface-2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+  var SALE_CURRENCY = {{ (settings.currency or 'AED') | tojson }};
+  var SALE_VAT_RATE = {{ (settings.vat_rate or '5') | float }};
+  var rowData = {};
+  var rowCounter = 0;
+</script>
+
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">New Parts Sale</h1>
+    <div class="page-subtitle">Select customer, add parts, and confirm the sale</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sales_list') }}" class="btn btn-ghost">
+      <i class="bi bi-clock-history"></i> Sales History
+    </a>
+  </div>
+</div>
+
+<form id="saleForm" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" id="payment_method_input" name="payment_method" value="cash">
+  <input type="hidden" id="vat_applied_input" name="vat_applied" value="false">
+
+  <div class="row g-4 animate-fade-up">
+
+    {# ━━━━━━━━━━━━━━━━━━━ LEFT COLUMN ━━━━━━━━━━━━━━━━━━━ #}
+    <div class="col-lg-8">
+
+      {# ── SECTION 1: Customer ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.5rem;">
+          <div class="s-head"><span class="s-num">1</span> Select Customer</div>
+
+          <div id="customerPillWrap" style="display:none;margin-bottom:1rem;">
+            <div class="customer-pill">
+              <div class="cust-avatar" id="customerAvatarInitials">?</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                     id="customerPillName">—</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);" id="customerPillSub">—</div>
+              </div>
+              <a href="#" style="font-size:0.78rem;color:var(--primary);text-decoration:none;white-space:nowrap;"
+                 onclick="clearCustomerSelection(); return false;">Change</a>
+            </div>
+          </div>
+
+          <div id="customerSelectWrap">
+            <div class="d-flex gap-2 align-items-start">
+              <div class="customer-search-wrapper" style="flex:1;position:relative;">
+                <input type="text" id="customerSearch" class="form-control"
+                       placeholder="Search by name or phone number…" autocomplete="off">
+                <div id="customerResults" class="customer-dropdown" style="display:none;"></div>
+                <input type="hidden" id="customerIdInput" name="customer_id">
+              </div>
+              <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-ghost" style="white-space:nowrap;">
+                <i class="bi bi-person-plus"></i> New
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ── SECTION 2: Add Parts ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.5rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div class="s-head" style="margin-bottom:0;">
+              <span class="s-num">2</span> Add Parts
+              <span id="partCountBadge" style="display:none;margin-left:0.5rem;background:var(--primary);
+                    color:#fff;padding:0.1rem 0.5rem;border-radius:999px;font-size:0.72rem;font-weight:700;">0</span>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="input-group">
+              <input type="text" id="scanPartInput"
+                     class="scan-input-large form-control"
+                     placeholder="Scan barcode, or type part name / part number…" autofocus
+                     autocomplete="off" autocorrect="off" spellcheck="false">
+              <div id="scanSpinner" style="display:none;position:absolute;right:60px;top:50%;transform:translateY(-50%);z-index:5;">
+                <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:1rem;height:1rem;"></div>
+              </div>
+              <button type="button" class="btn btn-primary"
+                      onclick="doPartScan()"
+                      style="border-radius:0 10px 10px 0;padding:0 1.25rem;">
+                <i class="bi bi-plus-lg"></i> Add
+              </button>
+            </div>
+          </div>
+
+          <div id="emptyPartsState" class="empty-units">
+            <i class="bi bi-box-seam"></i>
+            <p style="margin:0;font-size:0.88rem;">Scan or search a part above to add it to the sale</p>
+          </div>
+
+          <div class="parts-table-wrap">
+            <table class="table table-sm align-middle mb-0" id="partsTable" style="display:none;min-width:560px;">
+              <thead>
+                <tr>
+                  <th style="font-size:0.75rem;">Part Name</th>
+                  <th style="font-size:0.75rem;" class="d-none d-sm-table-cell">Part #</th>
+                  <th style="font-size:0.75rem;">Location</th>
+                  <th style="font-size:0.75rem;">Qty</th>
+                  <th style="font-size:0.75rem;text-align:right;">Unit Price</th>
+                  <th style="font-size:0.75rem;text-align:right;">Total</th>
+                  <th style="width:36px;"></th>
+                </tr>
+              </thead>
+              <tbody id="partsList"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {# ── SECTION 3: Payment Method ── #}
+      <div class="card">
+        <div class="card-body" style="padding:1.5rem;">
+          <div class="s-head"><span class="s-num">3</span> Payment Method</div>
+
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <div class="payment-card selected" data-method="cash" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-cash-stack"></i></span>
+              <span class="pm-label">Cash</span>
+            </div>
+            <div class="payment-card" data-method="card" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-credit-card"></i></span>
+              <span class="pm-label">Card</span>
+            </div>
+            <div class="payment-card" data-method="transfer" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-bank"></i></span>
+              <span class="pm-label">Transfer</span>
+            </div>
+            <div class="payment-card" data-method="credit" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-clock-history"></i></span>
+              <span class="pm-label">Credit</span>
+            </div>
+            <div class="payment-card" data-method="crypto" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-currency-bitcoin"></i></span>
+              <span class="pm-label">Crypto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>{# end col-lg-8 #}
+
+    {# ━━━━━━━━━━━━━━━━━━━ RIGHT COLUMN: Order Summary ━━━━━━━━━━━━━━━━━━━ #}
+    <div class="col-lg-4">
+      <div class="order-summary">
+        <div class="card">
+          <div class="card-body" style="padding:1.5rem;">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+              <span style="font-weight:700;font-size:0.9rem;">Order Summary</span>
+              <span id="unitCountLabel" style="font-size:0.75rem;color:var(--text-muted);">0 items</span>
+            </div>
+
+            <div id="summaryUnitList" style="min-height:60px;margin-bottom:1rem;max-height:220px;overflow-y:auto;"></div>
+
+            <hr style="margin:0.75rem 0;border-color:var(--border);">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+              <label for="vatToggle" style="font-size:0.82rem;font-weight:600;cursor:pointer;margin:0;">
+                VAT (<span id="vatRateLabel">{{ settings.vat_rate or '5' }}</span>%)
+              </label>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="vatToggle"
+                       style="width:36px;height:20px;">
+              </div>
+            </div>
+
+            <div class="summary-row">
+              <span style="color:var(--text-muted);">Subtotal</span>
+              <span id="breakdownSubtotal" style="font-variant-numeric:tabular-nums;">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+            <div id="vatLine" class="summary-row" style="display:none;">
+              <span style="color:var(--text-muted);">VAT (<span id="vatPct">{{ settings.vat_rate or '5' }}</span>%)</span>
+              <span id="breakdownVat" style="color:var(--text-muted);font-variant-numeric:tabular-nums;">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+            <div class="summary-row total-row">
+              <span>Total</span>
+              <span id="breakdownTotal" class="order-total-amount">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+
+            <div style="margin-top:1.25rem;">
+              <button type="submit" id="confirmSaleBtn" class="btn btn-primary w-100" disabled
+                      style="font-size:0.975rem;font-weight:700;padding:0.8rem 1rem;">
+                <i class="bi bi-check-circle me-1"></i>
+                <span id="confirmBtnLabel">Confirm Sale — {{ settings.currency or 'AED' }} 0.00</span>
+              </button>
+              <div class="text-center mt-2">
+                <a href="{{ url_for('parts_bp.parts_list') }}"
+                   style="font-size:0.78rem;color:var(--text-muted);text-decoration:none;">
+                  Cancel
+                </a>
+              </div>
+            </div>
+
+            <div id="saleLoadingSpinner" class="text-center mt-3" style="display:none;">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Processing…</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>{# end row #}
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* ── Escape HTML ── */
+function escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Payment card selector ── */
+function selectPaymentCard(card) {
+  document.querySelectorAll('.payment-card').forEach(function(c) { c.classList.remove('selected'); });
+  card.classList.add('selected');
+  document.getElementById('payment_method_input').value = card.dataset.method;
+}
+
+/* ── Customer search ── */
+var _addCustUrl = {{ url_for('customers_bp.add_customer') | tojson }};
+var _custCache  = {};
+var _custTimer  = null;
+
+function clearCustomerSelection() {
+  document.getElementById('customerIdInput').value = '';
+  document.getElementById('customerPillWrap').style.display = 'none';
+  document.getElementById('customerSelectWrap').style.display = '';
+  document.getElementById('customerSearch').value = '';
+  document.getElementById('customerResults').style.display = 'none';
+  setTimeout(function() { document.getElementById('customerSearch').focus(); }, 50);
+}
+
+function selectCustomer(c) {
+  _custCache[c.id] = c;
+  document.getElementById('customerIdInput').value = c.id;
+  document.getElementById('customerResults').style.display = 'none';
+  document.getElementById('customerSearch').value = '';
+  var name     = c.name || '';
+  var initials = name.trim().split(/\s+/).map(function(w) { return w[0]; }).join('').toUpperCase().slice(0,2);
+  var sub      = [c.phone, c.email].filter(Boolean).join(' · ') || 'No contact info';
+  document.getElementById('customerAvatarInitials').textContent = initials || '?';
+  document.getElementById('customerPillName').textContent = name;
+  document.getElementById('customerPillSub').textContent = sub;
+  document.getElementById('customerPillWrap').style.display = '';
+  document.getElementById('customerSelectWrap').style.display = 'none';
+}
+
+function _renderCustomerResults(results) {
+  var dropdown = document.getElementById('customerResults');
+  var addBtn = '<div class="customer-result-item" style="border-top:1px solid #E5E7EB;"'
+    + ' onclick="window.location.href=' + escH(JSON.stringify(_addCustUrl)) + '">'
+    + '<i class="bi bi-person-plus me-2" style="color:var(--primary);"></i>'
+    + '<span style="color:var(--primary);font-weight:600;">Add New Customer</span>'
+    + '</div>';
+  results.forEach(function(c) { _custCache[c.id] = c; });
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div style="padding:0.75rem 1rem;color:var(--text-muted);font-size:0.85rem;">No customers found</div>' + addBtn;
+  } else {
+    dropdown.innerHTML = results.map(function(c) {
+      var sub = [c.phone, c.company].filter(Boolean).join(' · ');
+      return '<div class="customer-result-item" onclick="selectCustomer(_custCache[' + c.id + '])">'
+        + '<div style="font-weight:600;font-size:0.88rem;">' + escH(c.name) + '</div>'
+        + (sub ? '<div style="font-size:0.76rem;color:var(--text-muted);">' + escH(sub) + '</div>' : '')
+        + '</div>';
+    }).join('') + addBtn;
+  }
+  dropdown.style.display = 'block';
+}
+
+function initCustomerSearch() {
+  var inp = document.getElementById('customerSearch');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(_custTimer);
+    if (q.length < 2) { document.getElementById('customerResults').style.display = 'none'; return; }
+    _custTimer = setTimeout(function() {
+      fetch('/customers/api/search?q=' + encodeURIComponent(q))
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(_renderCustomerResults)
+        .catch(function(err) {
+          console.error('Customer search error:', err);
+          document.getElementById('customerResults').style.display = 'none';
+        });
+    }, 300);
+  });
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('customerResults').style.display = 'none';
+  });
+  document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.customer-search-wrapper');
+    if (wrap && !wrap.contains(e.target)) document.getElementById('customerResults').style.display = 'none';
+  });
+}
+
+/* ── Scan ── */
+var _scanTimer = null;
+
+function doPartScan() {
+  var q = document.getElementById('scanPartInput').value.trim();
+  if (!q) { showToast('Enter a part name, number, or barcode.', 'warning'); return; }
+  clearTimeout(_scanTimer);
+  _performLookup(q);
+}
+
+function _performLookup(q) {
+  document.getElementById('scanSpinner').style.display = '';
+  document.getElementById('scanPartInput').disabled = true;
+
+  fetch('{{ url_for("parts_bp.api_part_lookup") }}?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('scanSpinner').style.display = 'none';
+      document.getElementById('scanPartInput').disabled = false;
+      document.getElementById('scanPartInput').value = '';
+      document.getElementById('scanPartInput').focus();
+
+      if (!data.found) {
+        showToast('Part not found: \u201c' + q + '\u201d', 'danger');
+        return;
+      }
+      var part = data.part;
+      _addOrIncrementPart(part);
+    })
+    .catch(function() {
+      document.getElementById('scanSpinner').style.display = 'none';
+      document.getElementById('scanPartInput').disabled = false;
+      document.getElementById('scanPartInput').focus();
+      showToast('Lookup failed. Please try again.', 'danger');
+    });
+}
+
+function _addOrIncrementPart(part) {
+  /* If this part is already in the table, increment qty in first matching row */
+  var rows = document.querySelectorAll('#partsList tr[data-part-id]');
+  for (var i = 0; i < rows.length; i++) {
+    if (parseInt(rows[i].dataset.partId) === part.id) {
+      var qtyInput = rows[i].querySelector('.qty-input');
+      var max = parseInt(qtyInput.max) || 9999;
+      var cur = parseInt(qtyInput.value) || 0;
+      if (cur < max) {
+        qtyInput.value = cur + 1;
+        var rowIdx = parseInt(rows[i].dataset.rowIdx);
+        _flashRow(rows[i]);
+        updateRowTotal(rowIdx);
+        updateCartTotals();
+      } else {
+        showToast('Maximum stock reached for this part.', 'warning');
+      }
+      return;
+    }
+  }
+  /* New part — add a row */
+  addPartRow(part);
+}
+
+function _flashRow(tr) {
+  tr.style.background = '#EFF6FF';
+  setTimeout(function() { tr.style.background = ''; }, 700);
+}
+
+/* ── Build and insert a table row ── */
+function addPartRow(part) {
+  var stocks = part.stocks || [];
+
+  /* Aggregate by location */
+  var locMap = {};
+  stocks.forEach(function(s) {
+    if (!locMap[s.location_id]) {
+      locMap[s.location_id] = { id: s.location_id, name: s.location_name, qty: 0 };
+    }
+    locMap[s.location_id].qty += s.quantity;
+  });
+  var locs = Object.values(locMap).filter(function(l) { return l.qty > 0; });
+
+  if (locs.length === 0) {
+    showToast(part.name + ': no stock available at any location.', 'warning');
+    return;
+  }
+
+  var rowIdx = rowCounter++;
+  rowData[rowIdx] = { stocks: stocks };
+
+  /* Location dropdown HTML */
+  var locOpts = '<option value="">— Select location —</option>';
+  locs.forEach(function(l) {
+    locOpts += '<option value="' + l.id + '" data-max="' + l.qty + '">'
+             + escH(l.name) + ' (' + l.qty + ' avail)</option>';
+  });
+
+  var price   = '';
+  var autoLoc = locs.length === 1 ? locs[0] : null;
+  var autoMax = autoLoc ? autoLoc.qty : 9999;
+
+  var tr = document.createElement('tr');
+  tr.id = 'prow-' + rowIdx;
+  tr.dataset.rowIdx = rowIdx;
+  tr.dataset.partId = part.id;
+
+  tr.innerHTML =
+    '<td style="font-size:0.85rem;font-weight:600;max-width:160px;">'
+  +   '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escH(part.name) + '">'
+  +     escH(part.name)
+  +   '</div>'
+  +   '<input type="hidden" name="part_id[]" value="' + part.id + '">'
+  +   '<input type="hidden" name="bin_id[]" class="bin-id-input" value="">'
+  + '</td>'
+  + '<td style="font-size:0.78rem;color:var(--text-muted);" class="d-none d-sm-table-cell">'
+  +   escH(part.part_number)
+  + '</td>'
+  + '<td>'
+  +   '<select name="location_id[]" class="form-select form-select-sm loc-select"'
+  +          ' onchange="onLocChange(this,' + rowIdx + ')"'
+  +          ' style="min-width:130px;">'
+  +     locOpts
+  +   '</select>'
+  + '</td>'
+  + '<td>'
+  +   '<input type="number" name="quantity[]" id="qty-' + rowIdx + '"'
+  +          ' class="form-control form-control-sm qty-input" min="1" max="' + autoMax + '" value="1"'
+  +          ' oninput="updateRowTotal(' + rowIdx + ')" style="width:70px;">'
+  + '</td>'
+  + '<td>'
+  +   '<div style="display:flex;align-items:center;gap:0.3rem;justify-content:flex-end;">'
+  +     '<span style="font-size:0.75rem;color:var(--text-muted);">' + SALE_CURRENCY + '</span>'
+  +     '<input type="number" name="unit_price[]" id="price-' + rowIdx + '"'
+  +            ' class="form-control form-control-sm price-input unit-price-input" step="0.01" min="0"'
+  +            ' value="' + price + '" oninput="updateRowTotal(' + rowIdx + ')">'
+  +   '</div>'
+  + '</td>'
+  + '<td style="text-align:right;font-size:0.85rem;font-weight:600;white-space:nowrap;"'
+  +    ' id="rowtotal-' + rowIdx + '">' + SALE_CURRENCY + ' 0.00</td>'
+  + '<td>'
+  +   '<button type="button" class="btn btn-ghost btn-sm"'
+  +           ' onclick="removePartRow(' + rowIdx + ')"'
+  +           ' style="color:var(--color-danger);padding:0.25rem 0.4rem;">'
+  +     '<i class="bi bi-x-lg"></i>'
+  +   '</button>'
+  + '</td>';
+
+  document.getElementById('partsList').appendChild(tr);
+
+  /* Auto-select single location */
+  if (autoLoc) {
+    var sel = tr.querySelector('.loc-select');
+    sel.value = autoLoc.id;
+    /* Set bin if applicable */
+    var firstBin = stocks.find(function(s) {
+      return s.location_id === autoLoc.id && s.bin_id !== null && s.quantity > 0;
+    });
+    var binInput = tr.querySelector('.bin-id-input');
+    if (binInput && firstBin) binInput.value = firstBin.bin_id;
+  }
+
+  updateRowTotal(rowIdx);
+  updateCartTotals();
+}
+
+/* ── Location change → update qty max + bin ── */
+function onLocChange(select, rowIdx) {
+  var locId = parseInt(select.value);
+  var data  = rowData[rowIdx];
+  var opt   = select.options[select.selectedIndex];
+  var max   = opt ? (parseInt(opt.dataset.max) || 9999) : 9999;
+
+  var qtyInput = document.getElementById('qty-' + rowIdx);
+  if (qtyInput) {
+    qtyInput.max = max;
+    if (parseInt(qtyInput.value) > max) qtyInput.value = max;
+  }
+
+  /* Update bin hidden input */
+  if (data) {
+    var firstBin = data.stocks.find(function(s) {
+      return s.location_id === locId && s.bin_id !== null && s.quantity > 0;
+    });
+    var binInput = document.querySelector('#prow-' + rowIdx + ' .bin-id-input');
+    if (binInput) binInput.value = firstBin ? firstBin.bin_id : '';
+  }
+
+  updateRowTotal(rowIdx);
+  updateCartTotals();
+}
+
+/* ── Per-row total ── */
+function updateRowTotal(rowIdx) {
+  var qty   = parseFloat((document.getElementById('qty-' + rowIdx)   || {}).value) || 0;
+  var price = parseFloat((document.getElementById('price-' + rowIdx) || {}).value) || 0;
+  var cell  = document.getElementById('rowtotal-' + rowIdx);
+  if (cell) cell.textContent = SALE_CURRENCY + ' ' + (qty * price).toFixed(2);
+  updateCartTotals();
+}
+
+/* ── Remove row ── */
+function removePartRow(rowIdx) {
+  var tr = document.getElementById('prow-' + rowIdx);
+  if (tr) tr.remove();
+  delete rowData[rowIdx];
+  updateCartTotals();
+}
+
+/* ── Grand totals + sidebar ── */
+function updateCartTotals() {
+  var subtotal = 0;
+  var count    = 0;
+  var lines    = [];
+
+  document.querySelectorAll('#partsList tr[data-row-idx]').forEach(function(tr) {
+    var rowIdx = parseInt(tr.dataset.rowIdx);
+    var qty    = parseFloat((document.getElementById('qty-' + rowIdx)   || {}).value) || 0;
+    var price  = parseFloat((document.getElementById('price-' + rowIdx) || {}).value) || 0;
+    var rt     = qty * price;
+    if (qty > 0) {
+      subtotal += rt;
+      count++;
+      var nameEl = tr.querySelector('div[title]');
+      var name   = nameEl ? nameEl.getAttribute('title') : '—';
+      lines.push({ name: name, qty: qty, total: rt });
+    }
+  });
+
+  var vatToggle  = document.getElementById('vatToggle');
+  var vatApplied = vatToggle ? vatToggle.checked : false;
+  document.getElementById('vat_applied_input').value = vatApplied ? 'true' : 'false';
+
+  var vatAmt = vatApplied ? subtotal * SALE_VAT_RATE / 100 : 0;
+  var total  = subtotal + vatAmt;
+
+  document.getElementById('breakdownSubtotal').textContent = SALE_CURRENCY + ' ' + subtotal.toFixed(2);
+  document.getElementById('breakdownVat').textContent      = SALE_CURRENCY + ' ' + vatAmt.toFixed(2);
+  document.getElementById('breakdownTotal').textContent    = SALE_CURRENCY + ' ' + total.toFixed(2);
+  document.getElementById('vatLine').style.display         = vatApplied ? '' : 'none';
+  document.getElementById('unitCountLabel').textContent    = count + ' item' + (count !== 1 ? 's' : '');
+  document.getElementById('confirmBtnLabel').textContent   = 'Confirm Sale \u2014 ' + SALE_CURRENCY + ' ' + total.toFixed(2);
+
+  /* Part count badge */
+  var rowCount = document.querySelectorAll('#partsList tr[data-row-idx]').length;
+  var badge = document.getElementById('partCountBadge');
+  if (badge) {
+    badge.textContent = rowCount;
+    badge.style.display = rowCount > 0 ? '' : 'none';
+  }
+
+  /* Summary list */
+  var list = document.getElementById('summaryUnitList');
+  if (lines.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:0.75rem 0;">No parts added yet</div>';
+  } else {
+    list.innerHTML = lines.map(function(l) {
+      return '<div class="summary-unit-row">'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<span style="font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+        +     escH(l.name) + ' \u00d7' + l.qty
+        +   '</span>'
+        + '</div>'
+        + '<span style="font-weight:600;color:var(--primary);white-space:nowrap;">'
+        +   SALE_CURRENCY + ' ' + l.total.toFixed(2)
+        + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  /* Show/hide table vs empty state */
+  var hasRows = rowCount > 0;
+  document.getElementById('partsTable').style.display    = hasRows ? '' : 'none';
+  document.getElementById('emptyPartsState').style.display = hasRows ? 'none' : '';
+
+  /* Enable/disable confirm button */
+  document.getElementById('confirmSaleBtn').disabled = count === 0;
+}
+
+/* ── DOMContentLoaded ── */
+document.addEventListener('DOMContentLoaded', function() {
+  /* VAT toggle */
+  var vatToggle = document.getElementById('vatToggle');
+  if (vatToggle) vatToggle.addEventListener('change', updateCartTotals);
+
+  /* Scan input — Enter key */
+  var scanInput = document.getElementById('scanPartInput');
+  if (scanInput) {
+    scanInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_scanTimer); doPartScan(); }
+    });
+    scanInput.addEventListener('input', function() {
+      clearTimeout(_scanTimer);
+      var val = this.value.trim();
+      if (val.length >= 4) {
+        _scanTimer = setTimeout(function() {
+          _performLookup(val);
+        }, 600);
+      }
+    });
+  }
+
+  initCustomerSearch();
+
+  /* Initial totals */
+  updateCartTotals();
+
+  /* Form submit — show spinner */
+  var form = document.getElementById('saleForm');
+  if (form) {
+    form.addEventListener('submit', function() {
+      var cid = document.getElementById('customerIdInput').value;
+      if (!cid) { showToast('Please select a customer.', 'warning'); return false; }
+      var hasItem = document.querySelectorAll('#partsList tr[data-row-idx]').length > 0;
+      if (!hasItem) { showToast('Add at least one part.', 'warning'); return false; }
+      document.getElementById('saleLoadingSpinner').style.display = 'block';
+      setButtonLoading(document.getElementById('confirmSaleBtn'), true);
+    });
+  }
+});
+</script>
+{% endblock %}

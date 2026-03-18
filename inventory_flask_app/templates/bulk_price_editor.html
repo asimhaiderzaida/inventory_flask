@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+{% block title %}Bulk Price Editor{% endblock %}
+{% block page_title %}Bulk Price Editor{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Flash-green animation for price cells ── */
+  @keyframes flash-green {
+    0%   { background: #dcfce7; }
+    70%  { background: #dcfce7; }
+    100% { background: transparent; }
+  }
+  .price-flash {
+    animation: flash-green 1.2s ease forwards;
+    border-radius: 4px;
+    padding: 1px 4px;
+    display: inline-block;
+  }
+
+  /* ── Row selected state ── */
+  .unit-row.row-selected {
+    background: var(--primary-light) !important;
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    transition: background var(--transition-base), outline var(--transition-base);
+  }
+  .unit-row {
+    transition: background var(--transition-base);
+  }
+
+  /* ── Sticky selection toolbar ── */
+  .sticky-toolbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    background: var(--sidebar-bg);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    transform: translateY(100%);
+    transition: transform var(--transition-slow);
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+  }
+  .sticky-toolbar.toolbar-visible {
+    transform: translateY(0);
+  }
+  .toolbar-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(59,130,246,0.2);
+    border: 1px solid rgba(59,130,246,0.3);
+    color: #93c5fd;
+    border-radius: 20px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .toolbar-count-badge i { font-size: 0.8rem; }
+  .sticky-toolbar .btn { min-height: 40px; }
+  .toolbar-set-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 0 1.1rem;
+    border-radius: var(--btn-radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    cursor: pointer;
+    transition: background var(--transition-base);
+  }
+  .toolbar-set-btn:hover { background: var(--primary-dark); }
+  .toolbar-clear-btn {
+    background: rgba(239,68,68,0.12);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.25);
+    padding: 0 1.1rem;
+    border-radius: var(--btn-radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    cursor: pointer;
+    transition: background var(--transition-base);
+  }
+  .toolbar-clear-btn:hover { background: rgba(239,68,68,0.2); }
+  .toolbar-deselect-btn {
+    background: rgba(255,255,255,0.06);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 0 0.9rem;
+    border-radius: var(--btn-radius);
+    font-size: 0.84rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    cursor: pointer;
+    transition: background var(--transition-base);
+    margin-left: auto;
+  }
+  .toolbar-deselect-btn:hover { background: rgba(255,255,255,0.1); color: #f1f5f9; }
+
+  /* bottom padding so sticky toolbar doesn't cover table footer */
+  body { padding-bottom: 80px; }
+</style>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Bulk Price Editor</h1>
+    <div class="page-subtitle" id="selectedCount">{{ instances|length }} unit{{ 's' if instances|length != 1 else '' }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="animate-fade-up" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.85rem 1rem;margin-bottom:1rem;">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Status</label>
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="all"           {% if status_filter=='all' %}selected{% endif %}>All (unsold)</option>
+        <option value="processed"     {% if status_filter=='processed' %}selected{% endif %}>Processed</option>
+        <option value="unprocessed"   {% if status_filter=='unprocessed' %}selected{% endif %}>Unprocessed</option>
+        <option value="under_process" {% if status_filter=='under_process' %}selected{% endif %}>Under Process</option>
+        <option value="idle"          {% if status_filter=='idle' %}selected{% endif %}>Idle</option>
+        <option value="disputed"      {% if status_filter=='disputed' %}selected{% endif %}>Disputed</option>
+      </select>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Model</label>
+      <input type="text" name="model" value="{{ model_filter }}"
+             class="form-control form-control-sm" placeholder="Filter model…">
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Location</label>
+      <select name="location" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Locations</option>
+        {% for loc in locations %}
+        <option value="{{ loc.name }}" {% if location_filter==loc.name %}selected{% endif %}>{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Price Set?</label>
+      <select name="priced" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value=""    {% if priced_filter=='' %}selected{% endif %}>Any</option>
+        <option value="yes" {% if priced_filter=='yes' %}selected{% endif %}>Has Price</option>
+        <option value="no"  {% if priced_filter=='no' %}selected{% endif %}>No Price</option>
+      </select>
+    </div>
+    <div class="col-auto d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Apply</button>
+      {% if status_filter != 'processed' or model_filter or location_filter or priced_filter %}
+      <a href="{{ url_for('stock_bp.bulk_price_editor') }}" class="btn btn-ghost btn-sm">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Table -->
+<div class="table-card animate-fade-up">
+  <div class="table-toolbar">
+    <span class="table-title">
+      <strong>{{ instances|length }}</strong> unit{{ 's' if instances|length != 1 else '' }}
+    </span>
+    <div class="d-flex align-items-center gap-2">
+      <span id="toolbarSelectedText" style="font-size:0.82rem;color:var(--text-muted);display:none;">
+        <span id="toolbarN">0</span> selected
+      </span>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" style="min-width:720px;">
+      <thead>
+        <tr>
+          <th style="width:36px;">
+            <input type="checkbox" id="selectAll" class="form-check-input" title="Select all">
+          </th>
+          <th>Serial / Asset</th>
+          <th>Item</th>
+          <th>Specs</th>
+          <th>Status</th>
+          <th>Location</th>
+          <th style="text-align:right;">Asking Price (AED)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in instances %}
+        <tr id="row-{{ i.id }}" class="unit-row{% if i.asking_price %} has-price{% endif %}">
+          <td>
+            <input type="checkbox" class="form-check-input unit-cb"
+                   value="{{ i.id }}"
+                   data-serial="{{ i.serial }}"
+                   data-model="{{ (i.product.model if i.product else None) | nonan }}">
+          </td>
+          <td>
+            <div style="font-family:monospace;font-size:0.82rem;font-weight:600;">{{ i.serial }}</div>
+            {% if i.asset %}
+            <div style="font-family:monospace;font-size:0.76rem;color:var(--text-muted);">{{ i.asset }}</div>
+            {% endif %}
+          </td>
+          <td style="font-size:0.84rem;font-weight:500;">
+            {{ (i.product.item_name if i.product else None) | nonan }}
+            {% if i.product and i.product.model %}
+            <div style="font-size:0.76rem;color:var(--text-muted);">{{ i.product.model | nonan }}</div>
+            {% endif %}
+          </td>
+          <td style="font-size:0.76rem;color:var(--text-secondary);">
+            {% set specs = [i.product.cpu, i.product.ram, i.product.disk1size, i.product.display] | select | list %}
+            {{ specs | join(' · ') if specs else '—' }}
+            {% if i.product and i.product.grade %}
+            <div>Grade: {{ i.product.grade | nonan }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>
+          </td>
+          <td style="font-size:0.82rem;">
+            {% if i.location %}{{ i.location.name }}{% if i.shelf_bin %} / {{ i.shelf_bin }}{% endif %}{% else %}—{% endif %}
+          </td>
+          <td style="text-align:right;">
+            <span class="price-cell" id="price-{{ i.id }}"
+                  style="font-family:monospace;font-weight:{% if i.asking_price %}700{% else %}400{% endif %};color:{% if i.asking_price %}var(--color-success){% else %}var(--text-muted){% endif %};">
+              {% if i.asking_price %}{{ "%.2f"|format(i.asking_price) }}{% else %}—{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-tag"></i>
+              <p>No units found for this filter.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Sticky selection toolbar ── -->
+<div class="sticky-toolbar" id="stickyToolbar">
+  <span class="toolbar-count-badge">
+    <i class="bi bi-check2-square"></i>
+    <span id="toolbarCount">0</span> selected
+  </span>
+  <button class="toolbar-set-btn" onclick="openPriceModal()">
+    <i class="bi bi-tag"></i> Set Price
+  </button>
+  <button class="toolbar-clear-btn" onclick="openClearModal()">
+    <i class="bi bi-x-circle"></i> Clear Price
+  </button>
+  <button class="toolbar-deselect-btn" onclick="deselectAll()">
+    <i class="bi bi-x-lg"></i> Deselect All
+  </button>
+</div>
+
+<!-- ── Set Price Modal ── -->
+<div class="modal fade" id="priceModal" tabindex="-1" aria-labelledby="priceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="priceModalLabel">
+          <i class="bi bi-tag me-2" style="color:var(--primary);"></i>Set Asking Price
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <p id="priceModalDesc" style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:1.1rem;"></p>
+        <label class="form-label fw-semibold" style="font-size:0.84rem;">Price (AED)</label>
+        <div class="input-group input-group-lg">
+          <span class="input-group-text" style="background:var(--surface-2);font-weight:600;font-size:0.9rem;">AED</span>
+          <input type="number" id="priceInput" class="form-control"
+                 min="0" step="0.01" placeholder="0.00"
+                 style="font-family:monospace;font-size:1.25rem;font-weight:700;letter-spacing:0.02em;">
+        </div>
+        <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.5rem;">
+          <i class="bi bi-keyboard me-1"></i>Press <kbd style="background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:0.05rem 0.35rem;font-size:0.7rem;">Enter</kbd> to apply
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmPriceBtn" onclick="savePrice()">
+          <i class="bi bi-check-lg me-1"></i>Apply to Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Clear Price Confirm Modal ── -->
+<div class="modal fade" id="clearModal" tabindex="-1" aria-labelledby="clearModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="clearModalLabel">
+          <i class="bi bi-x-circle me-2" style="color:var(--color-danger);"></i>Clear Prices
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-md);padding:0.85rem 1rem;margin-bottom:0.85rem;">
+          <i class="bi bi-exclamation-triangle-fill" style="color:var(--color-danger);"></i>
+          <span style="font-size:0.84rem;color:#991b1b;margin-left:0.4rem;">This will remove asking prices from selected units.</span>
+        </div>
+        <p id="clearModalDesc" style="font-size:0.84rem;color:var(--text-secondary);margin:0;"></p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmClearBtn" onclick="clearPrice()">
+          <i class="bi bi-x-lg me-1"></i>Clear Prices
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  'use strict';
+
+  const CSRF = '{{ csrf_token() }}';
+  const selectedIds = new Set();
+  const toolbar     = document.getElementById('stickyToolbar');
+
+  /* ── Update toolbar visibility and counts ── */
+  function updateToolbar() {
+    const n = selectedIds.size;
+    document.getElementById('toolbarCount').textContent   = n;
+    document.getElementById('toolbarN').textContent       = n;
+    document.getElementById('toolbarSelectedText').style.display = n ? 'inline' : 'none';
+
+    const label = n
+      ? n + ' unit' + (n !== 1 ? 's' : '') + ' selected'
+      : '{{ instances|length }} unit{{ "s" if instances|length != 1 else "" }}';
+    document.getElementById('selectedCount').textContent = label;
+
+    toolbar.classList.toggle('toolbar-visible', n > 0);
+  }
+
+  /* ── Select all checkbox ── */
+  document.getElementById('selectAll').addEventListener('change', function () {
+    document.querySelectorAll('.unit-cb').forEach(function (cb) {
+      cb.checked = this.checked;
+      const row = cb.closest('tr');
+      if (this.checked) {
+        selectedIds.add(+cb.value);
+        row.classList.add('row-selected');
+      } else {
+        selectedIds.delete(+cb.value);
+        row.classList.remove('row-selected');
+      }
+    }.bind(this));
+    updateToolbar();
+  });
+
+  /* ── Per-row checkboxes ── */
+  document.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('unit-cb')) return;
+    const id  = +e.target.value;
+    const row = e.target.closest('tr');
+    if (e.target.checked) {
+      selectedIds.add(id);
+      row.classList.add('row-selected');
+    } else {
+      selectedIds.delete(id);
+      row.classList.remove('row-selected');
+    }
+    const allCbs = document.querySelectorAll('.unit-cb');
+    document.getElementById('selectAll').checked =
+      allCbs.length > 0 && Array.from(allCbs).every(function (c) { return c.checked; });
+    updateToolbar();
+  });
+
+  /* ── Deselect all ── */
+  function deselectAll() {
+    document.querySelectorAll('.unit-cb').forEach(function (cb) {
+      cb.checked = false;
+      cb.closest('tr').classList.remove('row-selected');
+    });
+    selectedIds.clear();
+    document.getElementById('selectAll').checked = false;
+    updateToolbar();
+  }
+  window.deselectAll = deselectAll;
+
+  /* ── Open price modal ── */
+  function openPriceModal() {
+    const n = selectedIds.size;
+    if (!n) return;
+    document.getElementById('priceModalDesc').textContent =
+      'Set the asking price for ' + n + ' selected unit' + (n !== 1 ? 's' : '') + '.';
+    document.getElementById('priceInput').value = '';
+    const m = new bootstrap.Modal(document.getElementById('priceModal'));
+    m.show();
+    document.getElementById('priceModal').addEventListener('shown.bs.modal', function () {
+      document.getElementById('priceInput').focus();
+    }, { once: true });
+  }
+  window.openPriceModal = openPriceModal;
+
+  /* ── Open clear modal ── */
+  function openClearModal() {
+    const n = selectedIds.size;
+    if (!n) return;
+    document.getElementById('clearModalDesc').textContent =
+      'Remove asking price from ' + n + ' selected unit' + (n !== 1 ? 's' : '') + '?';
+    new bootstrap.Modal(document.getElementById('clearModal')).show();
+  }
+  window.openClearModal = openClearModal;
+
+  /* ── Save price ── */
+  function savePrice() {
+    const price = parseFloat(document.getElementById('priceInput').value);
+    if (isNaN(price) || price < 0) { showToast('Enter a valid price.', 'warning'); return; }
+    const btn = document.getElementById('confirmPriceBtn');
+    setButtonLoading(btn, true);
+
+    fetch('/stock/bulk_price/save', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: price }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setButtonLoading(btn, false);
+      bootstrap.Modal.getInstance(document.getElementById('priceModal')).hide();
+      if (data.success) {
+        showToast(
+          'Price set to AED ' + data.price.toFixed(2) +
+          ' for ' + data.count + ' unit' + (data.count !== 1 ? 's' : '') + '.',
+          'success'
+        );
+        selectedIds.forEach(function (id) {
+          const cell = document.getElementById('price-' + id);
+          if (cell) {
+            cell.textContent    = data.price.toFixed(2);
+            cell.style.fontWeight = '700';
+            cell.style.color      = 'var(--color-success)';
+            /* Flash animation */
+            cell.classList.remove('price-flash');
+            void cell.offsetWidth; /* reflow to restart */
+            cell.classList.add('price-flash');
+          }
+        });
+      } else {
+        showToast(data.message || 'Failed to update prices.', 'danger');
+      }
+    })
+    .catch(function () { setButtonLoading(btn, false); showToast('Network error.', 'danger'); });
+  }
+  window.savePrice = savePrice;
+
+  /* ── Clear price ── */
+  function clearPrice() {
+    const btn = document.getElementById('confirmClearBtn');
+    setButtonLoading(btn, true);
+
+    fetch('/stock/bulk_price/save', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: null, clear: true }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setButtonLoading(btn, false);
+      bootstrap.Modal.getInstance(document.getElementById('clearModal')).hide();
+      if (data.success) {
+        showToast('Price cleared for ' + data.count + ' unit' + (data.count !== 1 ? 's' : '') + '.', 'success');
+        selectedIds.forEach(function (id) {
+          const cell = document.getElementById('price-' + id);
+          if (cell) {
+            cell.textContent    = '—';
+            cell.style.fontWeight = '400';
+            cell.style.color      = 'var(--text-muted)';
+          }
+        });
+      } else {
+        showToast(data.message || 'Failed to clear prices.', 'danger');
+      }
+    })
+    .catch(function () { setButtonLoading(btn, false); showToast('Network error.', 'danger'); });
+  }
+  window.clearPrice = clearPrice;
+
+  /* ── Enter key in price input submits ── */
+  document.getElementById('priceInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); savePrice(); }
+  });
+
+}());
+</script>
+{% endblock %}

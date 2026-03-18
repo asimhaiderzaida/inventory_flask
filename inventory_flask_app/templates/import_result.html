@@ -1,56 +1,76 @@
 {% extends "base.html" %}
 {% block title %}Import Result{% endblock %}
+{% block page_title %}Import Result{% endblock %}
 
 {% block content %}
-<div class="container my-5">
-  <div class="card shadow rounded-4 p-4 bg-white">
-    <h2 class="mb-4 fw-bold text-success" style="font-size: 1.45rem;">✅ Import Result Summary</h2>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Import Result Summary</h1>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('import_excel_bp.upload_excel') }}" class="btn btn-ghost">
+      <i class="bi bi-upload"></i> Upload More
+    </a>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
 
-    <ul class="list-group mb-4">
-        <li class="list-group-item">🟢 Products Saved: <strong>{{ saved }}</strong></li>
-        <li class="list-group-item">🔴 Products Skipped: <strong>{{ skipped }}</strong></li>
-    </ul>
+<div class="animate-fade-up" style="max-width:640px;">
 
-    {% if skip_file %}
-    <div class="alert alert-warning">
-        Some products were skipped. 
-        <a href="{{ skip_file }}" class="alert-link" download>📥 Download Skipped Products</a>
+  <!-- Summary stats -->
+  <div style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+    <div class="card flex-fill" style="border-color:var(--color-success);">
+      <div class="card-body" style="padding:1.25rem;text-align:center;">
+        <div style="font-size:1.75rem;font-weight:700;color:var(--color-success);">{{ saved }}</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);">Products Saved</div>
+      </div>
     </div>
-    {% endif %}
-
-    {% if skipped_rows %}
-    <h4 class="mt-4">🔎 Skipped Products Preview:</h4>
-    <div class="text-muted small mb-2">
-      The table below shows fields from skipped products including Serial Number and Asset Tag.
+    <div class="card flex-fill" style="border-color:var(--color-danger);">
+      <div class="card-body" style="padding:1.25rem;text-align:center;">
+        <div style="font-size:1.75rem;font-weight:700;color:var(--color-danger);">{{ skipped }}</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);">Products Skipped</div>
+      </div>
     </div>
+  </div>
+
+  {% if skip_file %}
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-md);padding:0.875rem 1.25rem;margin-bottom:1.5rem;font-size:0.88rem;">
+      Some products were skipped.
+      <a href="{{ skip_file }}" download style="color:var(--primary);margin-left:0.5rem;">
+        <i class="bi bi-download"></i> Download Skipped Products
+      </a>
+    </div>
+  {% endif %}
+
+</div>
+
+{% if skipped_rows %}
+<div class="animate-fade-up">
+  <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;color:var(--text-muted);">Skipped Products Preview</div>
+  <div class="table-card">
     <div style="overflow-x:auto;">
-    <div class="table-responsive">
-        <table class="table table-sm table-bordered table-striped table-hover align-middle bg-white rounded-3 overflow-hidden mt-3">
-            <thead class="table-warning">
-                <tr>
-                    {% for col in skipped_rows[0].keys() %}
-                    <th>{{ col|capitalize }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in skipped_rows %}
-                <tr>
-                    {% for value in row.values() %}
-                    <td>{{ value }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    </div>
-    {% endif %}
-
-    <div class="mt-4">
-        <a href="/main_dashboard" class="btn btn-outline-primary rounded-pill btn-lg w-100 mt-2">🏠 Back to Dashboard</a>
-        <a href="/upload_excel" class="btn btn-outline-secondary rounded-pill btn-lg w-100 mt-2">⬆️ Upload More Products</a>
+      <table class="table">
+        <thead>
+          <tr>
+            {% for col in skipped_rows[0].keys() %}
+              <th>{{ col|capitalize }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in skipped_rows %}
+          <tr>
+            {% for value in row.values() %}
+              <td>{{ value or '—' }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}

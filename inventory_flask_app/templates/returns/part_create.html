@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Submit Part Return{% endblock %}
+{% block page_title %}Submit Part Return{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Submit Part Return</h1>
+    <div class="page-subtitle">
+      <span style="font-family:monospace;">{{ part.part_number }}</span> &middot; {{ part.name }}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()"
+       onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.part_lookup') }}'"
+       class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:520px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" value="{{ part.id }}">
+        {% if sale_item %}<input type="hidden" name="sale_item_id" value="{{ sale_item.id }}">{% endif %}
+
+        {# ── Return Details ─────────────────────────────────────────── #}
+        <div class="mb-3">
+          <label class="form-label">
+            Quantity to Return
+            {% if sale_item %}
+              <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">
+                (sold {{ sale_item.quantity }})
+              </span>
+            {% endif %}
+          </label>
+          <input type="number" class="form-control" name="quantity"
+                 min="1"
+                 value="{{ sale_item.quantity if sale_item else 1 }}"
+                 required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Reason for Return <span style="color:var(--color-danger);">*</span></label>
+          <input type="text" class="form-control" name="reason" required autofocus>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Condition <span style="color:var(--color-danger);">*</span></label>
+          <select class="form-select" name="condition" required>
+            <option value="">Select…</option>
+            <option value="Good">Good</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Defective">Defective</option>
+            <option value="Broken">Broken</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Action <span style="color:var(--color-danger);">*</span></label>
+          <select class="form-select" name="action" required>
+            <option value="">Select…</option>
+            <option value="Restock">Restock</option>
+            <option value="Return to Vendor">Return to Vendor</option>
+            <option value="Scrap">Scrap</option>
+            <option value="Refund">Refund</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Restore Stock To</label>
+          <select class="form-select" name="location_id">
+            <option value="">
+              {% if sale_item and sale_item.location %}
+                Auto ({{ sale_item.location.name }})
+              {% else %}
+                Auto-detect from sale
+              {% endif %}
+            </option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}"
+              {% if sale_item and sale_item.location_id == loc.id %}selected{% endif %}>
+              {{ loc.name }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text" style="font-size:0.78rem;color:var(--text-muted);">
+            Leave on "Auto" to restore to the original sale location.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Action Taken / Resolution Note</label>
+          <input type="text" class="form-control" name="action_taken"
+                 placeholder="e.g. Returned to vendor, restocked in bin A3…">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Additional Notes</label>
+          <textarea class="form-control" name="notes" rows="2" placeholder="Optional…"></textarea>
+        </div>
+
+        {# ── Refund Section ─────────────────────────────────────────── #}
+        <hr style="margin:1.25rem 0;border-color:var(--border);">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;">Refund / Credit</div>
+
+        <div class="mb-3">
+          <label class="form-label">Refund Method</label>
+          <select class="form-select" name="refund_method" id="refundMethod">
+            <option value="none">No Refund</option>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="credit_note">Issue Credit Note</option>
+          </select>
+        </div>
+
+        <div class="mb-3" id="refundAmountRow" style="display:none;">
+          <label class="form-label">
+            Refund Amount
+            {% if sale_item %}
+              <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">
+                (unit price: ${{ "%.2f"|format(sale_item.unit_price) }})
+              </span>
+            {% endif %}
+          </label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control" name="refund_amount"
+                   step="0.01" min="0"
+                   {% if sale_item %}placeholder="{{ "%.2f"|format(sale_item.unit_price) }}"{% else %}placeholder="0.00"{% endif %}>
+          </div>
+          <div id="creditNoteNote" style="display:none;margin-top:0.35rem;font-size:0.78rem;color:var(--text-muted);">
+            <i class="bi bi-info-circle"></i> A credit note number will be auto-generated.
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <a href="javascript:history.back()"
+             onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.view_returns') }}'"
+             class="btn btn-ghost flex-fill">Cancel</a>
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check2-circle"></i> Submit Return
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const refundMethod = document.getElementById('refundMethod');
+const refundAmountRow = document.getElementById('refundAmountRow');
+const creditNoteNote = document.getElementById('creditNoteNote');
+
+function toggleRefund() {
+  const val = refundMethod.value;
+  refundAmountRow.style.display = (val === 'none') ? 'none' : '';
+  creditNoteNote.style.display = (val === 'credit_note') ? '' : 'none';
+}
+
+refundMethod.addEventListener('change', toggleRefund);
+toggleRefund();
+</script>
+{% endblock %}

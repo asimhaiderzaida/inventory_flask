@@ -1,57 +1,65 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Export Inventory</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        label { font-weight: bold; display: block; margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <nav style="background-color: #007BFF; padding: 10px; color: white;">
-        <a href="/main_dashboard" style="color: white; text-decoration: none;">← Back to Dashboard</a>
-    </nav>
+{% extends "base.html" %}
+{% block title %}Export Inventory{% endblock %}
+{% block page_title %}Export Inventory{% endblock %}
 
-    <div class="container mt-4">
-        <div class="card p-4 shadow rounded-4">
-            <h2 class="mb-4">📤 Export Inventory</h2>
-            <form method="POST" action="/inventory/export">
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <label>Model:</label>
-                        <input type="text" name="model" class="form-control form-control-lg">
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label>Processor:</label>
-                        <input type="text" name="processor" class="form-control form-control-lg">
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label>GPU 1:</label>
-                        <input type="text" name="gpu1" class="form-control form-control-lg">
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label>Start Date:</label>
-                        <input type="date" name="start_date" class="form-control form-control-lg">
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label>End Date:</label>
-                        <input type="date" name="end_date" class="form-control form-control-lg">
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label>Serial Numbers (scan, paste, or type):</label>
-                        <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003..." class="form-control form-control-lg"></textarea>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label>Asset Tags (scan, paste, or type):</label>
-                        <textarea name="asset_tags" rows="4" placeholder="AT001, AT002, AT003..." class="form-control form-control-lg"></textarea>
-                    </div>
-                </div>
-                <div class="d-flex flex-column flex-md-row gap-3 mt-4">
-                    <button type="submit" name="action" value="preview" class="btn btn-primary btn-lg flex-fill">🔍 Preview</button>
-                    <button type="submit" name="action" value="download" class="btn btn-success btn-lg flex-fill">📥 Download Excel</button>
-                </div>
-            </form>
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Export Inventory</h1>
+    <div class="page-subtitle">Download filtered inventory records to Excel</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:640px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST" action="/inventory/export">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Model</label>
+            <input type="text" name="model" class="form-control" placeholder="e.g. Latitude 7490">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Processor</label>
+            <input type="text" name="processor" class="form-control" placeholder="e.g. i5-8350U">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">GPU 1</label>
+            <input type="text" name="gpu1" class="form-control" placeholder="GPU model">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Start Date</label>
+            <input type="date" name="start_date" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">End Date</label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Serial Numbers</label>
+            <textarea name="serial_numbers" rows="4" placeholder="SN001, SN002, SN003…" class="form-control"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Asset Tags</label>
+            <textarea name="asset_tags" rows="4" placeholder="AT001, AT002, AT003…" class="form-control"></textarea>
+          </div>
         </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" name="action" value="preview" class="btn btn-ghost flex-fill">
+            <i class="bi bi-search"></i> Preview
+          </button>
+          <button type="submit" name="action" value="download" class="btn btn-primary flex-fill">
+            <i class="bi bi-download"></i> Download Excel
+          </button>
+        </div>
+      </form>
     </div>
-</body>
-</html>
+  </div>
+</div>
+{% endblock %}

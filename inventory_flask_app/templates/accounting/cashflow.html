@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Cash Flow</h1>
+    <p class="page-subtitle">Last 12 months — month by month</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('accounting_bp.cashflow') }}?export=csv" class="btn btn-outline-secondary">
+      <i class="bi bi-download me-1"></i> Export CSV
+    </a>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="card mb-4 animate-fade-up">
+  <div class="card-body" style="position:relative;height:320px;">
+    <canvas id="cashflowChart"></canvas>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th class="text-end">Income</th>
+          <th class="text-end">Expenses</th>
+          <th class="text-end">Net</th>
+          <th class="text-end">Running Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr {% if row.net < 0 %}style="background:rgba(239,68,68,0.04);"{% endif %}>
+          <td class="fw-semibold">{{ row.label }}</td>
+          <td class="text-end text-success">{{ currency }} {{ '{:,.2f}'.format(row.income) }}</td>
+          <td class="text-end text-danger">{{ currency }} {{ '{:,.2f}'.format(row.expenses) }}</td>
+          <td class="text-end fw-semibold {% if row.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if row.net >= 0 %}+{% endif %}{{ currency }} {{ '{:,.2f}'.format(row.net) }}
+          </td>
+          <td class="text-end {% if row.running >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ currency }} {{ '{:,.2f}'.format(row.running) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% set total_in  = rows|sum(attribute='income') %}
+        {% set total_exp = rows|sum(attribute='expenses') %}
+        {% set total_net = rows|sum(attribute='net') %}
+        <tr class="table-light fw-bold">
+          <td>12-Month Total</td>
+          <td class="text-end text-success">{{ currency }} {{ '{:,.2f}'.format(total_in) }}</td>
+          <td class="text-end text-danger">{{ currency }} {{ '{:,.2f}'.format(total_exp) }}</td>
+          <td class="text-end {% if total_net >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if total_net >= 0 %}+{% endif %}{{ currency }} {{ '{:,.2f}'.format(total_net) }}
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const labels   = {{ chart_labels  | tojson }};
+  const income   = {{ chart_income  | tojson }};
+  const expenses = {{ chart_expense | tojson }};
+  const net      = {{ chart_net     | tojson }};
+  const cur      = {{ currency | tojson }};
+
+  const ctx = document.getElementById('cashflowChart').getContext('2d');
+  new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Income',
+          data: income,
+          backgroundColor: 'rgba(16,185,129,0.65)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          type: 'bar',
+          label: 'Expenses',
+          data: expenses,
+          backgroundColor: 'rgba(239,68,68,0.65)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Net',
+          data: net,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.1)',
+          pointRadius: 5,
+          pointBackgroundColor: net.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+          tension: 0.3,
+          order: 1,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${cur} ${Number(ctx.parsed.y).toLocaleString('en-US', {minimumFractionDigits:2})}`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { callback: v => cur + ' ' + Number(v).toLocaleString() },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

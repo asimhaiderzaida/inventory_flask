@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Parts Sales Report{% endblock %}
+{% block page_title %}Parts Sales Report{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Parts Sales</h1>
+    <div class="page-subtitle">
+      {{ total_txns }} transaction{{ 's' if total_txns != 1 }},
+      total ${{ '%.2f'|format(total_revenue) }}
+      {% if start_date or end_date %} — {{ start_date or '…' }} → {{ end_date or 'today' }}{% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.parts_sales_export', start_date=start_date, end_date=end_date) }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+    </a>
+    <a href="{{ url_for('reports_bp.reports_index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Reports
+    </a>
+  </div>
+</div>
+
+<!-- Date filter -->
+<div class="animate-fade-up" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <form method="get" class="d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label">From</label>
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="form-control" style="width:160px;">
+    </div>
+    <div>
+      <label class="form-label">To</label>
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="form-control" style="width:160px;">
+    </div>
+    <button type="submit" class="btn btn-primary">Apply</button>
+    {% if start_date or end_date %}
+    <a href="{{ url_for('reports_bp.parts_sales_report') }}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th style="text-align:center;">Items</th>
+          <th style="text-align:right;">Total</th>
+          <th>Payment</th>
+          <th>Status</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td style="white-space:nowrap;color:var(--text-muted);font-size:0.82rem;">
+            {{ row.date.strftime('%Y-%m-%d') }}
+          </td>
+          <td>
+            <a href="{{ url_for('parts_bp.sale_detail', txn_id=row.id) }}"
+               style="font-family:monospace;font-size:0.82rem;color:var(--primary);">
+              {{ row.invoice }}
+            </a>
+          </td>
+          <td style="font-size:0.84rem;">{{ row.customer }}</td>
+          <td style="text-align:center;font-weight:600;">{{ row.items }}</td>
+          <td style="text-align:right;font-weight:700;">${{ '%.2f'|format(row.total) }}</td>
+          <td>
+            <span class="status-pill" style="background:var(--surface-2);color:var(--text-secondary);font-size:0.72rem;">
+              {{ row.payment | title }}
+            </span>
+          </td>
+          <td>
+            {% if row.status == 'paid' %}
+            <span class="status-pill status-processed" style="font-size:0.72rem;">Paid</span>
+            {% elif row.status == 'pending' %}
+            <span class="status-pill status-idle" style="font-size:0.72rem;">Pending</span>
+            {% else %}
+            <span class="status-pill" style="background:var(--surface-2);color:var(--text-muted);font-size:0.72rem;">{{ row.status | title }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.82rem;color:var(--text-muted);">{{ row.seller }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-bag-x"></i>
+              <p>No parts sales in this period</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if rows %}
+  <div class="table-footer">
+    <span>{{ total_txns }} transaction{{ 's' if total_txns != 1 }} · Total revenue: <strong>${{ '%.2f'|format(total_revenue) }}</strong></span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

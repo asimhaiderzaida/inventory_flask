@@ -1,247 +1,405 @@
 {% extends "base.html" %}
-{% block content %}
-<style>
-.fixed-vendor-header {
-  position: fixed;
-  top: 0;
-  left: 240px;
-  right: 0;
-  background: #fff;
-  z-index: 1051;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  border-bottom: 1px solid #eee;
-  padding: 24px 0 12px 0;
-}
-.fixed-vendor-header .row {
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-  align-items: flex-start;
-}
-.vendor-actions {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-}
-.vendor-actions .btn {
-  min-width: 220px;
-}
-.vendor-main-content {
-  margin-top: 200px;
-  padding: 0 16px;
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-}
+{% block title %}{{ vendor.name }} — Vendor Profile{% endblock %}
+{% block page_title %}Vendor Profile{% endblock %}
 
-@media (max-width: 767px) {
-  .fixed-vendor-header {
-    left: 0 !important;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-  .fixed-vendor-header .row {
-    flex-direction: column;
-    max-width: 100%;
-  }
-  .vendor-actions {
-    flex-direction: column !important;
-    width: 100%;
-    gap: 8px;
-  }
-  .vendor-actions .btn {
-    min-width: 0;
-    width: 100%;
-  }
-  .vendor-main-content {
-    margin-top: 300px; /* more space for stacked header/buttons */
-    padding-left: 0;
-    padding-right: 0;
-  }
-}
-</style>
-<div class="fixed-vendor-header">
-  <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-start flex-wrap w-100 px-4">
-      <div class="d-flex flex-column">
-        <h2 class="mb-2">Vendor Profile</h2>
-        <div class="card shadow-sm mb-0" style="max-width:400px;">
-          <div class="card-body py-2 px-3">
-            <h5 class="mb-2">{{ vendor.name }}</h5>
-            <div class="mb-1"><strong>Phone:</strong> {{ vendor.phone or '' }}</div>
-            <div class="mb-1"><strong>Email:</strong> {{ vendor.email or '' }}</div>
-            <div class="mb-1"><strong>Company:</strong> {{ vendor.company or '' }}</div>
-            <div><strong>Address:</strong> {{ vendor.address or '' }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="d-flex flex-column align-items-end ms-auto vendor-actions">
-        <a href="{{ url_for('vendors_bp.export_vendor_po', vendor_id=vendor.id) }}" class="btn btn-outline-success btn-lg">Export PO History (Excel)</a>
-        <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-secondary btn-lg">Back to Vendor Center</a>
-      </div>
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ vendor.name }}</h1>
+    <div class="page-subtitle" style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;align-items:center;margin-top:0.25rem;">
+      {% if vendor.contact %}
+      <span><i class="bi bi-person me-1" style="color:var(--text-muted);"></i>{{ vendor.contact }}</span>
+      {% endif %}
+      {% if vendor.phone %}
+      <a href="tel:{{ vendor.phone }}" style="color:inherit;text-decoration:none;">
+        <i class="bi bi-telephone me-1" style="color:var(--text-muted);"></i>{{ vendor.phone }}
+      </a>
+      {% endif %}
+      {% if vendor.email %}
+      <a href="mailto:{{ vendor.email }}" style="color:inherit;text-decoration:none;">
+        <i class="bi bi-envelope me-1" style="color:var(--text-muted);"></i>{{ vendor.email }}
+      </a>
+      {% endif %}
+      {% if vendor.website %}
+      <a href="{{ vendor.website }}" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;">
+        <i class="bi bi-globe me-1"></i>{{ vendor.website|replace('https://','') }}
+      </a>
+      {% endif %}
+      {% if vendor.city or vendor.country %}
+      <span><i class="bi bi-geo-alt me-1" style="color:var(--text-muted);"></i>{{ [vendor.city, vendor.country]|select|join(', ') }}</span>
+      {% endif %}
+      {% if vendor.payment_terms %}
+      <span class="status-pill" style="background:var(--surface-3);color:var(--text-secondary);font-size:0.72rem;">
+        {{ vendor.payment_terms }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('vendors_bp.export_vendor_po', vendor_id=vendor.id) }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-excel"></i> Export PO History
+    </a>
+    <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-ghost">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('vendors_bp.vendor_center') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<!-- Stats Card -->
+<div class="animate-fade-up" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.25rem;">Purchase Orders</div>
+    <div style="font-size:1.6rem;font-weight:700;color:var(--text-primary);">{{ stats.total_pos }}</div>
+    {% if stats.last_po %}
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">Last: {{ stats.last_po.strftime('%b %d, %Y') }}</div>
+    {% endif %}
+  </div>
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.25rem;">Units Received</div>
+    <div style="font-size:1.6rem;font-weight:700;color:var(--text-primary);">{{ stats.total_units }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.25rem;">Parts Supplied</div>
+    <div style="font-size:1.6rem;font-weight:700;color:var(--text-primary);">{{ stats.total_parts }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.25rem;">Total Expenses</div>
+    <div style="font-size:1.6rem;font-weight:700;color:var(--text-primary);">{{ "%.0f"|format(stats.total_expenses) }}</div>
+  </div>
+  <div class="card" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.25rem;">Member Since</div>
+    <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-top:0.3rem;">
+      {{ vendor.created_at.strftime('%b %Y') if vendor.created_at else '—' }}
     </div>
   </div>
 </div>
-<div class="vendor-main-content" style="max-width: 100%; width: 100%;">
-  <h4 class="mt-4 mb-3">Purchase Orders</h4>
+
+<!-- Performance Widget -->
+{% set f = stats.fulfillment %}
+{% if f.expected > 0 %}
+<div class="card animate-fade-up" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
+  <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">
+    <div style="flex:1;min-width:200px;">
+      <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.4rem;">
+        <i class="bi bi-bar-chart-line me-1"></i>PO Fulfillment Rate
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <div style="flex:1;height:8px;background:var(--surface-3);border-radius:999px;overflow:hidden;">
+          <div style="width:{{ f.rate }}%;height:100%;background:{% if f.rate >= 90 %}var(--color-success){% elif f.rate >= 70 %}var(--color-warning){% else %}var(--color-danger){% endif %};border-radius:999px;transition:width 0.4s;"></div>
+        </div>
+        <span style="font-size:1.1rem;font-weight:700;color:{% if f.rate >= 90 %}var(--color-success){% elif f.rate >= 70 %}var(--color-warning){% else %}var(--color-danger){% endif %};">
+          {{ f.rate }}%
+        </span>
+      </div>
+    </div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--text-primary);">{{ f.expected }}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Expected</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--color-success);">{{ f.received }}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Received</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--color-danger);">{{ f.missing }}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Missing</div>
+      </div>
+      {% if f.extra %}
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--color-warning);">{{ f.extra }}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">Extra</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Tab Navigation -->
+<div class="animate-fade-up" style="border-bottom:1px solid var(--border);margin-bottom:1.25rem;">
+  <nav style="display:flex;gap:0;overflow-x:auto;">
+    {% set tabs = [
+      ('pos',      'bi-clipboard-check', 'Purchase Orders', stats.total_pos),
+      ('parts',    'bi-tools',           'Parts Supplied',  stats.total_parts),
+      ('expenses', 'bi-receipt',         'Expenses',        stats.total_expenses|int),
+      ('notes',    'bi-journal-text',    'Notes',           notes_list|length),
+    ] %}
+    {% for tab_id, icon, label, count in tabs %}
+    <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id, view=tab_id) }}"
+       style="padding:0.65rem 1.1rem;font-size:0.84rem;font-weight:{% if view == tab_id %}600{% else %}500{% endif %};
+              color:{% if view == tab_id %}var(--primary){% else %}var(--text-secondary){% endif %};
+              border-bottom:2px solid {% if view == tab_id %}var(--primary){% else %}transparent{% endif %};
+              text-decoration:none;white-space:nowrap;display:flex;align-items:center;gap:0.4rem;
+              transition:color 0.15s;">
+      <i class="bi {{ icon }}"></i> {{ label }}
+      {% if count %}
+      <span style="background:var(--surface-3);color:var(--text-muted);font-size:0.68rem;padding:0.1rem 0.45rem;border-radius:999px;">{{ count }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+</div>
+
+<!-- ── Purchase Orders Tab ───────────────────────────────────── -->
+{% if view == 'pos' %}
+<h6 class="animate-fade-up" style="font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;">Purchase Orders</h6>
+<div class="table-card animate-fade-up" style="margin-bottom:1.5rem;">
   <div style="overflow-x:auto;">
-    <table class="table table-bordered table-striped">
+    <table class="table table-sm align-middle mb-0">
       <thead>
         <tr>
-          <th class="align-middle">PO Number</th>
-          <th class="align-middle">Date</th>
-          <th class="align-middle">Total Units</th>
-          <th class="align-middle">Export</th>
-          <th class="align-middle">Details</th>
+          <th>PO Number</th>
+          <th>Date</th>
+          <th>Units</th>
+          <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        {% for po in purchase_orders %}
+        {% for po in po_list %}
         <tr>
-          <td class="align-middle">{{ po.po_number or po.id }}</td>
-          <td class="align-middle">{{ po.created_at.strftime('%Y-%m-%d') if po.created_at else '' }}</td>
-          <td class="align-middle">{{ po.instances|length if po.instances else 0 }}</td>
-          <td class="align-middle">
-            <a href="{{ url_for('vendors_bp.export_vendor_po', po_id=po.id) }}" class="btn btn-outline-success btn-sm">Export</a>
+          <td style="font-weight:600;font-size:0.875rem;">{{ po.po_number }}</td>
+          <td style="font-size:0.84rem;">{{ po.date.strftime('%Y-%m-%d') if po.date else '—' }}</td>
+          <td style="font-size:0.84rem;">{{ po.total_units }}</td>
+          <td>
+            <span class="status-pill status-{{ po.status }}">{{ po.status }}</span>
           </td>
-          <td class="align-middle">
-            <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ po.id }}" aria-expanded="false" aria-controls="details-{{ po.id }}">
-              View Details
-            </button>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('vendors_bp.export_vendor_po', vendor_id=vendor.id) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Export
+              </a>
+              <button class="btn btn-ghost btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#po-details-{{ po.po_id }}">
+                <i class="bi bi-chevron-down"></i> Details
+              </button>
+            </div>
           </td>
         </tr>
-        <tr class="collapse" id="details-{{ po.id }}">
-          <td class="align-middle" colspan="5">
-            {% if po_details_map[po.id] %}
-              <div style="overflow-x:auto;">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr>
-                      <th class="align-middle">Serial</th>
-                      <th class="align-middle">Asset</th>
-                      <th class="align-middle">Item Name</th>
-                      <th class="align-middle">Model</th>
-                      <th class="align-middle">RAM</th>
-                      <th class="align-middle">CPU</th>
-                      <th class="align-middle">Disk 1 Size</th>
-                      <th class="align-middle">Grade</th>
-                      <th class="align-middle">GPU 1</th>
-                      <th class="align-middle">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for inst in po_details_map[po.id] %}
-                    <tr>
-                      <td class="align-middle">{{ inst.serial }}</td>
-                      <td class="align-middle">{{ inst.asset }}</td>
-                      <td class="align-middle">{{ inst.item_name }}</td>
-                      <td class="align-middle">{{ inst.model }}</td>
-                      <td class="align-middle">{{ inst.ram }}</td>
-                      <td class="align-middle">{{ inst.cpu }}</td>
-                      <td class="align-middle">{{ inst.disk1size }}</td>
-                      <td class="align-middle">{{ inst.grade }}</td>
-                      <td class="align-middle">{{ inst.gpu1 }}</td>
-                      <td class="align-middle">{{ inst.status }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
+        <tr class="collapse" id="po-details-{{ po.po_id }}">
+          <td colspan="5" style="padding:0;background:var(--surface-2);">
+            {% if po_details_map[po.po_id] %}
+            <div style="overflow-x:auto;padding:0.75rem;">
+              <table class="table table-sm mb-0" style="font-size:0.8rem;">
+                <thead><tr><th>Serial</th><th>Asset</th><th>Model</th><th>RAM</th><th>CPU</th><th>Disk</th><th>Grade</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for inst in po_details_map[po.po_id] %}
+                  <tr>
+                    <td>{{ inst.serial }}</td><td>{{ inst.asset }}</td><td>{{ inst.model }}</td>
+                    <td>{{ inst.ram }}</td><td>{{ inst.cpu }}</td><td>{{ inst.disk1size }}</td>
+                    <td>{{ inst.grade }}</td>
+                    <td><span class="status-pill status-{{ inst.status }}">{{ inst.status or '—' }}</span></td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
             {% else %}
-              <div class="text-muted">No items for this PO.</div>
+            <div style="padding:0.75rem;font-size:0.84rem;color:var(--text-muted);">No items for this PO.</div>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td class="align-middle text-center" colspan="5">No purchase orders found for this vendor.</td></tr>
+        <tr><td colspan="5"><div class="empty-state" style="padding:2rem 0;"><i class="bi bi-clipboard-x"></i><p>No purchase orders</p></div></td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+</div>
 
-  <h4 class="mt-4 mb-3">Direct Uploads (No PO)</h4>
+{% if direct_uploads_list %}
+<h6 class="animate-fade-up" style="font-size:0.78rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;">Direct Uploads (No PO)</h6>
+<div class="table-card animate-fade-up">
   <div style="overflow-x:auto;">
-    <table class="table table-bordered">
+    <table class="table table-sm align-middle mb-0">
       <thead>
         <tr>
-          <th class="align-middle">Date Uploaded</th>
-          <th class="align-middle">Total Units</th>
-          <th class="align-middle">Export</th>
-          <th class="align-middle">Details</th>
+          <th>Date Uploaded</th>
+          <th>Units</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for upload in direct_uploads_list %}
         <tr>
-          {% if upload.upload_date == "Unknown" %}
-            <td class="align-middle text-muted fst-italic">{{ upload.upload_date }}</td>
-          {% else %}
-            <td class="align-middle">{{ upload.upload_date }}</td>
-          {% endif %}
-          <td class="align-middle">{{ upload.total_units }}</td>
-          <td class="align-middle">
-            {% if upload.upload_date != "Unknown" %}
-              <a href="{{ url_for('vendors_bp.export_vendor_upload', vendor_id=vendor.id, upload_date=upload.upload_date|string) }}" class="btn btn-outline-success btn-sm">Export</a>
-            {% else %}
-              <a href="#" class="btn btn-outline-success btn-sm disabled">Export</a>
-            {% endif %}
+          <td style="font-size:0.875rem;{% if upload.upload_date == 'Unknown' %}font-style:italic;color:var(--text-muted);{% endif %}">
+            {{ upload.upload_date }}
           </td>
-          <td class="align-middle">
-            <div class="d-flex gap-2">
-              <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#upload-details-{{ upload.upload_date }}">View Details</button>
+          <td style="font-size:0.84rem;">{{ upload.total_units }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if upload.upload_date != 'Unknown' %}
+              <a href="{{ url_for('vendors_bp.export_vendor_upload', vendor_id=vendor.id, upload_date=upload.upload_date|string) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Export
+              </a>
+              {% endif %}
+              <button class="btn btn-ghost btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#upload-details-{{ loop.index }}">
+                <i class="bi bi-chevron-down"></i> Details
+              </button>
             </div>
           </td>
         </tr>
-        <tr class="collapse" id="upload-details-{{ upload.upload_date }}">
-          <td class="align-middle" colspan="4">
+        <tr class="collapse" id="upload-details-{{ loop.index }}">
+          <td colspan="3" style="padding:0;background:var(--surface-2);">
             {% if direct_uploads_map and upload.upload_date in direct_uploads_map %}
-              <div style="overflow-x:auto;">
-                <table class="table table-sm table-bordered mb-0">
-                  <thead>
-                    <tr>
-                      <th class="align-middle">Serial</th>
-                      <th class="align-middle">Asset</th>
-                      <th class="align-middle">Item Name</th>
-                      <th class="align-middle">Model</th>
-                      <th class="align-middle">RAM</th>
-                      <th class="align-middle">CPU</th>
-                      <th class="align-middle">Disk 1 Size</th>
-                      <th class="align-middle">Grade</th>
-                      <th class="align-middle">GPU 1</th>
-                      <th class="align-middle">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for inst in direct_uploads_map[upload.upload_date] %}
-                    <tr>
-                      <td class="align-middle">{{ inst.serial }}</td>
-                      <td class="align-middle">{{ inst.asset }}</td>
-                      <td class="align-middle">{{ inst.item_name }}</td>
-                      <td class="align-middle">{{ inst.model }}</td>
-                      <td class="align-middle">{{ inst.ram }}</td>
-                      <td class="align-middle">{{ inst.cpu }}</td>
-                      <td class="align-middle">{{ inst.disk1size }}</td>
-                      <td class="align-middle">{{ inst.grade }}</td>
-                      <td class="align-middle">{{ inst.gpu1 }}</td>
-                      <td class="align-middle">{{ inst.status }}</td>
-                    </tr>
-                    {% else %}
-                    <tr><td class="align-middle text-center" colspan="10">No items for this upload.</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
+            <div style="overflow-x:auto;padding:0.75rem;">
+              <table class="table table-sm mb-0" style="font-size:0.8rem;">
+                <thead><tr><th>Serial</th><th>Asset</th><th>Model</th><th>RAM</th><th>CPU</th><th>Disk</th><th>Grade</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for inst in direct_uploads_map[upload.upload_date] %}
+                  <tr>
+                    <td>{{ inst.serial }}</td><td>{{ inst.asset }}</td><td>{{ inst.model }}</td>
+                    <td>{{ inst.ram }}</td><td>{{ inst.cpu }}</td><td>{{ inst.disk1size }}</td>
+                    <td>{{ inst.grade }}</td>
+                    <td><span class="status-pill status-{{ inst.status }}">{{ inst.status }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No items.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
             {% else %}
-              <div class="alert alert-info mb-0">No items for this upload.</div>
+            <div style="padding:0.75rem;font-size:0.84rem;color:var(--text-muted);">No items for this upload.</div>
             {% endif %}
           </td>
         </tr>
-        {% else %}
-        <tr><td class="align-middle text-center" colspan="4">No direct uploads for this vendor.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% endif %}
+
+<!-- ── Parts Supplied Tab ────────────────────────────────────── -->
+{% elif view == 'parts' %}
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Part Number</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Price</th>
+          <th>Min Stock</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for part in parts_list %}
+        <tr>
+          <td style="font-weight:600;font-size:0.84rem;font-family:monospace;">{{ part.part_number }}</td>
+          <td style="font-size:0.875rem;">{{ part.name }}</td>
+          <td style="font-size:0.84rem;color:var(--text-muted);">{{ part.part_type or '—' }}</td>
+          <td style="font-size:0.84rem;">{{ "%.2f"|format(part.price) if part.price else '—' }}</td>
+          <td style="font-size:0.84rem;">{{ part.min_stock }}</td>
+          <td>
+            <a href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6"><div class="empty-state" style="padding:2rem 0;"><i class="bi bi-tools"></i><p>No parts linked to this vendor</p></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Expenses Tab ──────────────────────────────────────────── -->
+{% elif view == 'expenses' %}
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Ref</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for exp in expenses_list %}
+        <tr>
+          <td style="font-size:0.84rem;white-space:nowrap;">{{ exp.expense_date.strftime('%Y-%m-%d') if exp.expense_date else '—' }}</td>
+          <td style="font-size:0.875rem;">{{ exp.description }}</td>
+          <td style="font-size:0.84rem;color:var(--text-muted);">{{ exp.category.name if exp.category else '—' }}</td>
+          <td style="font-size:0.875rem;font-weight:600;">{{ "%.2f"|format(exp.amount|float) }} {{ exp.currency }}</td>
+          <td style="font-size:0.8rem;color:var(--text-muted);">{{ exp.reference or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5"><div class="empty-state" style="padding:2rem 0;"><i class="bi bi-receipt"></i><p>No expenses recorded for this vendor</p></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if expenses_list %}
+  <div class="table-footer" style="padding:0.75rem 1rem;display:flex;justify-content:flex-end;font-size:0.84rem;font-weight:600;">
+    Total: {{ "%.2f"|format(stats.total_expenses) }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Notes Tab ─────────────────────────────────────────────── -->
+{% elif view == 'notes' %}
+<div class="animate-fade-up" style="max-width:680px;">
+  <!-- Add Note -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-body" style="padding:1.25rem;">
+      <form method="POST" action="{{ url_for('vendors_bp.add_vendor_note', vendor_id=vendor.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" style="font-weight:600;font-size:0.84rem;">Add Note</label>
+        <div class="d-flex gap-2">
+          <textarea name="note" class="form-control" rows="2" placeholder="Internal note about this vendor…" required></textarea>
+          <button type="submit" class="btn btn-primary" style="white-space:nowrap;align-self:flex-end;">
+            <i class="bi bi-plus-circle"></i> Add
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notes List -->
+  {% if notes_list %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      {% for note in notes_list %}
+      <div style="padding:1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}display:flex;gap:0.75rem;align-items:flex-start;">
+        <div style="width:32px;height:32px;background:var(--surface-3);border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-person" style="font-size:0.9rem;color:var(--text-muted);"></i>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.875rem;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;">{{ note.note }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;">
+            {{ note.author.full_name or note.author.username if note.author else 'Unknown' }}
+            &middot; {{ note.created_at.strftime('%b %d, %Y %H:%M') if note.created_at else '' }}
+          </div>
+        </div>
+        <form method="POST" action="{{ url_for('vendors_bp.delete_vendor_note', vendor_id=vendor.id, note_id=note.id) }}"
+              onsubmit="return confirm('Delete this note?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--color-danger);" title="Delete">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-journal-text"></i>
+    <p>No notes yet. Add the first one above.</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
 
 {% endblock %}

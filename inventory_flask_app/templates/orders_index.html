@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Orders</h1>
+    <div class="page-subtitle">Manage customer orders and tracking</div>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;max-width:600px;">
+  <a href="{{ url_for('order_bp.customer_orders') }}" class="card" style="text-decoration:none;color:inherit;transition:var(--transition-fast);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div class="card-body" style="padding:1.25rem;display:flex;align-items:center;gap:0.875rem;">
+      <div style="width:40px;height:40px;background:rgba(var(--primary-rgb,99,102,241),0.1);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-list-check" style="font-size:1.2rem;color:var(--primary);"></i>
+      </div>
+      <div>
+        <div style="font-size:0.9rem;font-weight:600;">Customer Orders</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">All orders</div>
+      </div>
+    </div>
+  </a>
+
+  <a href="{{ url_for('order_bp.customer_orders') }}?status=pending" class="card" style="text-decoration:none;color:inherit;transition:var(--transition-fast);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div class="card-body" style="padding:1.25rem;display:flex;align-items:center;gap:0.875rem;">
+      <div style="width:40px;height:40px;background:rgba(var(--warning-rgb,245,158,11),0.1);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-hourglass-split" style="font-size:1.2rem;color:var(--color-warning);"></i>
+      </div>
+      <div>
+        <div style="font-size:0.9rem;font-weight:600;">Pending Orders</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Orders awaiting action</div>
+      </div>
+    </div>
+  </a>
+</div>
+{% endblock %}

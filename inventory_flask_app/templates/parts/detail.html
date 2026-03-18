@@ -1,0 +1,791 @@
+{% extends "base.html" %}
+{% block title %}{{ part.name }}{% endblock %}
+{% block page_title %}{{ part.name }}{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Type filter pills for movements ── */
+  .type-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.22rem 0.65rem; border-radius: 20px;
+    font-size: 0.73rem; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-secondary); transition: background 0.12s, color 0.12s;
+    user-select: none; white-space: nowrap;
+  }
+  .type-chip:hover  { background: var(--surface-3); color: var(--text-primary); }
+  .type-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* ── Stat card ── */
+  .detail-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.85rem 1.25rem;
+    min-width: 120px;
+  }
+  .detail-stat-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.3rem;
+  }
+  .detail-stat-value {
+    font-size: 1.45rem; font-weight: 800; color: var(--text-primary); line-height: 1;
+  }
+
+  /* ── Movement type badges ── */
+  .mb { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+  .mb-stock_in  { background: rgba(34,197,94,0.15);  color: #15803d; }
+  .mb-stock_out { background: rgba(249,115,22,0.15); color: #c2410c; }
+  .mb-consume   { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+  .mb-sell      { background: rgba(16,185,129,0.15); color: #047857; }
+  .mb-transfer  { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+  .mb-other     { background: var(--surface-2); color: var(--text-muted); }
+
+  /* ── Barcode display strip ── */
+  .barcode-strip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+</style>
+
+<!-- Breadcrumb -->
+<nav style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;">
+  <a href="{{ url_for('parts_bp.parts_list') }}" style="color:var(--text-muted);text-decoration:none;">Parts</a>
+  <span style="margin:0 0.4rem;">›</span>
+  <span style="color:var(--text-primary);font-weight:500;">{{ part.name }}</span>
+</nav>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ part.name }}</h1>
+    <div class="page-subtitle" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+      <code style="font-size:0.85rem;">{{ part.part_number }}</code>
+      {% if part.part_type %}
+      <span style="background:var(--surface-2);border:1px solid var(--border);border-radius:20px;
+             padding:0.1rem 0.55rem;font-size:0.73rem;font-weight:600;color:var(--text-muted);">
+        {{ part.part_type }}
+      </span>
+      {% endif %}
+      {% if low_stock %}
+      <span style="background:rgba(239,68,68,0.12);color:var(--color-danger);border-radius:20px;
+             padding:0.1rem 0.55rem;font-size:0.73rem;font-weight:700;">
+        <i class="bi bi-exclamation-triangle-fill"></i> LOW STOCK
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if part.barcode %}
+    <a href="{{ url_for('parts_bp.part_label', part_id=part.id) }}" target="_blank" class="btn btn-ghost">
+      <i class="bi bi-printer"></i> Print Label
+    </a>
+    {% endif %}
+    <a href="{{ url_for('parts_bp.stock_in', part_id=part.id) }}" class="btn btn-ghost">
+      <i class="bi bi-box-arrow-in-down"></i> Stock In
+    </a>
+    <a href="{{ url_for('parts_bp.sell', part_id=part.id) }}" class="btn btn-ghost">
+      <i class="bi bi-bag-check"></i> Sell
+    </a>
+    <a href="{{ url_for('parts_bp.use', part_id=part.id) }}" class="btn btn-ghost">
+      <i class="bi bi-tools"></i> Use in Repair
+    </a>
+    <a href="{{ url_for('returns_bp.create_part_return', part_id=part.id) }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-return-left"></i> Return
+    </a>
+    <a href="{{ url_for('parts_bp.edit_part', part_id=part.id) }}" class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('parts_bp.parts_list') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<!-- Stat cards row -->
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+
+    <div class="detail-stat {% if low_stock %}border-color:var(--color-danger);{% endif %}"
+         {% if low_stock %}style="border-color:var(--color-danger);"{% endif %}>
+      <div class="detail-stat-label">Total Stock</div>
+      <div class="detail-stat-value"
+           style="color:{% if total_stock == 0 %}var(--color-danger){% elif low_stock %}var(--color-warning){% else %}var(--color-success){% endif %};">
+        {{ total_stock }}
+      </div>
+      <div style="font-size:0.73rem;color:var(--text-muted);margin-top:0.2rem;">min {{ part.min_stock or 1 }}</div>
+    </div>
+
+    {% if part.price %}
+    <div class="detail-stat">
+      <div class="detail-stat-label">Stock Value</div>
+      <div class="detail-stat-value">{{ '{:,.2f}'.format(total_value) }}</div>
+      <div style="font-size:0.73rem;color:var(--text-muted);margin-top:0.2rem;">@ {{ '{:,.2f}'.format(part.price) }} ea</div>
+    </div>
+    {% endif %}
+
+    {% if total_sold %}
+    <div class="detail-stat">
+      <div class="detail-stat-label">Units Sold</div>
+      <div class="detail-stat-value" style="color:var(--color-success);">{{ total_sold }}</div>
+    </div>
+    {% endif %}
+
+    {% if total_revenue %}
+    <div class="detail-stat">
+      <div class="detail-stat-label">Revenue</div>
+      <div class="detail-stat-value" style="color:var(--color-success);">{{ '{:,.2f}'.format(total_revenue) }}</div>
+    </div>
+    {% endif %}
+
+    {% if total_used %}
+    <div class="detail-stat">
+      <div class="detail-stat-label">Used in Repairs</div>
+      <div class="detail-stat-value">{{ total_used }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Two-column: Stock table + Barcode/Info -->
+<div class="animate-fade-up" style="display:grid;grid-template-columns:1fr auto;gap:1rem;margin-bottom:1.5rem;align-items:start;">
+
+  <!-- Stock by location table -->
+  <div class="table-card" style="margin-bottom:0;">
+    <div style="padding:0.75rem 1rem 0.4rem;font-size:0.73rem;font-weight:700;text-transform:uppercase;
+                letter-spacing:.06em;color:var(--text-muted);">Stock by Location</div>
+    <div style="overflow-x:auto;">
+      <table class="table table-sm align-middle mb-0" style="font-size:0.83rem;">
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th>Bin</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:center;">Status</th>
+            <th style="width:1px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in part.stocks %}
+          {% set low_here = s.quantity < (part.min_stock or 1) %}
+          <tr>
+            <td style="font-weight:500;">{{ s.location.name }}</td>
+            <td style="font-family:monospace;font-size:0.78rem;">
+              {% if s.bin %}
+                <code>{{ s.bin.name }}</code>
+              {% else %}
+                <span style="color:var(--text-muted);">— No bin</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;font-weight:700;
+                {% if s.quantity == 0 %}color:var(--color-danger);
+                {% elif low_here %}color:var(--color-warning);
+                {% else %}color:var(--color-success);{% endif %}">
+              {{ s.quantity }}
+            </td>
+            <td style="text-align:center;">
+              {% if s.quantity == 0 %}
+              <span style="background:rgba(239,68,68,0.12);color:var(--color-danger);border-radius:20px;padding:0.1rem 0.5rem;font-size:0.68rem;font-weight:700;">OUT</span>
+              {% elif low_here %}
+              <span style="background:rgba(245,158,11,0.12);color:var(--color-warning);border-radius:20px;padding:0.1rem 0.5rem;font-size:0.68rem;font-weight:700;">LOW</span>
+              {% else %}
+              <span style="background:rgba(16,185,129,0.12);color:var(--color-success);border-radius:20px;padding:0.1rem 0.5rem;font-size:0.68rem;font-weight:700;">OK</span>
+              {% endif %}
+            </td>
+            <td>
+              <button class="btn btn-ghost btn-sm detail-assign-bin-btn"
+                      data-part-id="{{ part.id }}"
+                      data-location-id="{{ s.location_id }}"
+                      data-location-name="{{ s.location.name | e }}"
+                      data-bin-id="{{ s.bin_id or '' }}"
+                      data-bin-name="{{ s.bin.name | e if s.bin else '' }}"
+                      data-qty="{{ s.quantity }}"
+                      title="{{ 'Change Bin' if s.bin else 'Assign Bin' }}"
+                      style="white-space:nowrap;font-size:0.78rem;">
+                <i class="bi bi-grid-3x3-gap" style="color:var(--primary);"></i>
+                {{ 'Change Bin' if s.bin else 'Assign Bin' }}
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align:center;color:var(--text-muted);font-style:italic;padding:1rem;">
+              No stock in any location
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Info + barcode strip -->
+  <div style="display:flex;flex-direction:column;gap:0.75rem;min-width:220px;">
+
+    <!-- Part info -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.85rem 1rem;font-size:0.83rem;">
+      {% if part.vendor_rel or part.vendor %}
+      <div style="margin-bottom:0.5rem;">
+        <span style="color:var(--text-muted);font-size:0.72rem;display:block;margin-bottom:0.1rem;">Vendor</span>
+        <strong>{% if part.vendor_rel %}{{ part.vendor_rel.name }}{% else %}{{ part.vendor }}{% endif %}</strong>
+      </div>
+      {% endif %}
+      {% if part.price %}
+      <div style="margin-bottom:0.5rem;">
+        <span style="color:var(--text-muted);font-size:0.72rem;display:block;margin-bottom:0.1rem;">Unit Price</span>
+        <strong>{{ '{:,.2f}'.format(part.price) }}</strong>
+      </div>
+      {% endif %}
+      <div>
+        <span style="color:var(--text-muted);font-size:0.72rem;display:block;margin-bottom:0.1rem;">Added</span>
+        <span>{{ part.created_at.strftime('%d %b %Y') if part.created_at else '—' }}</span>
+      </div>
+      {% if part.description %}
+      <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);">
+        <span style="color:var(--text-muted);font-size:0.72rem;display:block;margin-bottom:0.1rem;">Description</span>
+        <span style="color:var(--text-secondary);">{{ part.description }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Barcode display -->
+    {% if part.barcode %}
+    <div class="barcode-strip">
+      <div style="text-align:center;flex:1;">
+        <svg id="detailBarcode" style="max-width:100%;display:block;margin:0 auto;"></svg>
+        <div style="font-family:monospace;font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem;">
+          {{ part.barcode }}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="background:var(--surface-2);border:1px dashed var(--border);border-radius:var(--radius-lg);
+                padding:0.85rem 1rem;text-align:center;font-size:0.8rem;color:var(--text-muted);">
+      <i class="bi bi-upc" style="font-size:1.2rem;display:block;margin-bottom:0.3rem;"></i>
+      No barcode assigned
+      <br>
+      <a href="{{ url_for('parts_bp.edit_part', part_id=part.id) }}"
+         style="color:var(--primary);font-size:0.78rem;">Edit to add one</a>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+
+<!-- ══ TABS ═══════════════════════════════════════════════════════════════ -->
+<div class="animate-fade-up">
+  <ul class="nav nav-tabs" id="partTabs" role="tablist"
+      style="border-bottom:1px solid var(--border);margin-bottom:1rem;">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="movements-tab"
+              data-bs-toggle="tab" data-bs-target="#movements-pane"
+              type="button" role="tab" style="font-size:0.875rem;">
+        <i class="bi bi-clock-history me-1"></i> Movements
+        <span class="tab-count">{{ movements|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="sales-tab"
+              data-bs-toggle="tab" data-bs-target="#sales-pane"
+              type="button" role="tab" style="font-size:0.875rem;">
+        <i class="bi bi-bag-check me-1"></i> Sales
+        <span class="tab-count">{{ sale_items|length + legacy_sales|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="usage-tab"
+              data-bs-toggle="tab" data-bs-target="#usage-pane"
+              type="button" role="tab" style="font-size:0.875rem;">
+        <i class="bi bi-tools me-1"></i> Usage
+        <span class="tab-count">{{ usages|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <style>
+    .tab-count {
+      background: var(--surface-2); border-radius: 20px;
+      padding: 0.05rem 0.45rem; font-size: 0.7rem; margin-left: 0.25rem;
+    }
+    .nav-link.active .tab-count { background: rgba(255,255,255,0.2); }
+  </style>
+
+  <div class="tab-content">
+
+    <!-- ════════════════ MOVEMENTS TAB ════════════════ -->
+    <div class="tab-pane fade show active" id="movements-pane" role="tabpanel">
+
+      <!-- Filter + export toolbar -->
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.85rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;flex:1;">
+          <button class="type-chip active" data-filter="">All</button>
+          <button class="type-chip" data-filter="stock_in">Stock In</button>
+          <button class="type-chip" data-filter="stock_out">Stock Out</button>
+          <button class="type-chip" data-filter="consume">Consumed</button>
+          <button class="type-chip" data-filter="transfer">Transfer</button>
+          <button class="type-chip" data-filter="sell">Sold</button>
+        </div>
+        <a href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}?export=movements_csv"
+           class="btn btn-ghost btn-sm" style="white-space:nowrap;">
+          <i class="bi bi-download"></i> CSV
+        </a>
+      </div>
+
+      {% if movements %}
+      <div class="table-card">
+        <div style="overflow-x:auto;">
+          <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;" id="movementsTable">
+            <thead>
+              <tr>
+                <th style="white-space:nowrap;">Date</th>
+                <th>Type</th>
+                <th style="text-align:center;">Qty</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Unit</th>
+                <th>By</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in movements %}
+              <tr data-mtype="{{ m.movement_type }}">
+                <td style="white-space:nowrap;color:var(--text-muted);">
+                  {{ m.created_at.strftime('%d %b %Y') if m.created_at else '—' }}<br>
+                  <span style="font-size:0.7rem;">{{ m.created_at.strftime('%H:%M') if m.created_at else '' }}</span>
+                </td>
+                <td>
+                  <span class="mb mb-{{ m.movement_type }}">
+                    {{ m.movement_type | replace('_', ' ') | title }}
+                  </span>
+                </td>
+                <td style="text-align:center;font-weight:700;
+                    {% if m.movement_type == 'stock_in' %}color:var(--color-success);
+                    {% elif m.movement_type == 'transfer' %}color:#1d4ed8;
+                    {% else %}color:var(--color-danger);{% endif %}">
+                  {% if m.movement_type == 'stock_in' %}+{% elif m.movement_type != 'transfer' %}−{% endif %}{{ m.quantity }}
+                </td>
+                <td style="color:var(--text-muted);white-space:nowrap;">
+                  {% if m.from_location %}{{ m.from_location.name }}{% if m.from_bin %} / <code style="font-size:0.72rem;">{{ m.from_bin.name }}</code>{% endif %}{% else %}—{% endif %}
+                </td>
+                <td style="color:var(--text-muted);white-space:nowrap;">
+                  {% if m.to_location %}{{ m.to_location.name }}{% if m.to_bin %} / <code style="font-size:0.72rem;">{{ m.to_bin.name }}</code>{% endif %}{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if m.instance %}
+                  <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=m.instance_id) }}"
+                     style="color:var(--primary);font-family:monospace;font-size:0.78rem;">
+                    {{ m.instance.serial or m.instance.asset or m.instance_id }}
+                  </a>
+                  {% else %}—{% endif %}
+                </td>
+                <td style="color:var(--text-muted);">{{ m.user.username if m.user else '—' }}</td>
+                <td style="color:var(--text-muted);max-width:180px;white-space:nowrap;
+                           overflow:hidden;text-overflow:ellipsis;" title="{{ m.note or '' }}">
+                  {{ m.note or '—' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span id="movementsFooter">{{ movements|length }} movement{{ 's' if movements|length != 1 }}</span>
+          <a href="{{ url_for('parts_bp.part_history', part_id=part.id) }}"
+             style="font-size:0.8rem;color:var(--primary);">
+            Running balance view →
+          </a>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-clock-history"></i>
+        <p>No movement history yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+
+    <!-- ════════════════ SALES TAB ════════════════ -->
+    <div class="tab-pane fade" id="sales-pane" role="tabpanel">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+        <a href="{{ url_for('parts_bp.sell', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-plus"></i> New Sale
+        </a>
+      </div>
+
+      {% if sale_items or legacy_sales %}
+
+      {% if sale_items %}
+      <div class="table-card" style="margin-bottom:1rem;">
+        <div style="padding:0.6rem 1rem 0;font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.06em;color:var(--text-muted);">Invoice Sales</div>
+        <div style="overflow-x:auto;">
+          <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Invoice</th>
+                <th>Customer</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Unit Price</th>
+                <th style="text-align:right;">Total</th>
+                <th>Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in sale_items %}
+              {% set txn = item.transaction %}
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">
+                  {{ txn.sold_at.strftime('%d %b %Y') if txn.sold_at else '—' }}
+                </td>
+                <td>
+                  <a href="{{ url_for('parts_bp.sale_detail', txn_id=txn.id) }}"
+                     style="color:var(--primary);font-family:monospace;font-weight:600;">
+                    {{ txn.invoice_number }}
+                  </a>
+                </td>
+                <td>{{ txn.customer.name if txn.customer else (txn.customer_name or '—') }}</td>
+                <td style="text-align:center;font-weight:600;">{{ item.quantity }}</td>
+                <td style="text-align:right;">{{ '{:,.2f}'.format(item.unit_price) }}</td>
+                <td style="text-align:right;font-weight:600;">{{ '{:,.2f}'.format(item.subtotal) }}</td>
+                <td>
+                  <span class="status-pill status-{{ txn.payment_status }}">
+                    {{ txn.payment_status | title }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid var(--border);">
+                <td colspan="3" style="font-weight:600;font-size:0.8rem;color:var(--text-muted);">Totals</td>
+                <td style="text-align:center;font-weight:700;">{{ sale_items|sum(attribute='quantity') }}</td>
+                <td></td>
+                <td style="text-align:right;font-weight:700;">
+                  {{ '{:,.2f}'.format(sale_items|sum(attribute='subtotal')|float) }}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if legacy_sales %}
+      <div class="table-card">
+        <div style="padding:0.6rem 1rem 0;font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.06em;color:var(--text-muted);">Legacy Sales</div>
+        <div style="overflow-x:auto;">
+          <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Customer</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Unit Price</th>
+                <th style="text-align:right;">Total</th>
+                <th>By</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in legacy_sales %}
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">{{ s.sold_at.strftime('%d %b %Y') }}</td>
+                <td>{{ s.customer.name if s.customer else '—' }}</td>
+                <td style="text-align:center;font-weight:600;">{{ s.quantity }}</td>
+                <td style="text-align:right;">{% if s.unit_price %}{{ '{:,.2f}'.format(s.unit_price) }}{% else %}—{% endif %}</td>
+                <td style="text-align:right;font-weight:600;">
+                  {% if s.unit_price %}{{ '{:,.2f}'.format(s.unit_price * s.quantity) }}{% else %}—{% endif %}
+                </td>
+                <td style="color:var(--text-muted);">{{ s.user.username if s.user else '—' }}</td>
+                <td style="color:var(--text-muted);max-width:160px;white-space:nowrap;
+                           overflow:hidden;text-overflow:ellipsis;" title="{{ s.note or '' }}">
+                  {{ s.note or '—' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid var(--border);">
+                <td colspan="2" style="font-weight:600;font-size:0.8rem;color:var(--text-muted);">Totals</td>
+                <td style="text-align:center;font-weight:700;">{{ legacy_sales|sum(attribute='quantity') }}</td>
+                <td></td>
+                <td style="text-align:right;font-weight:700;">
+                  {% set ls_rev = namespace(v=0) %}
+                  {% for s in legacy_sales %}{% if s.unit_price %}{% set ls_rev.v = ls_rev.v + s.unit_price * s.quantity %}{% endif %}{% endfor %}
+                  {{ '{:,.2f}'.format(ls_rev.v) if ls_rev.v else '—' }}
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-bag-check"></i>
+        <p>No sales recorded yet.
+          <a href="{{ url_for('parts_bp.sell', part_id=part.id) }}" style="color:var(--primary);">Record first sale</a>
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+
+    <!-- ════════════════ USAGE TAB ════════════════ -->
+    <div class="tab-pane fade" id="usage-pane" role="tabpanel">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+        <a href="{{ url_for('parts_bp.use', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-plus"></i> Log Usage
+        </a>
+      </div>
+
+      {% if usages %}
+      <div class="table-card">
+        <div style="overflow-x:auto;">
+          <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Unit Serial</th>
+                <th style="text-align:center;">Qty</th>
+                <th>Technician</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in usages %}
+              <tr>
+                <td style="white-space:nowrap;color:var(--text-muted);">
+                  {{ u.used_at.strftime('%d %b %Y') if u.used_at else '—' }}
+                </td>
+                <td>
+                  {% if u.instance %}
+                  <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=u.instance.id) }}"
+                     style="color:var(--primary);font-family:monospace;font-size:0.83rem;">
+                    {{ u.instance.serial or u.instance.asset or ('ID:' + u.instance.id|string) }}
+                  </a>
+                  {% else %}—{% endif %}
+                </td>
+                <td style="text-align:center;font-weight:600;">{{ u.quantity }}</td>
+                <td style="color:var(--text-muted);">
+                  {% if u.user %}{{ u.user.full_name or u.user.username }}{% else %}—{% endif %}
+                </td>
+                <td style="color:var(--text-muted);max-width:220px;white-space:nowrap;
+                           overflow:hidden;text-overflow:ellipsis;" title="{{ u.note or '' }}">
+                  {{ u.note or '—' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid var(--border);">
+                <td style="font-weight:600;font-size:0.8rem;color:var(--text-muted);">Total</td>
+                <td></td>
+                <td style="text-align:center;font-weight:700;">{{ total_used }}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span>{{ usages|length }} usage record{{ 's' if usages|length != 1 }}</span>
+          <span style="color:var(--text-muted);font-size:0.8rem;">
+            {{ total_used }} unit{{ 's' if total_used != 1 }} consumed total
+          </span>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-tools"></i>
+        <p>No usage recorded yet.
+          <a href="{{ url_for('parts_bp.use', part_id=part.id) }}" style="color:var(--primary);">Log first usage</a>
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /tab-content -->
+</div>
+
+
+<!-- ══ ASSIGN / CHANGE BIN MODAL ══════════════════════════════════════════ -->
+<div class="modal fade" id="detailBinModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-grid-3x3-gap me-2" style="color:var(--primary);"></i>
+          <span id="dbmTitle">Assign Bin</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+        <div class="mb-3" style="font-size:0.85rem;color:var(--text-muted);">
+          Location: <strong id="dbmLocationName"></strong>
+          &nbsp;·&nbsp; Current bin:
+          <span id="dbmCurrentBin" style="font-family:monospace;"></span>
+          &nbsp;·&nbsp; Qty available: <strong id="dbmAvail"></strong>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:0.84rem;">Assign to Bin <span style="color:var(--text-muted);font-size:0.75rem;">(optional — blank removes bin assignment)</span></label>
+          <select id="dbmToBin" class="form-select">
+            <option value="">— no specific bin —</option>
+          </select>
+          <div id="dbmNoBinsNote" style="display:none;font-size:0.78rem;color:var(--text-muted);margin-top:0.35rem;">
+            <i class="bi bi-info-circle"></i> No parts bins at this location.
+            <a href="{{ url_for('stock_bp.manage_locations') }}" style="color:var(--primary);">Create one in Locations →</a>
+          </div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label" style="font-size:0.84rem;">Quantity to move</label>
+          <input type="number" id="dbmQty" class="form-control" min="1" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="dbmSubmit">
+          <i class="bi bi-check-circle"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script>
+/* ── Barcode render ── */
+{% if part.barcode %}
+JsBarcode('#detailBarcode', {{ part.barcode | tojson }}, {
+  format: 'CODE128', width: 1.6, height: 48,
+  displayValue: true, fontSize: 10, margin: 4, lineColor: '#1e293b',
+  background: 'transparent',
+});
+{% endif %}
+
+/* ── Assign / Change Bin (stock table buttons) ── */
+(function() {
+  var CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  var _dbm = {};
+
+  document.querySelectorAll('.detail-assign-bin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _dbm.partId     = parseInt(this.dataset.partId);
+      _dbm.locationId = parseInt(this.dataset.locationId);
+      _dbm.binId      = this.dataset.binId ? parseInt(this.dataset.binId) : null;
+      _dbm.qty        = parseInt(this.dataset.qty);
+
+      document.getElementById('dbmTitle').textContent       = this.dataset.binName ? 'Change Bin' : 'Assign Bin';
+      document.getElementById('dbmLocationName').textContent = this.dataset.locationName;
+      document.getElementById('dbmCurrentBin').textContent  = this.dataset.binName || '— No bin';
+      document.getElementById('dbmAvail').textContent       = this.dataset.qty;
+      document.getElementById('dbmQty').value               = this.dataset.qty;
+      document.getElementById('dbmQty').max                 = this.dataset.qty;
+
+      // Load bins for this location
+      var sel = document.getElementById('dbmToBin');
+      sel.innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('dbmNoBinsNote').style.display = 'none';
+
+      fetch('/parts/api/bins?location_id=' + this.dataset.locationId, {
+        headers: { 'X-CSRFToken': CSRF }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(bins) {
+        if (!bins.length) {
+          document.getElementById('dbmNoBinsNote').style.display = '';
+          return;
+        }
+        bins.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+          sel.appendChild(opt);
+        });
+      });
+
+      new bootstrap.Modal(document.getElementById('detailBinModal')).show();
+    });
+  });
+
+  document.getElementById('dbmSubmit').addEventListener('click', function() {
+    var toBin = document.getElementById('dbmToBin').value;
+    var qty   = parseInt(document.getElementById('dbmQty').value, 10);
+    if (!qty) { showToast('Enter a quantity.', 'warning'); return; }
+    var toBinInt = toBin ? parseInt(toBin) : null;
+    if (_dbm.locationId === _dbm.locationId && toBinInt === _dbm.binId) {
+      showToast('New bin is the same as the current bin.', 'warning'); return;
+    }
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+    fetch('/parts/api/move_to_bin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        part_id: _dbm.partId,
+        from_location_id: _dbm.locationId,
+        from_bin_id: _dbm.binId,
+        to_location_id: _dbm.locationId,
+        to_bin_id: toBinInt,
+        quantity: qty,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('detailBinModal')).hide();
+        showToast(data.message, 'success');
+        setTimeout(function() { location.reload(); }, 700);
+      } else {
+        showToast(data.message || 'Move failed.', 'danger');
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+    })
+    .catch(function() {
+      showToast('Network error.', 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+    });
+  });
+}());
+
+/* ── Movement type filter ── */
+(function() {
+  var chips = document.querySelectorAll('.type-chip');
+  chips.forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      chips.forEach(function(c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      var filter = chip.dataset.filter;
+      var rows = document.querySelectorAll('#movementsTable tbody tr');
+      var visible = 0;
+      rows.forEach(function(row) {
+        var show = !filter || row.dataset.mtype === filter;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      document.getElementById('movementsFooter').textContent =
+        visible + ' movement' + (visible !== 1 ? 's' : '') + (filter ? ' · ' + filter.replace('_', ' ') : '');
+    });
+  });
+}());
+</script>
+{% endblock %}
+{% endblock %}

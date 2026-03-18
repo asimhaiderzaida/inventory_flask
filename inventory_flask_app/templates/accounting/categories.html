@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Expense Categories{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Expense Categories</h1>
+    <p class="page-subtitle">Manage categories for organising expenses</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('accounting_bp.expenses') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Expenses
+    </a>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCatModal">
+      <i class="bi bi-plus"></i> Add Category
+    </button>
+  </div>
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:3rem;"></th>
+          <th>Category</th>
+          <th class="text-center">Expenses</th>
+          <th class="text-end">Total Spent</th>
+          <th style="width:1px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat, exp_count, exp_total in cats %}
+        <tr>
+          <td>
+            <span style="display:inline-flex;align-items:center;justify-content:center;
+                         width:36px;height:36px;background:var(--surface-2);
+                         border-radius:var(--radius-md);font-size:1.1rem;">
+              <i class="bi {{ cat.icon or 'bi-receipt' }}"></i>
+            </span>
+          </td>
+          <td class="fw-semibold">{{ cat.name }}</td>
+          <td class="text-center">
+            <span class="badge bg-secondary">{{ exp_count }}</span>
+          </td>
+          <td class="text-end">
+            {% if exp_total > 0 %}
+            <span class="fw-semibold text-danger">{{ '{:,.2f}'.format(exp_total) }}</span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-ghost btn-sm"
+                      data-bs-toggle="modal" data-bs-target="#editCatModal"
+                      data-id="{{ cat.id }}"
+                      data-name="{{ cat.name }}"
+                      data-icon="{{ cat.icon or 'bi-receipt' }}"
+                      title="Edit">
+                <i class="bi bi-pencil"></i>
+              </button>
+              {% if exp_count == 0 %}
+              <form method="post" onsubmit="return confirm('Delete category \'{{ cat.name }}\'?');" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="cat_id" value="{{ cat.id }}">
+                <button type="submit" class="btn btn-ghost btn-sm text-danger" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% else %}
+              <button class="btn btn-ghost btn-sm text-muted" disabled
+                      title="{{ exp_count }} expense(s) linked — cannot delete">
+                <i class="bi bi-trash"></i>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">
+            <div class="empty-state" style="padding:2rem 0;">
+              <i class="bi bi-tags" style="font-size:2.5rem;color:var(--text-muted);"></i>
+              <p>No categories yet. Add one to get started.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if cats %}
+  <div class="table-footer">
+    <div style="font-size:0.84rem;color:var(--text-secondary);">
+      <strong>{{ cats|length }}</strong> categor{{ 'ies' if cats|length != 1 else 'y' }}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ═══════════ Add Category Modal ═══════════ -->
+<div class="modal fade" id="addCatModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="add">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Category Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required placeholder="e.g. Office Supplies">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Icon <span class="text-muted small">(click to select)</span></label>
+            <div class="d-flex gap-2 flex-wrap mb-2" id="addIconPicker">
+              {% for ico in icon_options %}
+              <button type="button" class="btn btn-sm {% if ico == 'bi-receipt' %}btn-primary{% else %}btn-outline-secondary{% endif %} icon-opt"
+                      data-icon="{{ ico }}" title="{{ ico }}"
+                      onclick="pickIcon(this,'addIconField','addIconPicker')">
+                <i class="bi {{ ico }}"></i>
+              </button>
+              {% endfor %}
+            </div>
+            <input type="text" name="icon" id="addIconField" class="form-control form-control-sm"
+                   value="bi-receipt" placeholder="bi-receipt">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ Edit Category Modal ═══════════ -->
+<div class="modal fade" id="editCatModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="edit">
+        <input type="hidden" name="cat_id" id="editCatId">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Category Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="editCatName" class="form-control" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Icon</label>
+            <div class="d-flex gap-2 flex-wrap mb-2" id="editIconPicker">
+              {% for ico in icon_options %}
+              <button type="button" class="btn btn-sm btn-outline-secondary icon-opt"
+                      data-icon="{{ ico }}" title="{{ ico }}"
+                      onclick="pickIcon(this,'editIconField','editIconPicker')">
+                <i class="bi {{ ico }}"></i>
+              </button>
+              {% endfor %}
+            </div>
+            <input type="text" name="icon" id="editIconField" class="form-control form-control-sm" placeholder="bi-receipt">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function pickIcon(btn, fieldId, pickerId) {
+  document.getElementById(fieldId).value = btn.dataset.icon;
+  document.querySelectorAll('#' + pickerId + ' .icon-opt').forEach(b => {
+    b.classList.remove('btn-primary', 'active');
+    b.classList.add('btn-outline-secondary');
+  });
+  btn.classList.remove('btn-outline-secondary');
+  btn.classList.add('btn-primary', 'active');
+}
+
+document.getElementById('editCatModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const currentIcon = btn.dataset.icon || 'bi-receipt';
+  document.getElementById('editCatId').value   = btn.dataset.id;
+  document.getElementById('editCatName').value  = btn.dataset.name;
+  document.getElementById('editIconField').value = currentIcon;
+  document.querySelectorAll('#editIconPicker .icon-opt').forEach(b => {
+    const isActive = b.dataset.icon === currentIcon;
+    b.classList.toggle('btn-primary', isActive);
+    b.classList.toggle('btn-outline-secondary', !isActive);
+    b.classList.toggle('active', isActive);
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1534 @@
+{% extends "base.html" %}
+{% block title %}Scanner{% endblock %}
+{% block page_title %}Scanner{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Scanner workspace ── */
+  .scanner-workspace {
+    background: #0f172a;
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    box-shadow: var(--shadow-xl);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .scanner-workspace::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(59,130,246,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Scan input ── */
+  .scan-input-wrap {
+    position: relative;
+    margin-bottom: 0.75rem;
+  }
+  /* Barcode icon: bright enough to see on dark bg */
+  .scan-input-icon {
+    position: absolute;
+    left: 1.1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;          /* was #334155 — near-invisible on dark */
+    font-size: 1.6rem;
+    pointer-events: none;
+    z-index: 2;
+    transition: color 0.2s;
+  }
+  .scan-input-wrap:focus-within .scan-input-icon {
+    color: #93c5fd;           /* lights up blue when input is focused */
+  }
+  #scanInput {
+    width: 100%;
+    font-size: 1.6rem;        /* slightly larger for legibility */
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    background: rgba(255,255,255,0.06); /* was 0.035 — slightly more visible */
+    border: 2px solid rgba(59,130,246,0.35);
+    border-radius: var(--radius-lg);
+    color: #ffffff;           /* typed text: pure white */
+    padding: 1.2rem 3.5rem 1.2rem 3.5rem; /* taller — more touch-friendly */
+    outline: none;
+    transition: border-color var(--transition-base), box-shadow var(--transition-base),
+                background var(--transition-base);
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  /* Placeholder: light gray — clearly visible on dark bg */
+  #scanInput::placeholder {
+    color: #9ca3af;           /* was #1e293b — completely invisible */
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+  }
+  #scanInput:focus {
+    border-color: #3b82f6;
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.20), 0 0 32px rgba(59,130,246,0.16);
+    animation: none;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      border-color: rgba(59,130,246,0.30);
+      box-shadow: none;
+    }
+    50% {
+      border-color: rgba(59,130,246,0.60);
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.08), 0 0 24px rgba(59,130,246,0.14);
+    }
+  }
+
+  /* Clear ✕ button: visible on dark bg */
+  .scan-clear-btn {
+    position: absolute;
+    right: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #64748b;           /* was #334155 — invisible */
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 0.4rem;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+    z-index: 2;
+    line-height: 1;
+  }
+  .scan-clear-btn:hover { color: #f87171; }
+
+  /* ── Spinner ── */
+  .scan-spinner {
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    color: #94a3b8;           /* was #475569 — dim on dark */
+    margin-bottom: 0.75rem;
+    min-height: 28px;
+  }
+  .scan-spinner.active { display: flex; }
+  .scan-spinner .spinner-border {
+    width: 1rem; height: 1rem;
+    border-width: 2px;
+    color: #60a5fa;
+  }
+
+  /* ── Scanner hint ── */
+  .scanner-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    color: #6b7280;           /* was #1e293b — completely invisible */
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    line-height: 1.5;
+  }
+  .scanner-hint i {
+    color: #4b5563;           /* keyboard icon: muted but visible */
+  }
+  /* kbd shortcut badge: clear contrast */
+  .scanner-hint kbd {
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    color: #cbd5e1;           /* was #64748b — too dim */
+    font-family: monospace;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  /* ── Result card: slide-up reveal ── */
+  .result-card {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
+    pointer-events: none;
+  }
+  .result-card.result-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* ── Found panel ── */
+  .found-panel {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+  }
+  .found-product-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.025em;
+    margin-bottom: 0.4rem;
+  }
+
+  /* ── Large status badges for scanner ── */
+  .status-pill-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.95rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .status-pill-lg.status-unprocessed   { background: rgba(148,163,184,0.14); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.28); }
+  .status-pill-lg.status-under_process { background: rgba(245,158,11,0.18);  color: #fcd34d; border: 1px solid rgba(245,158,11,0.35); }
+  .status-pill-lg.status-processed     { background: rgba(16,185,129,0.18);  color: #6ee7b7; border: 1px solid rgba(16,185,129,0.35); }
+  .status-pill-lg.status-disputed      { background: rgba(239,68,68,0.18);   color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); }
+  .status-pill-lg.status-idle          { background: rgba(139,92,246,0.18);  color: #ddd6fe; border: 1px solid rgba(139,92,246,0.35); }
+  .status-pill-lg.status-sold          { background: rgba(59,130,246,0.18);  color: #bfdbfe; border: 1px solid rgba(59,130,246,0.35); }
+
+  /* ── Serial / asset display ── */
+  .serial-display {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #94a3b8;           /* was #475569 — too dark on dark bg */
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Spec pills ── */
+  .specs-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.9rem 0;
+  }
+  .spec-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.78rem;
+    color: #e2e8f0;           /* brighter: was #cbd5e1 */
+    font-weight: 500;
+  }
+  .spec-pill i {
+    font-size: 0.72rem;
+    color: #64748b;           /* was #475569 — barely visible */
+  }
+
+  /* ── Info grid ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 0.65rem;
+    margin: 0.85rem 0 1.25rem;
+  }
+  .info-cell {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-md);
+    padding: 0.65rem 0.9rem;
+  }
+  /* Label (LOCATION, STAGE, etc.) — must be legible on dark */
+  .info-cell-label {
+    font-size: 0.67rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #6b7280;           /* was #334155 — invisible */
+    margin-bottom: 0.25rem;
+  }
+  .info-cell-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f1f5f9;           /* slightly brighter */
+  }
+
+  /* ── Action buttons (min 48px touch target) ── */
+  .scanner-actions {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+  .scanner-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0 1.3rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all var(--transition-base);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .scanner-btn-primary {
+    background: #3b82f6;
+    color: #fff;
+  }
+  .scanner-btn-primary:hover {
+    background: #2563eb;
+    color: #fff;
+  }
+  .scanner-btn-outline {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: #cbd5e1;           /* was #94a3b8 — a bit brighter */
+  }
+  .scanner-btn-outline:hover {
+    background: rgba(255,255,255,0.13);
+    color: #f1f5f9;
+    border-color: rgba(255,255,255,0.25);
+  }
+  .scanner-btn-success {
+    background: rgba(34,197,94,0.18);
+    border: 1px solid rgba(34,197,94,0.35);
+    color: #86efac;
+  }
+  .scanner-btn-success:hover {
+    background: rgba(34,197,94,0.28);
+    color: #bbf7d0;
+    border-color: rgba(34,197,94,0.5);
+  }
+  .scanner-btn-danger-ghost {
+    background: rgba(239,68,68,0.10);
+    border: 1px solid rgba(239,68,68,0.28);
+    color: #fca5a5;
+    margin-left: auto;
+  }
+  .scanner-btn-danger-ghost:hover {
+    background: rgba(239,68,68,0.18);
+    color: #fecaca;
+  }
+
+  /* ── Not-found panel ── */
+  .notfound-panel {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.28);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .notfound-icon {
+    font-size: 2rem;
+    color: #f87171;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 0.05rem;
+  }
+  .notfound-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fca5a5;
+    margin-bottom: 0.25rem;
+  }
+  .notfound-serial {
+    font-family: monospace;
+    font-size: 0.88rem;
+    color: #94a3b8;           /* was #64748b — slightly brighter */
+  }
+  .notfound-panel .text-muted-dark {
+    color: #6b7280;           /* helper for the "check for typos" line */
+  }
+
+  /* ── Part-found panel ── */
+  .part-found-panel {
+    background: rgba(245,158,11,0.07);
+    border: 1px solid rgba(245,158,11,0.30);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+  }
+  .part-found-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #f59e0b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.45rem;
+  }
+  .part-found-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fef3c7;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .part-stock-badge-ok   { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.30); }
+  .part-stock-badge-low  { background: rgba(234,179,8,0.15);  color: #fde047; border: 1px solid rgba(234,179,8,0.30); }
+  .part-stock-badge-out  { background: rgba(239,68,68,0.12);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.28); }
+  .part-stock-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 0.6rem;
+    color: #94a3b8;
+  }
+  .part-stock-table th {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    padding: 0.25rem 0.4rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .part-stock-table td {
+    padding: 0.3rem 0.4rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .part-mvmt-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.78rem;
+    color: #64748b;
+    padding: 0.2rem 0;
+  }
+  .part-mvmt-type {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+
+  /* ── Mobile tweaks ── */
+  @media (max-width: 575px) {
+    .scanner-workspace { padding: 1.25rem; }
+    #scanInput { font-size: 1.3rem; padding: 1rem 3rem; }
+    .scan-input-icon { font-size: 1.35rem; left: 0.9rem; }
+    .scanner-hint { font-size: 0.72rem; gap: 0.35rem; }
+    .found-product-name { font-size: 1.05rem; }
+    .info-grid { grid-template-columns: 1fr 1fr; }
+    .scanner-actions { gap: 0.5rem; }
+    .scanner-btn { min-height: 52px; font-size: 0.85rem; }
+    .scanner-btn-danger-ghost { margin-left: 0; }
+  }
+</style>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Scanner</h1>
+    <div class="page-subtitle" id="scannerSubtitle">Scan a serial or asset tag to look up a unit instantly</div>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-ghost" id="batchToggleBtn" onclick="toggleBatchMode()">
+      <i class="bi bi-collection"></i> Batch Mode
+    </button>
+    <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-ghost">
+      <i class="bi bi-table"></i> Inventory
+    </a>
+  </div>
+</div>
+
+<!-- Audio feedback -->
+<audio id="beep-sound"  src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+<audio id="error-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+
+<!-- Dark scanner workspace -->
+<div class="scanner-workspace animate-fade-up">
+
+  <!-- Input -->
+  <div class="scan-input-wrap">
+    <i class="bi bi-upc-scan scan-input-icon"></i>
+    <input id="scanInput" type="text"
+           autocomplete="off" autocorrect="off" spellcheck="false"
+           placeholder="Waiting for scan…">
+    <button class="scan-clear-btn" id="clearBtn" onclick="clearScan()" title="Clear" style="display:none;">
+      <i class="bi bi-x-circle-fill"></i>
+    </button>
+  </div>
+
+  <!-- Spinner -->
+  <div class="scan-spinner" id="scanSpinner">
+    <div class="spinner-border" role="status"><span class="visually-hidden">Loading…</span></div>
+    <span>Looking up unit…</span>
+  </div>
+
+  <!-- Hint bar -->
+  <div class="scanner-hint" id="scanHint">
+    <i class="bi bi-keyboard" style="color:#4b5563;"></i>
+    Press <kbd>Enter</kbd> to search immediately &nbsp;·&nbsp;
+    Auto-searches after 0.6s &nbsp;·&nbsp;
+    Click anywhere outside modals to refocus
+  </div>
+
+  <!-- Result area -->
+  <div class="result-card" id="resultCard">
+
+    <!-- Found -->
+    <div class="found-panel" id="foundCard" style="display:none;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.35rem;">
+        <div class="found-product-name" id="unitName">—</div>
+        <span id="unitStatusBadge" class="status-pill-lg status-unprocessed"></span>
+      </div>
+      <div class="serial-display">
+        <span id="unitSerial"></span><span id="unitAssetWrap"></span>
+      </div>
+
+      <!-- Specs pills -->
+      <div class="specs-row" id="specsRow"></div>
+
+      <!-- Info grid -->
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-cell-label">Location</div>
+          <div class="info-cell-value" id="unitLocation">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Shelf / Bin</div>
+          <div class="info-cell-value" id="unitBin">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Stage</div>
+          <div class="info-cell-value" id="unitStage">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Team</div>
+          <div class="info-cell-value" id="unitTeam">—</div>
+        </div>
+      </div>
+
+      <!-- Actions (populated dynamically based on unit status) -->
+      <div class="scanner-actions" id="scannerActions"></div>
+    </div>
+
+    <!-- Not found -->
+    <div class="notfound-panel" id="notFoundCard" style="display:none;">
+      <div class="notfound-icon"><i class="bi bi-question-circle-fill"></i></div>
+      <div>
+        <div class="notfound-title">Unit Not Found</div>
+        <div class="notfound-serial" id="notFoundSerial"></div>
+        <div style="font-size:0.8rem;color:#6b7280;margin-top:0.5rem;">
+          No unit matched this serial or asset tag. Check for typos or try a different format.
+        </div>
+        <button class="scanner-btn scanner-btn-outline mt-3" onclick="clearScan()"
+                style="min-height:40px;padding:0 1rem;font-size:0.82rem;">
+          <i class="bi bi-arrow-counterclockwise"></i> Try Again
+        </button>
+      </div>
+    </div>
+
+    <!-- Part Found -->
+    <div class="part-found-panel" id="partFoundCard" style="display:none;">
+      <div class="part-found-tag"><i class="bi bi-cpu me-1"></i>Part</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.4rem;">
+        <div class="part-found-name" id="partName">—</div>
+        <span id="partStockBadge" class="status-pill-lg"></span>
+      </div>
+      <div class="serial-display" style="margin-bottom:0.5rem;">
+        <span id="partNumber" style="color:#94a3b8;font-family:monospace;font-size:0.85rem;"></span>
+        <span id="partTypeChip" style="margin-left:0.5rem;font-size:0.7rem;padding:0.1em 0.5em;border-radius:3px;background:rgba(255,255,255,0.07);color:#94a3b8;"></span>
+      </div>
+
+      <!-- Stock by location table -->
+      <div id="partStockWrap">
+        <table class="part-stock-table">
+          <thead>
+            <tr><th>Location</th><th style="text-align:right;">Qty</th></tr>
+          </thead>
+          <tbody id="partStockBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Recent movements -->
+      <div id="partMovementsWrap" style="margin-top:0.75rem;display:none;">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:#4b5563;margin-bottom:0.3rem;">Recent Movements</div>
+        <div id="partMovementsList"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="scanner-actions" id="partActions" style="margin-top:0.85rem;"></div>
+    </div>
+
+  </div><!-- /result-card -->
+
+</div><!-- /scanner-workspace -->
+
+<!-- ── Batch Mode Panel ── -->
+<div id="batchPanel" style="display:none;" class="animate-fade-up mt-3">
+  <div class="table-card">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+      <div style="display:flex;align-items:center;gap:0.6rem;">
+        <span style="font-size:0.85rem;font-weight:600;">Batch Queue</span>
+        <span id="batchCount" style="background:var(--primary);color:#fff;border-radius:20px;padding:0.15em 0.6em;font-size:0.72rem;font-weight:700;">0</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="clearBatch()" id="batchClearBtn" style="display:none;">
+        <i class="bi bi-trash me-1"></i>Clear All
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="batchEmpty" style="padding:2rem;text-align:center;color:var(--text-muted);">
+      <i class="bi bi-upc-scan" style="font-size:2rem;display:block;margin-bottom:0.5rem;opacity:0.4;"></i>
+      <div style="font-size:0.85rem;">Scan units to add them to the batch queue.</div>
+    </div>
+
+    <!-- Unit table (hidden until items added) -->
+    <div id="batchTableWrap" style="display:none;overflow-x:auto;">
+      <table class="table" style="margin-bottom:0;">
+        <thead>
+          <tr>
+            <th>Unit</th>
+            <th style="white-space:nowrap;">Serial / Asset</th>
+            <th>Status</th>
+            <th>Location</th>
+            <th>Bin</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="batchTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Apply bar (hidden until items added) -->
+    <div id="batchApplyBar" style="display:none;padding:1rem 1.25rem;border-top:1px solid var(--border);background:var(--surface-2);">
+      <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;">Apply to all queued units</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.65rem;align-items:flex-end;">
+        <div style="flex:1;min-width:130px;">
+          <label style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;display:block;">Status</label>
+          <select id="batchStatus" class="form-select form-select-sm">
+            <option value="">— no change —</option>
+            <option value="unprocessed">Unprocessed</option>
+            <option value="under_process">Under Process</option>
+            <option value="processed">Processed</option>
+            <option value="idle">Idle</option>
+            <option value="disputed">Disputed</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:130px;">
+          <label style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;display:block;">Location</label>
+          <select id="batchLocation" class="form-select form-select-sm" onchange="loadBatchBins(this.value)">
+            <option value="">— no change —</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="flex:1;min-width:130px;">
+          <label style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;display:block;">Bin</label>
+          <select id="batchBin" class="form-select form-select-sm">
+            <option value="">— no change —</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="batchApplyBtn" onclick="applyBatch()">
+          <i class="bi bi-check-lg me-1"></i>Apply to All
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Move Location Modal ── -->
+<div class="modal fade" id="moveModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="moveModalLabel">
+          <i class="bi bi-geo-alt me-2" style="color:var(--primary);"></i>Move Location
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="moveForm">
+        <div class="modal-body" style="padding:1.5rem;">
+          <input type="hidden" id="moveInstanceId" name="instance_id">
+          <div id="moveUnitInfo"
+               style="font-size:0.84rem;color:var(--text-secondary);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 0.85rem;margin-bottom:1rem;"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">Location</label>
+            <select id="moveLocationId" name="location_id" class="form-select">
+              <option value="">— No change —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">
+              Bin / Shelf <span style="font-weight:400;color:var(--text-muted);">(optional)</span>
+            </label>
+            <select id="moveShelfBin" name="shelf_bin" class="form-select">
+              <option value="">— no bin —</option>
+            </select>
+            <div id="moveBinHint" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;display:none;">
+              Select a location to see available bins.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="moveSubmitBtn">
+            <i class="bi bi-check-lg me-1"></i>Move
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Update Status Modal ── -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="statusModalLabel">
+          <i class="bi bi-arrow-repeat me-2" style="color:var(--primary);"></i>Update Status
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="statusForm">
+        <div class="modal-body" style="padding:1.5rem;">
+          <input type="hidden" id="statusInstanceId" name="instance_id">
+          <div id="statusUnitInfo"
+               style="font-size:0.84rem;color:var(--text-secondary);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 0.85rem;margin-bottom:1rem;"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">New Status</label>
+            <select id="statusSelect" name="status" class="form-select">
+              <option value="unprocessed">Unprocessed</option>
+              <option value="under_process">Under Process</option>
+              <option value="processed">Processed</option>
+              <option value="idle">Idle</option>
+              <option value="disputed">Disputed</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">Process Stage <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+            <input type="text" id="statusStage" name="process_stage" class="form-control" placeholder="e.g. specs, qc, repair…">
+          </div>
+          <div>
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">Note <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+            <textarea name="note" id="statusNote" class="form-control" rows="2" placeholder="Optional note…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="statusSubmitBtn">
+            <i class="bi bi-check-lg me-1"></i>Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Mark Idle Modal ── -->
+<div class="modal fade" id="idleModal" tabindex="-1" aria-labelledby="idleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
+        <h5 class="modal-title fw-semibold" id="idleModalLabel">
+          <i class="bi bi-pause-circle me-2" style="color:var(--color-warning);"></i>Mark Idle
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="idleForm">
+        <div class="modal-body" style="padding:1.5rem;">
+          <input type="hidden" id="idleInstanceId" name="instance_id">
+          <div id="idleUnitInfo"
+               style="font-size:0.84rem;color:var(--text-secondary);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 0.85rem;margin-bottom:1rem;"></div>
+          <div>
+            <label class="form-label fw-semibold" style="font-size:0.84rem;">
+              Reason <span style="font-weight:400;color:var(--text-muted);">(optional)</span>
+            </label>
+            <input type="text" name="reason" id="idleReason" class="form-control"
+                   placeholder="e.g. waiting for parts, hold for customer…">
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning" id="idleSubmitBtn">
+            <i class="bi bi-pause-circle me-1"></i>Mark Idle
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  'use strict';
+
+  let currentUnit = null;
+  let scanTimeout = null;
+  const CSRF = '{{ csrf_token() }}';
+  const STATUS_LABELS = {
+    'unprocessed':  '{{ get_status_label("unprocessed") }}',
+    'under_process':'{{ get_status_label("under_process") }}',
+    'processed':    '{{ get_status_label("processed") }}',
+    'idle':         '{{ get_status_label("idle") }}',
+    'disputed':     '{{ get_status_label("disputed") }}',
+    'sold':         '{{ get_status_label("sold") }}'
+  };
+
+  const scanInput    = document.getElementById('scanInput');
+  const clearBtn     = document.getElementById('clearBtn');
+  const scanSpinner  = document.getElementById('scanSpinner');
+  const scanHint     = document.getElementById('scanHint');
+  const resultCard   = document.getElementById('resultCard');
+  const foundCard     = document.getElementById('foundCard');
+  const notFoundCard  = document.getElementById('notFoundCard');
+  const partFoundCard = document.getElementById('partFoundCard');
+
+  /* ── Auto-focus ── */
+  scanInput.focus();
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.modal') &&
+        !e.target.closest('select') &&
+        !e.target.closest('button') &&
+        !e.target.closest('textarea')) {
+      scanInput.focus();
+    }
+  });
+
+  /* ── Input events ── */
+  scanInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = scanInput.value.trim();
+      if (val) { clearTimeout(scanTimeout); doLookup(val); }
+    }
+  });
+
+  scanInput.addEventListener('input', function () {
+    clearTimeout(scanTimeout);
+    const val = scanInput.value.trim();
+    clearBtn.style.display = val ? 'block' : 'none';
+    if (!val) { hideResult(); return; }
+    scanTimeout = setTimeout(function () {
+      if (scanInput.value.trim()) doLookup(scanInput.value.trim());
+    }, 600);
+  });
+
+  /* ── Lookup ── */
+  function doLookup(q) {
+    clearTimeout(scanTimeout);
+    showSpinner(true);
+
+    /* ── Batch mode: add to queue, don't show result card ── */
+    if (isBatchMode) {
+      hideResult();
+      fetch('/stock/api/lookup_unit?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          showSpinner(false);
+          if (data.found) {
+            addToBatch(data);
+            playBeep();
+            scanInput.value = '';
+            clearBtn.style.display = 'none';
+          } else {
+            playErrorBeep();
+            showToast('"' + escHtml(q) + '" not found.', 'danger');
+          }
+        })
+        .catch(function () {
+          showSpinner(false);
+          showToast('Network error.', 'danger');
+        });
+      return;
+    }
+
+    /* ── Single mode: show result card ── */
+    hideResult();
+    fetch('/stock/api/lookup_unit?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.found) {
+          showSpinner(false);
+          showFound(data);
+          playBeep();
+        } else {
+          // Try bin lookup
+          return fetch('/stock/api/lookup_bin?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (binData) {
+              if (binData.found) {
+                showSpinner(false);
+                showBinFound(binData);
+                playBeep();
+              } else {
+                // Try part lookup as final fallback
+                return fetch('/stock/api/lookup_part?q=' + encodeURIComponent(q))
+                  .then(function (r) { return r.json(); })
+                  .then(function (partData) {
+                    showSpinner(false);
+                    if (partData.found) {
+                      showPartFound(partData.part);
+                      playBeep();
+                    } else {
+                      showNotFound(q);
+                      playErrorBeep();
+                    }
+                  });
+              }
+            });
+        }
+      })
+      .catch(function () {
+        showSpinner(false);
+        showToast('Network error during lookup.', 'danger');
+      });
+  }
+
+  /* ── Show found ── */
+  function showFound(d) {
+    currentUnit = d;
+
+    document.getElementById('unitName').textContent = d.item_name || 'Unknown Product';
+
+    document.getElementById('unitSerial').textContent = d.serial || '—';
+    const assetWrap = document.getElementById('unitAssetWrap');
+    assetWrap.textContent = d.asset ? '  ·  AT: ' + d.asset : '';
+
+    const badge = document.getElementById('unitStatusBadge');
+    badge.className = 'status-pill-lg status-' + (d.status || 'unprocessed');
+    badge.textContent = (d.status || 'unprocessed').replace('_', ' ')
+      .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+
+    /* Specs pills */
+    const specDefs = [
+      { icon: 'bi-cpu',         val: d.cpu },
+      { icon: 'bi-memory',      val: d.ram },
+      { icon: 'bi-device-hdd',  val: d.disk1size },
+      { icon: 'bi-aspect-ratio',val: d.display },
+      { icon: 'bi-gpu-card',    val: d.gpu1 },
+      { icon: 'bi-star',        val: d.grade ? 'Grade: ' + d.grade : null },
+      { icon: 'bi-box',         val: d.model },
+    ];
+    const specsRow = document.getElementById('specsRow');
+    specsRow.innerHTML = '';
+    specDefs.filter(function (s) { return !!s.val; }).forEach(function (s) {
+      const pill = document.createElement('span');
+      pill.className = 'spec-pill';
+      pill.innerHTML = '<i class="bi ' + s.icon + '"></i>' + escHtml(s.val);
+      specsRow.appendChild(pill);
+    });
+
+    document.getElementById('unitLocation').textContent = d.location_name || '—';
+    document.getElementById('unitBin').textContent      = d.shelf_bin     || '—';
+    document.getElementById('unitStage').textContent    = (d.process_stage || '—').replace('_', ' ');
+    document.getElementById('unitTeam').textContent     = d.team_assigned  || '—';
+
+    renderActions(d);
+
+    notFoundCard.style.display = 'none';
+    foundCard.style.display    = '';
+    showResultCard();
+  }
+
+  /* ── Show not found ── */
+  function showNotFound(serial) {
+    currentUnit = null;
+    document.getElementById('notFoundSerial').textContent = serial;
+    foundCard.style.display    = 'none';
+    notFoundCard.style.display = '';
+    showResultCard();
+  }
+
+  /* ── Clear ── */
+  function clearScan() {
+    currentUnit = null;
+    clearTimeout(scanTimeout);
+    scanInput.value = '';
+    clearBtn.style.display = 'none';
+    hideResult();
+    scanInput.focus();
+  }
+  window.clearScan = clearScan;
+
+  /* ── Render context-aware action buttons ── */
+  function renderActions(d) {
+    const wrap = document.getElementById('scannerActions');
+    const status = d.status || 'unprocessed';
+    const iid = d.instance_id;
+    const sn  = encodeURIComponent(d.serial || '');
+    let html = '';
+
+    if (d.is_sold) {
+      html += `<a href="/instances/view/${iid}" class="scanner-btn scanner-btn-outline" target="_blank"><i class="bi bi-receipt"></i> View Sale</a>`;
+      html += `<a href="/returns/lookup?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-arrow-return-left"></i> Process Return</a>`;
+    } else {
+      // Move Location — always available for non-sold
+      html += `<button class="scanner-btn scanner-btn-primary" onclick="openMoveModal()"><i class="bi bi-geo-alt"></i> Move Location</button>`;
+
+      if (status === 'unprocessed') {
+        html += `<button class="scanner-btn scanner-btn-success" onclick="doCheckin()"><i class="bi bi-play-circle"></i> Check In for Processing</button>`;
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Status</button>`;
+      } else if (status === 'under_process') {
+        html += `<button class="scanner-btn scanner-btn-success" onclick="doCheckout()"><i class="bi bi-check-circle"></i> Check Out</button>`;
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Stage</button>`;
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openIdleModal()"><i class="bi bi-pause-circle"></i> Mark Idle</button>`;
+      } else if (status === 'processed') {
+        html += `<a href="/sales/create?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-cart-plus"></i> Create Sale</a>`;
+        html += `<a href="/orders/customer_orders/reserve?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-bookmark"></i> Reserve</a>`;
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Status</button>`;
+      } else if (status === 'idle') {
+        html += `<button class="scanner-btn scanner-btn-success" onclick="doCheckin()"><i class="bi bi-play-circle"></i> Return to Processing</button>`;
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Status</button>`;
+      } else {
+        // disputed / other
+        html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Status</button>`;
+      }
+    }
+
+    // View Unit + Clear — always present
+    html += `<a href="/instances/view/${iid}" class="scanner-btn scanner-btn-outline" target="_blank"><i class="bi bi-box-arrow-up-right"></i> View Unit</a>`;
+    html += `<button class="scanner-btn scanner-btn-danger-ghost" onclick="clearScan()"><i class="bi bi-x-lg"></i> Clear</button>`;
+
+    wrap.innerHTML = html;
+  }
+
+  /* ── Show bin-found result ── */
+  function showBinFound(d) {
+    currentUnit = null;
+    document.getElementById('unitName').textContent = 'Bin: ' + d.bin_name;
+    const badge = document.getElementById('unitStatusBadge');
+    badge.className = 'status-pill-lg status-processed';
+    var unitLabel = d.unit_count + ' unit' + (d.unit_count !== 1 ? 's' : '');
+    if (d.part_count > 0) {
+      unitLabel += ' · ' + d.part_count + ' part type' + (d.part_count !== 1 ? 's' : '');
+    }
+    badge.textContent = unitLabel;
+    document.getElementById('unitSerial').textContent = 'Bin Code';
+    document.getElementById('unitAssetWrap').textContent = '';
+    document.getElementById('specsRow').innerHTML = '';
+    document.getElementById('unitLocation').textContent = d.location_name || '—';
+    document.getElementById('unitBin').textContent = d.bin_name;
+    document.getElementById('unitStage').textContent = '—';
+    document.getElementById('unitTeam').textContent = '—';
+    const wrap = document.getElementById('scannerActions');
+    var partsBtn = d.part_count > 0
+      ? '<a href="/parts/list?bin_id=' + d.bin_id + '" class="scanner-btn scanner-btn-primary" style="background:var(--color-warning);border-color:var(--color-warning);"><i class="bi bi-cpu"></i> Parts (' + d.part_count + ')</a>'
+      : '';
+    wrap.innerHTML =
+      '<a href="' + escHtml(d.url) + '" class="scanner-btn scanner-btn-primary"><i class="bi bi-grid-3x3-gap"></i> View Bin Contents</a>' +
+      partsBtn +
+      '<button class="scanner-btn scanner-btn-danger-ghost" onclick="clearScan()"><i class="bi bi-x-lg"></i> Clear</button>';
+    notFoundCard.style.display  = 'none';
+    partFoundCard.style.display = 'none';
+    foundCard.style.display     = '';
+    showResultCard();
+  }
+
+  /* ── Show part-found ── */
+  function showPartFound(p) {
+    currentUnit = null;  // not a unit
+
+    document.getElementById('partName').textContent = p.name || 'Unknown Part';
+    document.getElementById('partNumber').textContent = p.part_number || '';
+    document.getElementById('partTypeChip').textContent = p.part_type || '';
+
+    // Stock badge
+    const badge = document.getElementById('partStockBadge');
+    if (p.total_stock <= 0) {
+      badge.className = 'status-pill-lg part-stock-badge-out';
+      badge.textContent = 'OUT — 0 in stock';
+    } else if (p.low_stock) {
+      badge.className = 'status-pill-lg part-stock-badge-low';
+      badge.textContent = 'LOW — ' + p.total_stock + ' in stock';
+    } else {
+      badge.className = 'status-pill-lg part-stock-badge-ok';
+      badge.textContent = p.total_stock + ' in stock';
+    }
+
+    // Stock by location
+    const tbody = document.getElementById('partStockBody');
+    tbody.innerHTML = '';
+    if (p.stocks && p.stocks.length > 0) {
+      p.stocks.forEach(function (s) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escHtml(s.location) + '</td><td style="text-align:right;font-weight:600;color:#e2e8f0;">' + s.qty + '</td>';
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = '<tr><td colspan="2" style="color:#4b5563;text-align:center;">No stock on record</td></tr>';
+    }
+
+    // Recent movements
+    const mList = document.getElementById('partMovementsList');
+    const mWrap = document.getElementById('partMovementsWrap');
+    mList.innerHTML = '';
+    if (p.recent_movements && p.recent_movements.length > 0) {
+      p.recent_movements.forEach(function (m) {
+        const row = document.createElement('div');
+        row.className = 'part-mvmt-row';
+        row.innerHTML =
+          '<span class="part-mvmt-type">' + escHtml(m.type) + '</span>' +
+          '<span style="color:#64748b;">' + escHtml(m.date) + '</span>' +
+          '<span style="color:#94a3b8;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(m.note || '') + '</span>' +
+          '<span style="color:#e2e8f0;font-weight:600;">' + (m.qty >= 0 ? '+' : '') + m.qty + '</span>';
+        mList.appendChild(row);
+      });
+      mWrap.style.display = '';
+    } else {
+      mWrap.style.display = 'none';
+    }
+
+    // Action buttons
+    const actWrap = document.getElementById('partActions');
+    actWrap.innerHTML =
+      '<a href="' + escHtml(p.url_stock_in)  + '" class="scanner-btn scanner-btn-success"><i class="bi bi-plus-circle"></i> Stock In</a>' +
+      '<a href="' + escHtml(p.url_stock_out) + '" class="scanner-btn scanner-btn-outline"><i class="bi bi-dash-circle"></i> Stock Out</a>' +
+      '<a href="' + escHtml(p.url_sell)      + '" class="scanner-btn scanner-btn-outline"><i class="bi bi-cart-plus"></i> Sell</a>' +
+      '<a href="' + escHtml(p.url_use)       + '" class="scanner-btn scanner-btn-outline"><i class="bi bi-tools"></i> Use in Repair</a>' +
+      '<a href="' + escHtml(p.url_detail)    + '" class="scanner-btn scanner-btn-outline" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Details</a>' +
+      '<button class="scanner-btn scanner-btn-danger-ghost" onclick="clearScan()"><i class="bi bi-x-lg"></i> Clear</button>';
+
+    foundCard.style.display     = 'none';
+    notFoundCard.style.display  = 'none';
+    partFoundCard.style.display = '';
+    showResultCard();
+  }
+
+  /* ── Status badge helper ── */
+  function updateStatusBadge(status) {
+    const badge = document.getElementById('unitStatusBadge');
+    badge.className   = 'status-pill-lg status-' + status;
+    badge.textContent = STATUS_LABELS[status] || status.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  /* ── Check In ── */
+  function doCheckin() {
+    if (!currentUnit) return;
+    const fd = new FormData();
+    fd.append('instance_id', currentUnit.instance_id);
+    fetch('/stock/scan/checkin', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          currentUnit.status = data.status;
+          updateStatusBadge(data.status);
+          renderActions(currentUnit);
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message || 'Action failed.', 'danger');
+        }
+      })
+      .catch(function () { showToast('Network error.', 'danger'); });
+  }
+  window.doCheckin = doCheckin;
+
+  /* ── Check Out ── */
+  function doCheckout() {
+    if (!currentUnit) return;
+    const fd = new FormData();
+    fd.append('instance_id', currentUnit.instance_id);
+    fetch('/stock/scan/checkout', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success) {
+          currentUnit.status = data.status;
+          updateStatusBadge(data.status);
+          renderActions(currentUnit);
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message || 'Action failed.', 'danger');
+        }
+      })
+      .catch(function () { showToast('Network error.', 'danger'); });
+  }
+  window.doCheckout = doCheckout;
+
+  /* ── Open Idle Modal ── */
+  function openIdleModal() {
+    if (!currentUnit) return;
+    document.getElementById('idleInstanceId').value = currentUnit.instance_id;
+    document.getElementById('idleUnitInfo').textContent =
+      (currentUnit.item_name || '') + '  —  SN: ' + (currentUnit.serial || '');
+    document.getElementById('idleReason').value = '';
+    new bootstrap.Modal(document.getElementById('idleModal')).show();
+  }
+  window.openIdleModal = openIdleModal;
+
+  /* ── Idle form submit ── */
+  document.getElementById('idleForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('idleSubmitBtn');
+    setButtonLoading(btn, true);
+    const fd = new FormData(this);
+    fetch('/stock/scan/mark_idle', { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        setButtonLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('idleModal')).hide();
+        if (data.success) {
+          currentUnit.status = data.status;
+          updateStatusBadge(data.status);
+          renderActions(currentUnit);
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message || 'Action failed.', 'danger');
+        }
+      })
+      .catch(function () {
+        setButtonLoading(btn, false);
+        showToast('Network error.', 'danger');
+      });
+  });
+
+  /* ── Bin loader for move modal ── */
+  function loadMoveBins(locationId, selectedBin) {
+    const binSel = document.getElementById('moveShelfBin');
+    const hint   = document.getElementById('moveBinHint');
+    binSel.innerHTML = '<option value="">— no bin —</option>';
+    if (!locationId) { if (hint) hint.style.display = ''; return; }
+    if (hint) hint.style.display = 'none';
+    fetch('/stock/bins/for_location?location_id=' + locationId + '&bin_type=units')
+      .then(r => r.json())
+      .then(bins => {
+        bins.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.name;
+          opt.textContent = b.name;
+          if (b.name === selectedBin) opt.selected = true;
+          binSel.appendChild(opt);
+        });
+        if (selectedBin && !bins.find(b => b.name === selectedBin)) {
+          const opt = document.createElement('option');
+          opt.value = selectedBin;
+          opt.textContent = selectedBin + ' (legacy)';
+          opt.selected = true;
+          binSel.appendChild(opt);
+        }
+        const newOpt = document.createElement('option');
+        newOpt.value = '__new__'; newOpt.textContent = '＋ New Bin…';
+        binSel.appendChild(newOpt);
+      });
+  }
+
+  document.getElementById('moveShelfBin').addEventListener('change', function() {
+    if (this.value !== '__new__') return;
+    const name = prompt('New bin name:');
+    if (!name || !name.trim()) { this.value = ''; return; }
+    const locId = document.getElementById('moveLocationId').value;
+    if (!locId) { this.value = ''; return; }
+    fetch('/stock/bins/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name.trim().toUpperCase(), location_id: parseInt(locId)}),
+    }).then(r => r.json()).then(data => {
+      if (data.id) { loadMoveBins(locId, data.name); }
+      else { this.value = ''; }
+    });
+  });
+
+  document.getElementById('moveLocationId').addEventListener('change', function () {
+    loadMoveBins(this.value, '');
+  });
+
+  /* ── Open Move Modal ── */
+  function openMoveModal() {
+    if (!currentUnit) return;
+    document.getElementById('moveInstanceId').value = currentUnit.instance_id;
+    document.getElementById('moveUnitInfo').textContent =
+      (currentUnit.item_name || '') + '  —  SN: ' + (currentUnit.serial || '');
+    const locSel = document.getElementById('moveLocationId');
+    for (const opt of locSel.options) {
+      opt.selected = String(opt.value) === String(currentUnit.location_id);
+    }
+    loadMoveBins(currentUnit.location_id, currentUnit.shelf_bin || '');
+    new bootstrap.Modal(document.getElementById('moveModal')).show();
+  }
+  window.openMoveModal = openMoveModal;
+
+  /* ── Open Status Modal ── */
+  function openStatusModal() {
+    if (!currentUnit) return;
+    document.getElementById('statusInstanceId').value = currentUnit.instance_id;
+    document.getElementById('statusUnitInfo').textContent =
+      (currentUnit.item_name || '') + '  —  SN: ' + (currentUnit.serial || '');
+    const sel = document.getElementById('statusSelect');
+    for (const opt of sel.options) {
+      opt.selected = opt.value === (currentUnit.status || 'unprocessed');
+    }
+    document.getElementById('statusStage').value = currentUnit.process_stage || '';
+    document.getElementById('statusNote').value  = '';
+    new bootstrap.Modal(document.getElementById('statusModal')).show();
+  }
+  window.openStatusModal = openStatusModal;
+
+  /* ── Move form submit ── */
+  document.getElementById('moveForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('moveSubmitBtn');
+    setButtonLoading(btn, true);
+    const fd = new FormData(this);
+
+    fetch('/stock/scan/move', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setButtonLoading(btn, false);
+      bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+      if (data.success) {
+        showToast(data.message, 'success');
+        if (currentUnit) {
+          currentUnit.location_name = data.location_name;
+          currentUnit.shelf_bin     = data.shelf_bin;
+          currentUnit.location_id   = document.getElementById('moveLocationId').value;
+          document.getElementById('unitLocation').textContent = data.location_name || '—';
+          document.getElementById('unitBin').textContent      = data.shelf_bin     || '—';
+        }
+      } else {
+        showToast(data.message || 'Move failed.', 'danger');
+      }
+    })
+    .catch(function () {
+      setButtonLoading(btn, false);
+      showToast('Network error.', 'danger');
+    });
+  });
+
+  /* ── Status form submit ── */
+  document.getElementById('statusForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('statusSubmitBtn');
+    setButtonLoading(btn, true);
+    const fd = new FormData(this);
+
+    fetch('/stock/scan/update_status', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setButtonLoading(btn, false);
+      bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+      if (data.success) {
+        showToast(data.message, 'success');
+        if (currentUnit) {
+          currentUnit.status = data.status;
+          updateStatusBadge(data.status);
+          renderActions(currentUnit);
+        }
+      } else {
+        showToast(data.message || 'Update failed.', 'danger');
+      }
+    })
+    .catch(function () {
+      setButtonLoading(btn, false);
+      showToast('Network error.', 'danger');
+    });
+  });
+
+  /* ── Audio ── */
+  function playBeep() {
+    const a = document.getElementById('beep-sound');
+    if (a) { a.currentTime = 0; a.play().catch(function () {}); }
+  }
+  function playErrorBeep() {
+    const a = document.getElementById('beep-sound');
+    if (!a) return;
+    a.currentTime = 0; a.play().catch(function () {});
+    setTimeout(function () { a.currentTime = 0; a.play().catch(function () {}); }, 250);
+  }
+
+  /* ── Helpers ── */
+  function showSpinner(on) {
+    scanSpinner.classList.toggle('active', on);
+    scanHint.style.display = on ? 'none' : '';
+  }
+  function showResultCard() {
+    resultCard.classList.add('result-visible');
+  }
+  function hideResult() {
+    resultCard.classList.remove('result-visible');
+    foundCard.style.display     = 'none';
+    notFoundCard.style.display  = 'none';
+    partFoundCard.style.display = 'none';
+  }
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ── Batch Mode ── */
+  let isBatchMode = false;
+  let batchUnits  = [];   // array of lookup result objects
+
+  function toggleBatchMode() {
+    isBatchMode = !isBatchMode;
+    const btn      = document.getElementById('batchToggleBtn');
+    const panel    = document.getElementById('batchPanel');
+    const subtitle = document.getElementById('scannerSubtitle');
+
+    if (isBatchMode) {
+      btn.classList.add('btn-primary');
+      btn.classList.remove('btn-ghost');
+      btn.innerHTML = '<i class="bi bi-collection-fill"></i> Batch Mode';
+      panel.style.display = '';
+      subtitle.textContent = 'Batch mode — scan units to queue them, then apply bulk updates';
+      clearScan();
+      scanInput.placeholder = 'Scan to add to batch…';
+    } else {
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-ghost');
+      btn.innerHTML = '<i class="bi bi-collection"></i> Batch Mode';
+      panel.style.display = 'none';
+      subtitle.textContent = 'Scan a serial or asset tag to look up a unit instantly';
+      scanInput.placeholder = 'Waiting for scan…';
+      clearScan();
+    }
+  }
+  window.toggleBatchMode = toggleBatchMode;
+
+  function addToBatch(d) {
+    /* Prevent duplicates */
+    if (batchUnits.find(function (u) { return u.instance_id === d.instance_id; })) {
+      showToast('Unit already in batch.', 'warning');
+      return;
+    }
+    batchUnits.push(d);
+    renderBatchTable();
+  }
+
+  function removeBatch(instanceId) {
+    batchUnits = batchUnits.filter(function (u) { return u.instance_id !== instanceId; });
+    renderBatchTable();
+  }
+  window.removeBatch = removeBatch;
+
+  function renderBatchTable() {
+    const tbody    = document.getElementById('batchTbody');
+    const tableWrap= document.getElementById('batchTableWrap');
+    const empty    = document.getElementById('batchEmpty');
+    const applyBar = document.getElementById('batchApplyBar');
+    const clearBtn2= document.getElementById('batchClearBtn');
+    const countEl  = document.getElementById('batchCount');
+
+    countEl.textContent = batchUnits.length;
+
+    if (batchUnits.length === 0) {
+      tableWrap.style.display = 'none';
+      applyBar.style.display  = 'none';
+      empty.style.display     = '';
+      clearBtn2.style.display = 'none';
+      tbody.innerHTML = '';
+      return;
+    }
+
+    empty.style.display     = 'none';
+    tableWrap.style.display = '';
+    applyBar.style.display  = '';
+    clearBtn2.style.display = '';
+
+    tbody.innerHTML = batchUnits.map(function (d) {
+      return '<tr id="batchrow-' + d.instance_id + '">' +
+        '<td style="font-size:0.85rem;font-weight:600;">' + escHtml(d.item_name || '—') + '</td>' +
+        '<td style="font-family:monospace;font-size:0.8rem;">' + escHtml(d.serial || d.asset || '—') + '</td>' +
+        '<td><span class="status-pill status-' + escHtml(d.status || 'unprocessed') + '" style="font-size:0.72rem;">' +
+          (d.status || 'unprocessed').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }) +
+        '</span></td>' +
+        '<td style="font-size:0.82rem;">' + escHtml(d.location_name || '—') + '</td>' +
+        '<td style="font-family:monospace;font-size:0.8rem;">' + escHtml(d.shelf_bin || '—') + '</td>' +
+        '<td><button class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:0.15rem 0.4rem;" ' +
+          'onclick="removeBatch(' + d.instance_id + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function clearBatch() {
+    batchUnits = [];
+    renderBatchTable();
+  }
+  window.clearBatch = clearBatch;
+
+  function loadBatchBins(locationId) {
+    const binSel = document.getElementById('batchBin');
+    binSel.innerHTML = '<option value="">— no change —</option>';
+    if (!locationId) return;
+    fetch('/stock/bins/for_location?location_id=' + locationId + '&bin_type=units')
+      .then(function (r) { return r.json(); })
+      .then(function (bins) {
+        bins.forEach(function (b) {
+          const opt = document.createElement('option');
+          opt.value = b.name; opt.textContent = b.name;
+          binSel.appendChild(opt);
+        });
+      });
+  }
+  window.loadBatchBins = loadBatchBins;
+
+  function applyBatch() {
+    if (batchUnits.length === 0) { showToast('No units in batch.', 'warning'); return; }
+    const status    = document.getElementById('batchStatus').value;
+    const locationId= document.getElementById('batchLocation').value;
+    const bin       = document.getElementById('batchBin').value;
+    if (!status && !locationId && !bin) {
+      showToast('Select at least one change to apply.', 'warning'); return;
+    }
+    const btn = document.getElementById('batchApplyBtn');
+    setButtonLoading(btn, true);
+
+    fetch('/stock/scan/batch_apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        serials:      batchUnits.map(function (u) { return u.serial || u.asset; }),
+        status:       status,
+        location_id:  locationId ? parseInt(locationId) : null,
+        shelf_bin:    bin,
+      }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setButtonLoading(btn, false);
+      if (data.success) {
+        showToast(data.updated + ' of ' + data.total + ' unit(s) updated.', 'success');
+        /* Mark updated rows green briefly then clear */
+        data.results.forEach(function (r) {
+          if (r.outcome === 'updated') {
+            const unit = batchUnits.find(function (u) { return (u.serial || u.asset) === r.serial; });
+            if (unit) {
+              if (status) unit.status = status;
+              const row = document.getElementById('batchrow-' + (unit ? unit.instance_id : ''));
+              if (row) { row.style.background = 'rgba(34,197,94,0.08)'; }
+            }
+          }
+        });
+        setTimeout(function () { clearBatch(); }, 900);
+      } else {
+        showToast(data.message || 'Apply failed.', 'danger');
+      }
+    })
+    .catch(function () {
+      setButtonLoading(btn, false);
+      showToast('Network error.', 'danger');
+    });
+  }
+  window.applyBatch = applyBatch;
+
+}());
+</script>
+{% endblock %}

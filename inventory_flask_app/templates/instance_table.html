@@ -1,374 +1,578 @@
 {% extends "base.html" %}
+{% block title %}{{ title or 'Inventory' }}{% endblock %}
+{% block page_title %}{{ title or 'Inventory' }}{% endblock %}
+
 {% block content %}
 <style>
-/* --- Inventory unified fixed header --- */
-.fixed-inventory-header {
-  position: fixed;
-  top: 0;
-  left: 240px;
-  right: 0;
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(6px);
-  z-index: 1051;
-  border-bottom: 1px solid #eee;
-  padding: 12px 0 8px 0;
-}
-@media (max-width: 991px) {
-  .fixed-inventory-header { left: 0; }
-}
-.inventory-main-content {
-  margin-top: 85px;
-  padding: 0 16px;
-}
-/* .comfortable-table: main table styling */
-.comfortable-table {
-  border-collapse: separate;
-  border-spacing: 0 6px;
-  width: 100%;
-  min-width: 100%;
-  overflow-x: auto;
-}
-.comfortable-table th {
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  background: #f0f2f5;
-  border: none;
-  color: #333;
-  text-transform: uppercase;
-  font-weight: bold;
-}
-.comfortable-table td {
-  padding: 8px 12px;
-  font-size: 13px;
-  background: #fff;
-  vertical-align: middle;
-  border: none;
-  border-top: 1px solid #eee;
-  border-bottom: 1px solid #eee;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-}
-.comfortable-table tbody tr:hover td {
-  background-color: #f1f2f5;
-}
-.comfortable-table .btn {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 0.5rem;
-}
-.comfortable-table thead th {
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 2;
-  box-shadow: 0 2px 2px -1px rgba(0,0,0,0.06);
-}
-.instances-card {
-  background: #f6f7fa;
-  border-radius: 1.1rem;
-  box-shadow: 0 2px 12px #0057b710;
-  border: none;
-  padding: 2.3rem 1.2rem 1.4rem 1.2rem;
-  margin-top: 1.2rem;
-}
-.batch-action-bar .btn {
-  border-radius: 2rem !important;
-  font-weight: 500;
-  font-size: 0.97rem;
-}
-.btn {
-  color: #222 !important;
-}
-.btn:hover {
-  color: #000 !important;
-}
-.btn-outline-dark:hover {
-  background-color: #e4e6e9;
-  color: #111;
-  border-color: #bbb;
-}
+  .inv-filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .inv-filter-bar .form-select,
+  .inv-filter-bar .form-control {
+    font-size: 0.8rem;
+    min-height: 36px;
+    padding: 0.35rem 0.75rem;
+  }
+  .group-row td { vertical-align: middle; }
+  .group-row { cursor: pointer; }
+  .group-row:hover td { background: var(--surface-2); }
+  .count-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--primary-light); color: var(--primary);
+    border-radius: 20px; padding: 0.15rem 0.65rem;
+    font-size: 0.76rem; font-weight: 600; white-space: nowrap;
+  }
+  .count-badge.badge-success { background: rgba(var(--color-success-rgb,34,197,94),0.12); color: var(--color-success); }
+  .count-badge.badge-primary { background: var(--primary-light); color: var(--primary); }
+  .count-badge.badge-danger  { background: rgba(var(--color-danger-rgb,239,68,68),0.12); color: var(--color-danger); }
+  .count-badge.badge-muted   { background: var(--surface-3); color: var(--text-muted); }
+  .inv-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;
+  }
+  .inv-toolbar-info { font-size: 0.84rem; color: var(--text-secondary); }
+  .inv-toolbar-info strong { color: var(--text-primary); }
+
+  @media (max-width: 767px) {
+    .inv-filter-body { display: none; }
+    .inv-filter-body.filter-open { display: block; padding-top: 0.75rem; }
+  }
+
+  /* animate-fade-up leaves transform:translateY(0) active (forwards fill-mode),
+     which permanently creates a stacking context on each sibling. DOM-order wins
+     by default, so .inv-filter-bar paints over the page-header's dropdown.
+     Explicitly raise the page-header stacking context to fix it. */
+  .page-header { position: relative; z-index: 200; overflow: visible; }
+  .page-header .dropdown-menu { z-index: 9999 !important; }
+  .inv-filter-bar { position: relative; z-index: 1; }
 </style>
-<style>
-.comfortable-table td,
-.comfortable-table th {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  max-width: 180px;
-}
 
-/* Remove fixed width/min-width for first and second columns to allow horizontal scrolling */
-
-/* .comfortable-table width, min-width, overflow-x, display moved to main style above */
-
-.comfortable-table td a.btn {
-  white-space: nowrap;
-}
-</style>
-<div class="fixed-inventory-header">
-  <div class="container-fluid">
-    <form method="get">
-      <div class="row g-2 align-items-end">
-        <div class="col-auto">
-          <h4 class="mb-0"><i class="bi bi-list-ul me-2"></i>{{ title }}</h4>
-        </div>
-        <div class="col">
-          <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="all" {% if request.args.get('status', 'all') == 'all' %}selected{% endif %}>All Statuses</option>
-            <option value="unprocessed" {% if request.args.get('status') == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
-            <option value="under_process" {% if request.args.get('status') == 'under_process' %}selected{% endif %}>Under Process</option>
-            <option value="processed" {% if request.args.get('status') == 'processed' %}selected{% endif %}>Processed</option>
-            <option value="disputed" {% if request.args.get('status') == 'disputed' %}selected{% endif %}>Disputed</option>
-          </select>
-        </div>
-        <div class="col">
-          <input type="text" name="model" value="{{ request.args.get('model', '') }}" class="form-control form-control-sm" placeholder="Model">
-        </div>
-        <div class="col">
-          <select name="processor" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">Processor</option>
-            {% for p in processors %}
-              <option value="{{ p }}" {% if request.args.get('processor') == p %}selected{% endif %}>{{ p }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-auto d-flex gap-2">
-          <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
-          <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
-        </div>
-      </div>
-    </form>
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ title or 'Inventory' }}</h1>
+    <div class="page-subtitle" id="selected-count">0 selected</div>
   </div>
-</div>
-<div class="inventory-main-content">
-  <div class="instances-card mt-3">
-    <form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <div>
-          {% set total = total_units if total_units is defined and total_units is not none else 0 %}
-          <strong>{{ "{:,}".format(total) }} units in inventory across {{ grouped_instances|length }} model{{ 's' if grouped_instances|length != 1 else '' }}</strong>
-          <span class="text-muted small ms-3" id="selected-count">0 selected</span>
-        </div>
-        <div class="d-flex gap-2">
-          <a href="{{ url_for('stock_bp.scan_move') }}" class="btn btn-outline-success btn-sm rounded-pill">Scan & Move</a>
-          <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill">🖨️ Print Selected</button>
-          <button type="submit" form="export-excel-form" class="btn btn-outline-dark btn-sm rounded-pill">Export Selected</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto; width: 100%;">
-        {% set column_order = (settings.column_order_instance_table or '').split(',') %}
-        <table class="table table-sm align-middle table-hover comfortable-table w-100">
-          <thead>
-            <tr>
-              <th class="text-uppercase fw-bold bg-light" style="width: 40px;">
-                <input type="checkbox" id="select-all-labels" onclick="for(let cb of document.querySelectorAll('.batch-label-checkbox')) cb.checked=this.checked; updateSelectedFromCheckboxes();">
-              </th>
-              <th class="text-uppercase fw-bold bg-light">Model</th>
-              <th class="text-uppercase fw-bold bg-light">Processor</th>
-              <th class="text-uppercase fw-bold bg-light">Count</th>
-              <th class="text-uppercase fw-bold bg-light">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="instance-rows">
-            {% for group in grouped_instances %}
-              <tr class="table-light" style="margin-bottom: 6px;">
-                <td>
-                  <input type="checkbox" class="batch-label-checkbox" value="group_{{ loop.index0 }}" data-model="{{ group.model }}" data-cpu="{{ group.cpu }}">
-                </td>
-                <td><strong>{{ group.model }}</strong></td>
-                <td><span class="text-muted small">{{ group.cpu }}</span></td>
-                <td><span class="badge bg-primary">{{ group.count }} unit{{ 's' if group.count != 1 else '' }}</span></td>
-                <td>
-                  <a href="{{ url_for('stock_bp.group_view_page') }}?model={{ group.model }}&cpu={{ group.cpu }}" class="btn btn-sm btn-outline-secondary">
-                    View Units
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </form>
-  </div>
-</div>
-<script>
-  // Track selected groups by their checkbox values
-  let selectedInstances = new Set();
-
-  function updateSelectedCount() {
-    document.getElementById("selected-count").textContent = `${selectedInstances.size} selected`;
-  }
-
-  function updateSelectedFromCheckboxes() {
-    selectedInstances.clear();
-    document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
-      if(cb.checked) selectedInstances.add(cb.value);
-    });
-    updateSelectedCount();
-  }
-
-  // On checkbox change, update selectedInstances set
-  document.addEventListener("change", function (e) {
-    if (e.target.classList && e.target.classList.contains("batch-label-checkbox")) {
-      if (e.target.checked) {
-        selectedInstances.add(e.target.value);
-      } else {
-        selectedInstances.delete(e.target.value);
-      }
-      // Update select-all checkbox state
-      const allCheckboxes = document.querySelectorAll('.batch-label-checkbox');
-      const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
-      document.getElementById("select-all-labels").checked = allChecked;
-      updateSelectedCount();
-    }
-  });
-
-  // On select-all checkbox change
-  document.getElementById("select-all-labels").addEventListener("change", function () {
-    const checked = this.checked;
-    document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
-      cb.checked = checked;
-      if (checked) {
-        selectedInstances.add(cb.value);
-      } else {
-        selectedInstances.delete(cb.value);
-      }
-    });
-    updateSelectedCount();
-  });
-
-  // Inject selected IDs on print form submit
-  const printForm = document.getElementById("batch-print-form");
-  printForm.addEventListener("submit", function (e) {
-    // Remove any previously added hidden inputs scoped to this form
-    printForm.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
-
-    if(selectedInstances.size === 0){
-      e.preventDefault();
-      alert("Please select at least one group to print labels.");
-      return;
-    }
-
-    selectedInstances.forEach(id => {
-      const hiddenInput = document.createElement("input");
-      hiddenInput.type = "hidden";
-      hiddenInput.name = "instance_ids";
-      hiddenInput.value = id;
-      printForm.appendChild(hiddenInput);
-    });
-  });
-
-  // Inject selected IDs on Excel export form submit
-  const exportForm = document.getElementById("export-excel-form");
-  exportForm.addEventListener("submit", function (e) {
-    // Remove any previously added hidden inputs scoped to this form
-    exportForm.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
-
-    if (selectedInstances.size > 0) {
-      selectedInstances.forEach(id => {
-        const hiddenInput = document.createElement("input");
-        hiddenInput.type = "hidden";
-        hiddenInput.name = "instance_ids";
-        hiddenInput.value = id;
-        exportForm.appendChild(hiddenInput);
-      });
-    } else {
-      e.preventDefault(); // cancel export
-      alert("Please select at least one group to export.");
-    }
-  });
-
-  // Infinite scroll and other scripts remain unchanged
-
-  let currentPage = 2;
-  let loading = false;
-  let noMoreData = false;
-
-  window.addEventListener('scroll', () => {
-    if (loading || noMoreData) return;
-
-    const scrollBottom = window.scrollY + window.innerHeight;
-    const docHeight = document.body.scrollHeight;
-
-    if (scrollBottom >= docHeight - 200) {
-      loadMoreRows();
-    }
-  });
-
-  function loadMoreRows() {
-    loading = true;
-    const loader = document.getElementById('infinite-loading');
-    loader.style.display = 'block';
-
-    const url = new URL(window.location.href);
-    url.searchParams.set('page', currentPage);
-    url.searchParams.set('partial', '1');
-
-    fetch(url)
-      .then(r => r.text())
-      .then(html => {
-        if (html.trim()) {
-          const tbody = document.getElementById('instance-rows');
-          tbody.insertAdjacentHTML('beforeend', html);
-          // After new rows are injected, update checkboxes and counter for infinite scroll
-          document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
-            if (selectedInstances.has(cb.value)) cb.checked = true;
-          });
-          updateSelectedCount();
-          currentPage += 1;
-          loading = false;
-        } else {
-          noMoreData = true;
-          loader.innerHTML = '<span class="text-muted">All units loaded.</span>';
-        }
-      })
-      .catch(() => {
-        loader.innerHTML = '<span class="text-danger">Failed to load more.</span>';
-        loading = false;
-      });
-  }
-</script>
-<div id="infinite-loading" class="text-center my-4">
-  <span class="text-muted small">Loading more units...</span>
-</div>
-
-<script>
-  function toggleGroup(id) {
-    // No-op: legacy, replaced by modal.
-  }
-</script>
-
-<!-- Modal for group units -->
-<div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="groupModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="groupModalLabel">Units for Group</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="groupModalContent">
-        <div class="text-center text-muted">Loading...</div>
-      </div>
+  <div class="page-actions">
+    <a href="{{ url_for('scanner_bp.scan_move') }}" class="btn btn-ghost">
+      <i class="bi bi-upc-scan"></i> Scan &amp; Move
+    </a>
+    <!-- Export All (current filters, no selection needed) -->
+    <a href="{{ url_for('stock_bp.export_instances', **request.args) }}" class="btn btn-ghost" target="_blank">
+      <i class="bi bi-file-earmark-excel"></i> Export All
+    </a>
+    <!-- Bulk actions dropdown (requires selection) -->
+    <div class="dropdown">
+      <button class="btn btn-ghost dropdown-toggle" type="button" id="bulkActionsBtn"
+              data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+        <i class="bi bi-lightning"></i> Bulk Actions
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="bulkActionsBtn" style="z-index:9999">
+        <li><button class="dropdown-item" type="button" onclick="submitBulkForm('batch-print-form')">
+          <i class="bi bi-printer me-2"></i>Print Labels
+        </button></li>
+        <li><button class="dropdown-item" type="button" onclick="submitBulkForm('export-excel-form')">
+          <i class="bi bi-file-earmark-excel me-2"></i>Export Selected
+        </button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item" type="button" onclick="openBulkStatusModal()">
+          <i class="bi bi-arrow-repeat me-2"></i>Change Status
+        </button></li>
+        <li><button class="dropdown-item" type="button" onclick="openBulkMoveModal()">
+          <i class="bi bi-box-arrow-right me-2"></i>Move to Bin
+        </button></li>
+      </ul>
     </div>
   </div>
 </div>
 
-<script>
-function loadGroupModal(model, cpu) {
-  const modal = new bootstrap.Modal(document.getElementById('groupModal'));
-  document.getElementById("groupModalLabel").textContent = `${model} — ${cpu}`;
-  document.getElementById("groupModalContent").innerHTML = '<div class="text-center text-muted">Loading...</div>';
-  modal.show();
+<!-- Filter bar -->
+<div class="inv-filter-bar animate-fade-up">
+  <!-- Mobile toggle (hidden on md+) -->
+  <div class="d-flex d-md-none align-items-center justify-content-between mb-1">
+    <button type="button" class="btn btn-ghost btn-sm" id="filter-toggle-btn" onclick="toggleFilterBar()">
+      <i class="bi bi-funnel"></i> Filters
+      <span id="active-filter-badge" class="badge bg-primary ms-1" style="display:none;"></span>
+    </button>
+    {% if request.args.get('serial_search') or request.args.get('model') or request.args.get('processor') or request.args.get('ram') or request.args.get('video_card') or request.args.get('disk1size') or request.args.get('bin_search') or request.args.get('team') or request.args.get('status','all')!='all' or request.args.get('process_stage') or request.args.get('location') %}
+    <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-ghost btn-sm text-danger">
+      <i class="bi bi-x-circle"></i> Clear
+    </a>
+    {% endif %}
+  </div>
+  <div class="inv-filter-body" id="inv-filter-body">
+  <form method="get" class="row g-2 align-items-end">
+    <!-- Row 1: Serial search + Model + Status + Stage -->
+    <div class="col-12 col-md-3">
+      <label class="form-label" style="font-size:0.72rem;">Serial / Asset Tag</label>
+      <input type="text" name="serial_search" value="{{ request.args.get('serial_search','') }}" class="form-control" placeholder="Search serial or asset…">
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Model</label>
+      <input type="text" name="model" value="{{ request.args.get('model','') }}" class="form-control" placeholder="Filter model…">
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Status</label>
+      <select name="status" class="form-select" onchange="this.form.submit()">
+        <option value="all"          {% if request.args.get('status','all')=='all' %}selected{% endif %}>All Statuses</option>
+        <option value="unprocessed"  {% if request.args.get('status')=='unprocessed' %}selected{% endif %}>{{ get_status_label('unprocessed') }}</option>
+        <option value="under_process"{% if request.args.get('status')=='under_process' %}selected{% endif %}>{{ get_status_label('under_process') }}</option>
+        <option value="processed"    {% if request.args.get('status')=='processed' %}selected{% endif %}>{{ get_status_label('processed') }}</option>
+        <option value="idle"         {% if request.args.get('status')=='idle' %}selected{% endif %}>Idle</option>
+        <option value="disputed"     {% if request.args.get('status')=='disputed' %}selected{% endif %}>{{ get_status_label('disputed') }}</option>
+      </select>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Stage</label>
+      <select name="process_stage" class="form-select" onchange="this.form.submit()">
+        <option value="">All Stages</option>
+        {% for stage in process_stages %}
+          <option value="{{ stage.name }}" {% if request.args.get('process_stage')==stage.name %}selected{% endif %}>{{ stage.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <!-- Row 2: CPU + RAM + GPU + Location + Team + Disk + Bin + Apply/Clear -->
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Processor</label>
+      <select name="processor" class="form-select" onchange="this.form.submit()">
+        <option value="">All CPUs</option>
+        {% for p in processors %}
+          <option value="{{ p }}" {% if request.args.get('processor')==p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-4 col-sm-3 col-md-1">
+      <label class="form-label" style="font-size:0.72rem;">RAM</label>
+      <input type="text" name="ram" value="{{ request.args.get('ram','') }}" class="form-control" placeholder="e.g. 16GB">
+    </div>
+    <div class="col-4 col-sm-3 col-md-1">
+      <label class="form-label" style="font-size:0.72rem;">GPU</label>
+      <input type="text" name="video_card" value="{{ request.args.get('video_card','') }}" class="form-control" placeholder="GPU">
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Location</label>
+      <select name="location" class="form-select" onchange="this.form.submit()">
+        <option value="">All Locations</option>
+        {% for loc in locations %}
+          <option value="{{ loc }}" {% if request.args.get('location')==loc %}selected{% endif %}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Team</label>
+      <select name="team" class="form-select" onchange="this.form.submit()">
+        <option value="">All Teams</option>
+        {% for t in teams | default([]) %}
+          <option value="{{ t }}" {% if request.args.get('team')==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-4 col-sm-3 col-md-1">
+      <label class="form-label" style="font-size:0.72rem;">Disk</label>
+      <input type="text" name="disk1size" value="{{ request.args.get('disk1size','') }}" class="form-control" placeholder="e.g. 256GB">
+    </div>
+    <div class="col-4 col-sm-3 col-md-2">
+      <label class="form-label" style="font-size:0.72rem;">Bin</label>
+      <input type="text" name="bin_search" value="{{ request.args.get('bin_search','') }}" class="form-control" placeholder="Search bin…">
+    </div>
+    <div class="col-auto d-flex gap-1 align-items-end">
+      <button type="submit" class="btn btn-primary" style="min-height:36px;padding:0.35rem 0.9rem;font-size:0.8rem;">
+        <i class="bi bi-funnel"></i> Apply
+      </button>
+      {% if request.args.get('serial_search') or request.args.get('model') or request.args.get('processor') or request.args.get('ram') or request.args.get('video_card') or request.args.get('disk1size') or request.args.get('bin_search') or request.args.get('team') or request.args.get('status','all')!='all' or request.args.get('process_stage') or request.args.get('location') %}
+      <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-ghost" style="min-height:36px;padding:0.35rem 0.75rem;font-size:0.8rem;">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+  </div><!-- /inv-filter-body -->
+</div>
 
-  fetch(`/stock/api/group_detail?model=${encodeURIComponent(model)}&cpu=${encodeURIComponent(cpu)}`)
-    .then(response => response.text())
-    .then(html => {
-      document.getElementById("groupModalContent").innerHTML = html;
-    });
+<!-- Summary stats bar -->
+{% if summary_stats is defined and summary_stats %}
+<div class="animate-fade-up" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;font-size:0.8rem;">
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;color:var(--text-secondary);">
+    <strong style="color:var(--text-primary);">{{ "{:,}".format(summary_stats.groups) }}</strong> groups
+  </span>
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;color:var(--text-secondary);">
+    <strong style="color:var(--text-primary);">{{ "{:,}".format(summary_stats.total) }}</strong> units total
+  </span>
+  {% if summary_stats.unprocessed %}
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;">
+    <span class="status-pill status-unprocessed" style="font-size:0.72rem;padding:0.1rem 0.5rem;">{{ summary_stats.unprocessed }} unprocessed</span>
+  </span>
+  {% endif %}
+  {% if summary_stats.under_process %}
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;">
+    <span class="status-pill status-under_process" style="font-size:0.72rem;padding:0.1rem 0.5rem;">{{ summary_stats.under_process }} in process</span>
+  </span>
+  {% endif %}
+  {% if summary_stats.processed %}
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;">
+    <span class="status-pill status-processed" style="font-size:0.72rem;padding:0.1rem 0.5rem;">{{ summary_stats.processed }} processed</span>
+  </span>
+  {% endif %}
+  {% if summary_stats.idle %}
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;">
+    <span class="status-pill status-idle" style="font-size:0.72rem;padding:0.1rem 0.5rem;">{{ summary_stats.idle }} idle</span>
+  </span>
+  {% endif %}
+  {% if summary_stats.disputed %}
+  <span style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.3rem 0.75rem;">
+    <span class="status-pill status-disputed" style="font-size:0.72rem;padding:0.1rem 0.5rem;">{{ summary_stats.disputed }} disputed</span>
+  </span>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Inventory table -->
+<div class="table-card animate-fade-up">
+  <div class="table-toolbar">
+      <span class="table-title">
+        {% set total = total_units if total_units is defined and total_units is not none else 0 %}
+        <strong>{{ "{:,}".format(total) }}</strong> units &nbsp;&middot;&nbsp;
+        {{ grouped_instances|length }} model{{ 's' if grouped_instances|length != 1 else '' }}
+      </span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-sm align-middle mb-0" style="min-width:500px;">
+        <thead>
+          <tr>
+            <th style="width:40px;">
+              <input type="checkbox" id="select-all-cb" class="form-check-input">
+            </th>
+            {% macro sort_link(col, label) %}
+              {% set cur_dir = sort_dir if sort_col == col else 'asc' %}
+              {% set next_dir = 'desc' if (sort_col == col and sort_dir == 'asc') else 'asc' %}
+              <a href="{{ url_for('stock_bp.under_process', **dict(request.args, sort=col, sort_dir=next_dir)) }}"
+                 style="color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+                {{ label }}
+                {% if sort_col == col %}
+                  <i class="bi bi-caret-{{ 'up' if sort_dir == 'asc' else 'down' }}-fill" style="font-size:0.65rem;color:var(--primary);"></i>
+                {% else %}
+                  <i class="bi bi-caret-up" style="font-size:0.65rem;opacity:0.3;"></i>
+                {% endif %}
+              </a>
+            {% endmacro %}
+            <th>{{ sort_link('model', 'Model') }}</th>
+            <th>{{ sort_link('cpu', 'Processor') }}</th>
+            <th>{{ sort_link('count', 'Units') }}</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="instance-rows">
+          {% for group in grouped_instances %}
+          {% set statuses = group.instances | map(attribute='status') | list %}
+          {% set has_disputed = ('disputed' in statuses) or ('idle' in statuses) %}
+          {% set has_under    = 'under_process' in statuses %}
+          {% set all_proc     = (statuses | select('equalto','processed') | list | length) == statuses | length and statuses | length > 0 %}
+          {% set badge_cls    = 'badge-danger' if has_disputed else ('badge-primary' if has_under else ('badge-success' if all_proc else 'badge-muted')) %}
+          {% set group_url    = url_for('stock_bp.api_group_detail') ~ '?model=' ~ (group.model|urlencode) ~ '&cpu=' ~ ((group.cpu or '')|urlencode) ~ (('&location=' ~ request.args.get('location')) if request.args.get('location') else '') ~ (('&ram=' ~ request.args.get('ram')) if request.args.get('ram') else '') ~ (('&gpu=' ~ request.args.get('video_card')) if request.args.get('video_card') else '') ~ (('&stage=' ~ request.args.get('process_stage')) if request.args.get('process_stage') else '') %}
+          <tr class="group-row" data-url="{{ group_url }}" onclick="groupRowClick(event, this)">
+            <td>
+              <input type="checkbox" class="form-check-input batch-label-checkbox"
+                value="{{ group.model | nonan }}|||{{ group.cpu }}"
+                data-model="{{ group.model | nonan }}" data-cpu="{{ group.cpu }}">
+            </td>
+            <td>
+              <span style="font-weight:600;font-size:0.875rem;">{{ group.model | nonan }}</span>
+            </td>
+            <td>
+              <span style="font-size:0.82rem;color:var(--text-secondary);">{{ group.cpu | nonan }}</span>
+            </td>
+            <td>
+              <span class="count-badge {{ badge_cls }}">{{ group.count }} unit{{ 's' if group.count != 1 else '' }}</span>
+            </td>
+            <td>
+              {% if group.product_id %}
+              <a href="{{ group_url }}"
+                class="btn btn-ghost" style="font-size:0.78rem;min-height:30px;padding:0.25rem 0.65rem;">
+                <i class="bi bi-eye"></i> View Units
+              </a>
+              {% else %}
+              <span style="font-size:0.78rem;color:var(--color-danger);">Invalid product</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5">
+              <div class="empty-state" style="padding:2.5rem 0;">
+                <i class="bi bi-box-seam"></i>
+                <p>No inventory found</p>
+                <a href="{{ url_for('stock_bp.stock_intake') }}" class="btn btn-primary btn-sm">Receive Stock</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="infinite-loading" class="text-center py-3" style="display:none;">
+      <span class="text-muted small">Loading more…</span>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden forms for bulk operations -->
+<form method="post" action="{{ url_for('stock_bp.export_instances') }}" target="_blank" id="export-excel-form" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form method="post" action="{{ url_for('stock_bp.print_labels_batch') }}" target="_blank" id="batch-print-form" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<!-- Bulk Status Change Modal -->
+<div class="modal fade" id="bulkStatusModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);overflow:hidden;">
+      <div class="modal-header" style="padding:1rem 1.5rem;">
+        <div style="font-weight:700;font-size:0.9rem;"><i class="bi bi-arrow-repeat me-2"></i>Change Status</div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('stock_bp.bulk_status_change') }}" id="bulk-status-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body" style="padding:1.25rem 1.5rem;">
+          <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:1rem;">
+            Change status for all selected groups.
+          </p>
+          <label class="form-label" style="font-weight:600;font-size:0.84rem;">New Status</label>
+          <select name="new_status" class="form-select">
+            <option value="unprocessed">Unprocessed</option>
+            <option value="under_process">Under Process</option>
+            <option value="processed">Processed</option>
+            <option value="idle">Idle</option>
+            <option value="disputed">Disputed</option>
+          </select>
+        </div>
+        <div class="modal-footer" style="padding:0.85rem 1.5rem;">
+          <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Move to Bin Modal -->
+<div class="modal fade" id="bulkMoveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);overflow:hidden;">
+      <div class="modal-header" style="padding:1rem 1.5rem;">
+        <div style="font-weight:700;font-size:0.9rem;"><i class="bi bi-box-arrow-right me-2"></i>Move to Bin</div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('stock_bp.bulk_move_to_bin') }}" id="bulk-move-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body" style="padding:1.25rem 1.5rem;">
+          <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:1rem;">
+            Move all selected groups to a bin.
+          </p>
+          <div class="mb-3">
+            <label class="form-label" style="font-weight:600;font-size:0.84rem;">Location</label>
+            <select id="modal-location-select" class="form-select" onchange="loadBinsForLocation(this.value)">
+              <option value="">— Select location —</option>
+              {% for loc in location_objs | default([]) %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-weight:600;font-size:0.84rem;">Bin</label>
+            <select name="bin_id" id="modal-bin-select" class="form-select">
+              <option value="">— Select location first —</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:0.85rem 1.5rem;">
+          <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Move</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let selectedInstances = new Set();
+
+function updateSelectedCount() {
+  document.getElementById('selected-count').textContent =
+    selectedInstances.size ? `${selectedInstances.size} selected` : '0 selected';
 }
+
+const selectAll = document.getElementById('select-all-cb');
+selectAll.addEventListener('change', function() {
+  document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
+    cb.checked = this.checked;
+    this.checked ? selectedInstances.add(cb.value) : selectedInstances.delete(cb.value);
+  });
+  updateSelectedCount();
+});
+
+document.addEventListener('change', function(e) {
+  if (!e.target.classList.contains('batch-label-checkbox')) return;
+  e.target.checked ? selectedInstances.add(e.target.value) : selectedInstances.delete(e.target.value);
+  const all = document.querySelectorAll('.batch-label-checkbox');
+  selectAll.checked = all.length > 0 && Array.from(all).every(c => c.checked);
+  updateSelectedCount();
+});
+
+function injectSelected(form) {
+  form.querySelectorAll('input[name="instance_ids"]').forEach(el => el.remove());
+  selectedInstances.forEach(id => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'instance_ids'; inp.value = id;
+    form.appendChild(inp);
+  });
+}
+
+document.getElementById('batch-print-form').addEventListener('submit', function(e) {
+  if (selectedInstances.size === 0) { e.preventDefault(); showToast('Select at least one group to print.', 'warning'); return; }
+  injectSelected(this);
+});
+
+document.getElementById('export-excel-form').addEventListener('submit', function(e) {
+  if (selectedInstances.size === 0) { e.preventDefault(); showToast('Select at least one group to export.', 'warning'); return; }
+  injectSelected(this);
+});
+
+function submitBulkForm(formId) {
+  if (selectedInstances.size === 0) { showToast('Select at least one group first.', 'warning'); return; }
+  const form = document.getElementById(formId);
+  injectSelected(form);
+  form.submit();
+}
+
+function openBulkStatusModal() {
+  if (selectedInstances.size === 0) { showToast('Select at least one group first.', 'warning'); return; }
+  injectSelected(document.getElementById('bulk-status-form'));
+  new bootstrap.Modal(document.getElementById('bulkStatusModal')).show();
+}
+
+function openBulkMoveModal() {
+  if (selectedInstances.size === 0) { showToast('Select at least one group first.', 'warning'); return; }
+  injectSelected(document.getElementById('bulk-move-form'));
+  new bootstrap.Modal(document.getElementById('bulkMoveModal')).show();
+}
+
+document.getElementById('bulk-status-form').addEventListener('submit', function() {
+  injectSelected(this);
+});
+document.getElementById('bulk-move-form').addEventListener('submit', function() {
+  injectSelected(this);
+});
+
+function loadBinsForLocation(locationId) {
+  const sel = document.getElementById('modal-bin-select');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  if (!locationId) { sel.innerHTML = '<option value="">— Select location first —</option>'; return; }
+  fetch(`/stock/bins/for_location?location_id=${locationId}&bin_type=units`)
+    .then(r => r.json())
+    .then(data => {
+      sel.innerHTML = '<option value="">— No bin (unassign) —</option>';
+      data.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id; opt.textContent = b.name;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => { sel.innerHTML = '<option value="">Failed to load bins</option>'; });
+}
+
+function groupRowClick(event, row) {
+  if (event.target.closest('input,button,a')) return;
+  window.location = row.dataset.url;
+}
+
+/* Fix dropdown clipping in page-header — reposition to fixed coords */
+document.addEventListener('show.bs.dropdown', function(e) {
+  if (e.target.id !== 'bulkActionsBtn') return;
+  const menu = e.target.closest('.dropdown').querySelector('.dropdown-menu');
+  if (!menu) return;
+  const rect = e.target.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.zIndex = '9999';
+  menu.style.top = (rect.bottom + 2) + 'px';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+  menu.style.left = 'auto';
+  menu.style.minWidth = rect.width + 'px';
+});
+document.addEventListener('hide.bs.dropdown', function(e) {
+  if (e.target.id !== 'bulkActionsBtn') return;
+  const menu = e.target.closest('.dropdown').querySelector('.dropdown-menu');
+  if (!menu) return;
+  menu.style.position = '';
+  menu.style.top = '';
+  menu.style.right = '';
+  menu.style.left = '';
+  menu.style.minWidth = '';
+});
+
+/* Mobile filter toggle */
+function toggleFilterBar() {
+  const body = document.getElementById('inv-filter-body');
+  body.classList.toggle('filter-open');
+  const btn = document.getElementById('filter-toggle-btn');
+  const icon = btn.querySelector('i');
+  if (body.classList.contains('filter-open')) {
+    icon.className = 'bi bi-funnel-fill';
+  } else {
+    icon.className = 'bi bi-funnel';
+  }
+}
+
+(function initFilterBadge() {
+  const params = new URLSearchParams(window.location.search);
+  let count = 0;
+  ['serial_search','model','processor','ram','video_card','disk1size','bin_search','team','process_stage','location'].forEach(k => { if (params.get(k)) count++; });
+  if (params.get('status') && params.get('status') !== 'all') count++;
+  const badge = document.getElementById('active-filter-badge');
+  if (badge && count > 0) {
+    badge.textContent = count;
+    badge.style.display = '';
+    // Auto-open filter bar if filters are active
+    const body = document.getElementById('inv-filter-body');
+    if (body) body.classList.add('filter-open');
+  }
+})();
+
+/* Infinite scroll */
+let currentPage = 2, loading = false, noMoreData = false;
+const loader = document.getElementById('infinite-loading');
+
+window.addEventListener('scroll', () => {
+  if (loading || noMoreData) return;
+  if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 300) loadMoreRows();
+});
+
+function loadMoreRows() {
+  loading = true;
+  loader.style.display = 'block';
+  const url = new URL(window.location.href);
+  url.searchParams.set('page', currentPage);
+  url.searchParams.set('partial', '1');
+  fetch(url)
+    .then(r => r.text())
+    .then(html => {
+      if (html.trim()) {
+        document.getElementById('instance-rows').insertAdjacentHTML('beforeend', html);
+        document.querySelectorAll('.batch-label-checkbox').forEach(cb => {
+          if (selectedInstances.has(cb.value)) cb.checked = true;
+        });
+        currentPage++; loading = false;
+      } else {
+        noMoreData = true;
+        loader.innerHTML = '<span class="text-muted small">All units loaded.</span>';
+      }
+    })
+    .catch(() => { loader.innerHTML = '<span style="color:var(--color-danger)">Failed to load more.</span>'; loading = false; });
+}
+
 </script>
 {% endblock %}
-.sidebar .nav-link:hover {
-  background-color: #f1f2f5;
-  color: #000;
-}

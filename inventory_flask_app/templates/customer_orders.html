@@ -1,184 +1,246 @@
 {% extends "base.html" %}
+{% block title %}Customer Orders{% endblock %}
+{% block page_title %}Customer Orders{% endblock %}
+
 {% block content %}
-{# Styles moved to external CSS file for cleanliness #}
-<div class="container-fluid py-4">
-  <section class="card shadow border-0 rounded-4 p-4 mt-3">
-    <div class="fixed-orders-header">
-      <div class="container-fluid">
-        <!-- First row: Title only -->
-        <div class="row mb-4">
-          <div class="col">
-            <h2 class="mb-2">
-              <i class="bi bi-clipboard-check me-2"></i>Customer Order Tracker
-            </h2>
-          </div>
-        </div>
-        <!-- Second row: Unified, responsive horizontal filter + export controls -->
-        <div class="row mt-2">
-          <div class="col-12 d-flex align-items-center flex-wrap gap-2">
-            <form method="GET" class="d-flex align-items-center gap-2 flex-grow-1 flex-wrap flex-lg-nowrap w-100">
-              <select name="customer_id" id="customer_id"
-                class="form-select rounded-pill form-control-sm w-auto"
-                style="min-width: 180px; min-height: 38px;">
-                <option value="">-- All Customers --</option>
-                {% for customer in customers %}
-                  <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|string %}selected{% endif %}>
-                    {{ customer.name }}
-                  </option>
-                {% endfor %}
-              </select>
-              <div class="form-check ms-2 mb-0 d-flex align-items-center"
-                style="height: 38px;">
-                <input class="form-check-input"
-                  type="checkbox" name="show_completed" value="1"
-                  id="showCompletedToggle"
-                  {% if request.args.get('show_completed') %}checked{% endif %}
-                  style="height: 18px; width: 18px;">
-                <label class="form-check-label ms-2 mb-0"
-                  for="showCompletedToggle" style="font-size:1rem;">
-                  Show Completed
-                </label>
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Customer Order Tracker</h1>
+    <div class="page-subtitle">Track and manage reserved units</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('exports_bp.export_customer_orders', customer_id=selected_customer_id) }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-excel"></i> Export Excel
+    </a>
+    <button class="btn btn-ghost" onclick="openPortalModal()">
+      <i class="bi bi-link-45deg"></i> Share Portal Link
+    </button>
+  </div>
+</div>
+
+<!-- Filter bar + quick search -->
+<div class="table-card animate-fade-up" style="margin-bottom:1rem;">
+  <form method="GET" class="d-flex flex-wrap gap-2 align-items-end p-1">
+    <input type="hidden" name="status" value="{{ active_status }}">
+    <div>
+      <label class="form-label" style="font-size:0.72rem;">Customer</label>
+      <select name="customer_id" class="form-select" style="min-width:180px;">
+        <option value="">All Customers</option>
+        {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|string %}selected{% endif %}>
+            {{ customer.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label" style="font-size:0.72rem;">Quick Search</label>
+      <input type="text" id="quickSearch" class="form-control" placeholder="Customer name or serial…"
+             style="min-width:220px;" autocomplete="off">
+    </div>
+    <div class="d-flex align-items-end" style="height:68px;">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+    </div>
+  </form>
+</div>
+
+<!-- Status tabs -->
+<div class="animate-fade-up" style="margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+  {% set tab_map = [
+    ('reserved',  'Reserved',  'var(--primary)'),
+    ('delivered', 'Delivered', 'var(--color-success)'),
+    ('cancelled', 'Cancelled', 'var(--text-muted)'),
+    ('all',       'All',       'var(--text-secondary)'),
+  ] %}
+  {% for key, label, color in tab_map %}
+  <a href="{{ url_for('order_bp.customer_orders', status=key, customer_id=selected_customer_id or '') }}"
+     style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.35rem 0.9rem;border-radius:20px;font-size:0.82rem;font-weight:600;text-decoration:none;
+            {% if active_status == key %}background:{{ color }};color:#fff;{% else %}background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);{% endif %}">
+    {{ label }}
+    <span style="background:rgba(255,255,255,0.25);border-radius:20px;padding:0.05em 0.5em;font-size:0.78rem;">{{ status_counts[key] }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Batch action buttons -->
+<div class="d-flex flex-wrap gap-2 mb-3 animate-fade-up">
+  <button id="batch-move-btn" class="btn btn-ghost">
+    <i class="bi bi-truck"></i> Batch Move
+  </button>
+  <button id="batch-delivered-btn" class="btn btn-ghost">
+    <i class="bi bi-box-seam"></i> Mark Ready
+  </button>
+  <button id="batch-create-sale-btn" class="btn btn-ghost">
+    <i class="bi bi-cart-plus"></i> Create Sale
+  </button>
+  <form id="batch-cancel-form" method="POST" action="{{ url_for('order_bp.batch_cancel_reservation') }}" class="m-0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-ghost" style="color:var(--color-danger);">
+      <i class="bi bi-x-circle"></i> Cancel Reservation
+    </button>
+  </form>
+</div>
+
+<!-- Orders table -->
+<div class="table-card animate-fade-up">
+  {% if orders %}
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" id="ordersTable" style="min-width:1100px;">
+      <thead>
+        <tr>
+          <th style="width:40px;">
+            <input type="checkbox" id="select-all-orders" class="form-check-input">
+          </th>
+          <th>Customer</th>
+          <th>Serial / Asset</th>
+          <th>Model</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th>Storage</th>
+          <th>Grade</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Stage / Team</th>
+          <th>Reserved</th>
+          <th>Event</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        {% set pi   = order.product_instance %}
+        {% set prod = pi.product if pi else None %}
+        <tr data-customer-id="{{ order.customer.id }}"
+            data-search="{{ order.customer.name|lower }} {{ (pi.serial or '')|lower }} {{ (pi.asset or '')|lower }}">
+          <td>
+            {% if pi %}
+            <input type="checkbox" class="form-check-input order-select"
+              value="{{ pi.asset }}|{{ pi.serial }}">
+            {% endif %}
+          </td>
+
+          {# Customer #}
+          <td style="font-weight:600;font-size:0.84rem;white-space:nowrap;">{{ order.customer.name }}</td>
+
+          {# Serial / Asset stacked #}
+          <td>
+            {% if pi %}
+            <div style="font-family:monospace;font-size:0.8rem;font-weight:600;">{{ pi.serial or '—' }}</div>
+            {% if pi.asset %}<div style="font-family:monospace;font-size:0.72rem;color:var(--text-muted);">{{ pi.asset }}</div>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+
+          {# Model #}
+          <td style="font-size:0.84rem;">{{ (prod.model if prod else None) | nonan }}</td>
+
+          {# CPU #}
+          <td style="font-size:0.8rem;color:var(--text-secondary);">{{ (prod.cpu if prod else None) | nonan }}</td>
+
+          {# RAM #}
+          <td style="font-size:0.8rem;">{{ (prod.ram if prod else None) | nonan }}</td>
+
+          {# Storage #}
+          <td style="font-size:0.8rem;">{{ (prod.disk1size if prod else None) | nonan }}</td>
+
+          {# Grade #}
+          <td style="font-size:0.8rem;">{{ (prod.grade if prod else None) | nonan }}</td>
+
+          {# Location #}
+          <td style="font-size:0.8rem;">{{ pi.location.name if pi and pi.location else '—' }}</td>
+
+          {# Status — td:nth-child(10) — used by JS getCheckedOrders() #}
+          <td>
+            <span class="status-pill status-{{ order.status }}">{{ order.status|capitalize }}</span>
+          </td>
+
+          {# Stage / Team stacked #}
+          <td style="font-size:0.8rem;">
+            {% if order.process_stage %}<div>{{ order.process_stage }}</div>{% endif %}
+            {% if order.team_assigned %}<div style="color:var(--text-muted);font-size:0.75rem;">{{ order.team_assigned }}</div>{% endif %}
+            {% if not order.process_stage and not order.team_assigned %}—{% endif %}
+          </td>
+
+          {# Reserved — date + who #}
+          <td style="font-size:0.8rem;white-space:nowrap;">
+            <div>{{ order.reserved_date.strftime('%d %b %Y') if order.reserved_date else '—' }}</div>
+            {% if order.reserved_by %}
+            <div style="font-size:0.72rem;color:var(--text-muted);">by {{ order.reserved_by.username }}</div>
+            {% endif %}
+          </td>
+
+          {# Event — what happened after reservation (ready / cancelled) #}
+          <td style="font-size:0.8rem;white-space:nowrap;">
+            {% if order.status == 'cancelled' %}
+              <div style="color:var(--color-danger);font-weight:500;">
+                Cancelled {{ order.cancelled_at.strftime('%d %b %Y') if order.cancelled_at else '' }}
               </div>
-              <button type="submit"
-                class="btn btn-outline-primary btn-sm rounded-pill flex-shrink-0"
-                style="min-height: 38px; min-width: 160px;"
-                data-bs-toggle="tooltip" title="Apply current filters">
-                <i class="bi bi-search me-1"></i>Apply Filter
+              {% if order.cancelled_by %}
+              <div style="font-size:0.72rem;color:var(--text-muted);">by {{ order.cancelled_by.username }}</div>
+              {% endif %}
+            {% elif order.status == 'delivered' and order.delivered_date %}
+              <div style="color:var(--color-success);font-weight:500;">
+                Ready {{ order.delivered_date.strftime('%d %b %Y') }}
+              </div>
+              {% if order.delivered_by %}
+              <div style="font-size:0.72rem;color:var(--text-muted);">by {{ order.delivered_by.username }}</div>
+              {% endif %}
+            {% else %}
+              <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          {# Actions #}
+          <td style="white-space:nowrap;">
+            {% if order.status == 'reserved' %}
+            <form method="POST" action="{{ url_for('order_bp.mark_delivered', order_id=order.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm" style="font-size:0.76rem;color:var(--color-success);">
+                <i class="bi bi-check-circle"></i> Mark Ready
               </button>
-              <a href="{{ url_for('exports_bp.export_customer_orders', customer_id=selected_customer_id) }}"
-                class="btn btn-outline-dark btn-sm rounded-pill flex-shrink-0"
-                style="min-height: 38px; min-width: 160px;"
-                data-bs-toggle="tooltip" title="Export filtered orders to Excel">
-                <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
-              </a>
             </form>
-          </div>
-        </div>
-        <!-- Third row: Batch action buttons -->
-        <div class="orders-actions mt-3">
-          <button id="batch-move-btn" class="btn btn-outline-warning btn-sm rounded-pill" style="min-height: 36px; min-width: 160px;"
-            data-bs-toggle="tooltip" title="Move selected units to next stage">
-            <i class="bi bi-truck me-1"></i>Batch Move Units
-          </button>
-          <button id="batch-delivered-btn" class="btn btn-outline-success btn-sm rounded-pill" style="min-height: 36px; min-width: 160px;"
-            data-bs-toggle="tooltip" title="Mark selected units as delivered">
-            <i class="bi bi-box-seam me-1"></i>Mark as Delivered
-          </button>
-          <button id="batch-create-sale-btn" class="btn btn-outline-primary btn-sm rounded-pill" style="min-height: 36px; min-width: 160px;"
-            data-bs-toggle="tooltip" title="Create sale for selected delivered units">
-            <i class="bi bi-cart-plus me-1"></i>Create Sale
-          </button>
-          <form id="batch-cancel-form" method="POST" action="{{ url_for('order_bp.batch_cancel_reservation') }}" class="m-0 p-0 d-inline">
-            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill" style="min-height: 36px; min-width: 160px;"
-              data-bs-toggle="tooltip" title="Cancel reservation for selected units">
-              <i class="bi bi-x-circle me-1"></i>Cancel Reservation
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="orders-main-content mt-5 bg-white p-3 rounded-4">
-      {% if orders %}
-      <div style="overflow-x:auto;">
-        <div class="table-responsive">
-          <table class="table table-hover table-sm table-bordered align-middle rounded-4 overflow-hidden" style="background: #fff;">
-            <thead class="table-light">
-              <tr>
-                <th><input type="checkbox" id="select-all-orders"></th>
-                <th>Customer</th>
-                <th>Asset</th>
-                <th>Serial</th>
-                <th>Model</th>
-                <th>CPU</th>
-                <th>RAM</th>
-                <th>disk1size</th>
-                <th>Display</th>
-                <th>GPU</th>
-                <th>Grade</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Stage</th>
-                <th>Team</th>
-                <th>Reserved</th>
-                <th>Delivered</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for order in orders %}
-              <tr data-customer-id="{{ order.customer.id }}">
-                <td>
-                  {% if order.product_instance %}
-                    <input type="checkbox" class="order-select" name="serials" value="{{ order.product_instance.asset }}|{{ order.product_instance.serial }}">
-                  {% endif %}
-                </td>
-                <td>{{ order.customer.name }}</td>
-                <td>{{ order.product_instance.asset if order.product_instance else 'N/A' }}</td>
-                <td>{{ order.product_instance.serial if order.product_instance else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.model if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.cpu if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.ram if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.disk1size if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.display if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.gpu1 if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.product.grade if order.product_instance and order.product_instance.product else 'N/A' }}</td>
-                <td>{{ order.product_instance.location.name if order.product_instance and order.product_instance.location else 'N/A' }}</td>
-                <td>{{ order.status|capitalize }}</td>
-                <td>{{ order.process_stage }}</td>
-                <td>{{ order.team_assigned }}</td>
-                <td>{{ order.reserved_date.strftime('%Y-%m-%d') }}</td>
-                <td>
-                  {% if order.delivered_date %}
-                    <span class="badge bg-primary bg-opacity-10 text-primary">{{ order.delivered_date.strftime('%Y-%m-%d') }}</span>
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-                <td>
-                  {% if order.status != 'delivered' %}
-                  <form method="POST" action="{{ url_for('order_bp.mark_delivered', order_id=order.id) }}">
-                    <button class="btn btn-outline-success btn-sm rounded-pill" style="min-width: 140px;">Mark as Delivered</button>
-                  </form>
-                  {% else %}
-                  <span class="badge bg-success">Delivered</span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% else %}
-        <p class="text-muted">No reserved units found.</p>
-      {% endif %}
-    </div>
-  </section>
+            {% elif order.status == 'delivered' %}
+            <span style="font-size:0.76rem;color:var(--color-success);font-weight:500;">
+              <i class="bi bi-check-circle-fill"></i> Ready
+            </span>
+            {% else %}
+            <span style="font-size:0.76rem;color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-clipboard-x"></i>
+    <p>No reserved units found</p>
+    <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-primary btn-sm">View Inventory</a>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Batch Move Modal -->
-<div class="modal fade" id="batchMoveModal" tabindex="-1" aria-labelledby="batchMoveModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="batchMoveModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog">
-    <div class="modal-content rounded-4">
+    <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="batchMoveModalLabel">
-          <i class="bi bi-truck me-2"></i>Batch Move Units to Next Stage
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title"><i class="bi bi-truck me-2"></i>Batch Move Units</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" action="{{ url_for('order_bp.batch_move') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Paste or Scan Serials<br>
-              <small class="text-muted">(One per line, or comma/space separated)</small>
-            </label>
-            <textarea name="serials_raw" class="form-control" rows="5" placeholder="Scan or paste serial numbers..."></textarea>
+            <label class="form-label">Scan or Paste Serials <small class="text-muted">(one per line)</small></label>
+            <textarea name="serials_raw" class="form-control" rows="5" placeholder="Scan or paste serial numbers…"></textarea>
           </div>
-          <div id="selected-serials-hint" class="mb-3 text-muted" style="white-space: pre-wrap;"></div>
+          <div id="selected-serials-hint" class="mb-3" style="font-size:0.8rem;color:var(--text-muted);white-space:pre-wrap;"></div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Next Stage</label>
-            <select name="to_stage" class="form-select rounded-pill" required>
-              <option value="">-- Select Stage --</option>
+            <label class="form-label">Next Stage</label>
+            <select name="to_stage" class="form-select" required>
+              <option value="">Select stage…</option>
               <option value="specs">Specs</option>
               <option value="qc">QC</option>
               <option value="paint">Paint</option>
@@ -188,245 +250,291 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Assign Team</label>
-            <input type="text" name="to_team" class="form-control rounded-pill" placeholder="Enter team (optional)">
+            <label class="form-label">Assign Team <small class="text-muted">(optional)</small></label>
+            <input type="text" name="to_team" class="form-control" placeholder="Team name">
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-success rounded-pill px-4 fw-semibold">
-            <i class="bi bi-arrow-right-circle me-1"></i>Move Units
-          </button>
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-right-circle"></i> Move Units</button>
         </div>
       </form>
     </div>
   </div>
 </div>
-<!-- End Batch Move Modal -->
 
-<form id="batch-delivered-form" method="POST" action="{{ url_for('order_bp.batch_delivered') }}" style="display:none;"></form>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const deliveredBtn = document.getElementById('batch-delivered-btn');
-    const deliveredForm = document.getElementById('batch-delivered-form');
-
-    if (deliveredBtn && deliveredForm) {
-      deliveredBtn.addEventListener('click', function () {
-        deliveredForm.innerHTML = ''; // Clear old inputs
-
-        const selectedCheckboxes = document.querySelectorAll('.order-select:checked');
-        if (selectedCheckboxes.length === 0) {
-          alert('Please select at least one unit to mark as delivered.');
-          return;
-        }
-
-        selectedCheckboxes.forEach(cb => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'serials';
-          input.value = cb.value.split('|')[0];
-          deliveredForm.appendChild(input);
-        });
-
-        deliveredForm.submit();
-      });
-    }
-  });
-</script>
+<form id="batch-delivered-form" method="POST" action="{{ url_for('order_bp.batch_delivered') }}" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
 <form id="batch-create-sale-form" method="GET" action="{{ url_for('sales_bp.create_sale_form') }}" style="display:none;"></form>
 
+<!-- Portal Link Modal -->
+<div class="modal fade" id="portalLinkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="background:var(--surface-2);border:1px solid var(--border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title" style="font-size:0.95rem;font-weight:600;">
+          <i class="bi bi-link-45deg me-1"></i> Customer Portal Link
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" style="font-size:0.8rem;">Select Customer</label>
+          <select id="portalCustomerSelect" class="form-select form-select-sm">
+            <option value="">— choose customer —</option>
+            {% for customer in customers %}
+            <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|string %}selected{% endif %}>
+              {{ customer.name }}
+              {% if not customer.email %} (no email){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div id="portalLinkResult" style="display:none;">
+          <label class="form-label" style="font-size:0.8rem;">Portal URL</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="portalLinkInput" class="form-control form-control-sm"
+                   readonly style="font-size:0.75rem;font-family:monospace;">
+            <button class="btn btn-ghost btn-sm" onclick="copyPortalLink()" title="Copy">
+              <i class="bi bi-clipboard" id="copyIcon"></i>
+            </button>
+          </div>
+          <div id="portalEmailRow" style="display:none;margin-top:0.65rem;">
+            <button class="btn btn-primary btn-sm w-100" onclick="emailPortalLink()">
+              <i class="bi bi-envelope"></i> Email link to customer
+            </button>
+          </div>
+        </div>
+        <div id="portalLinkLoading" style="display:none;text-align:center;padding:0.5rem;">
+          <span class="spinner-border spinner-border-sm text-primary"></span>
+        </div>
+        <div id="portalLinkError" style="display:none;color:var(--color-danger);font-size:0.8rem;margin-top:0.5rem;"></div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);">
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  // Enable Bootstrap tooltips
-  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-    new bootstrap.Tooltip(tooltipTriggerEl);
-  });
+/* ── Portal link modal ── */
+var _portalUrl = '';
 
-  // Before submit, split serials_raw into multiple <input name="serials">
-  function getOrderCheckboxes() {
-    return document.querySelectorAll('.order-select');
+function openPortalModal() {
+  _portalUrl = '';
+  document.getElementById('portalLinkResult').style.display = 'none';
+  document.getElementById('portalLinkError').style.display  = 'none';
+  new bootstrap.Modal(document.getElementById('portalLinkModal')).show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var sel = document.getElementById('portalCustomerSelect');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      var cid = this.value;
+      if (!cid) {
+        document.getElementById('portalLinkResult').style.display = 'none';
+        return;
+      }
+      document.getElementById('portalLinkLoading').style.display = 'block';
+      document.getElementById('portalLinkResult').style.display  = 'none';
+      document.getElementById('portalLinkError').style.display   = 'none';
+
+      fetch('/customers/' + cid + '/portal_token', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+      })
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('portalLinkLoading').style.display = 'none';
+        if (data.success) {
+          _portalUrl = data.url;
+          document.getElementById('portalLinkInput').value = data.url;
+          document.getElementById('portalLinkResult').style.display = 'block';
+          // Show email row only if customer has email (option text contains "(no email)" if not)
+          var optText = sel.options[sel.selectedIndex].text;
+          var hasEmail = !optText.includes('(no email)');
+          document.getElementById('portalEmailRow').style.display = hasEmail ? 'block' : 'none';
+        } else {
+          document.getElementById('portalLinkError').textContent = data.message || 'Failed to generate link.';
+          document.getElementById('portalLinkError').style.display = 'block';
+        }
+      })
+      .catch(() => {
+        document.getElementById('portalLinkLoading').style.display = 'none';
+        document.getElementById('portalLinkError').textContent = 'Network error.';
+        document.getElementById('portalLinkError').style.display = 'block';
+      });
+    });
+
+    // Auto-trigger if a customer is pre-selected from filter
+    if (sel.value) sel.dispatchEvent(new Event('change'));
   }
+});
 
-  var batchForm = document.querySelector('#batchMoveModal form');
-  var batchMoveBtn = document.getElementById('batch-move-btn');
-  var selectAllCheckbox = document.getElementById('select-all-orders');
-  var textarea = batchForm.querySelector('textarea[name="serials_raw"]');
-  var selectedSerialsHint = document.getElementById('selected-serials-hint');
+function copyPortalLink() {
+  if (!_portalUrl) return;
+  navigator.clipboard.writeText(_portalUrl).then(() => {
+    var icon = document.getElementById('copyIcon');
+    icon.className = 'bi bi-clipboard-check';
+    showToast('Portal link copied to clipboard.', 'success');
+    setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+  }).catch(() => {
+    document.getElementById('portalLinkInput').select();
+    document.execCommand('copy');
+    showToast('Portal link copied.', 'success');
+  });
+}
 
-  // Select All toggle
-  if(selectAllCheckbox) {
-    selectAllCheckbox.addEventListener('change', function() {
-      Array.from(getOrderCheckboxes()).forEach(function(cb) {
-        cb.checked = selectAllCheckbox.checked;
+function emailPortalLink() {
+  var sel = document.getElementById('portalCustomerSelect');
+  var cid = sel ? sel.value : '';
+  if (!cid || !_portalUrl) return;
+
+  fetch('/customers/' + cid + '/send_portal_link', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token() }}',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url: _portalUrl }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast(data.message, 'success');
+      bootstrap.Modal.getInstance(document.getElementById('portalLinkModal')).hide();
+    } else {
+      showToast(data.message || 'Failed to send email.', 'danger');
+    }
+  })
+  .catch(() => showToast('Network error.', 'danger'));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  /* ── Quick search ── */
+  var searchInput = document.getElementById('quickSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      var q = this.value.toLowerCase().trim();
+      document.querySelectorAll('#ordersTable tbody tr').forEach(function(row) {
+        var haystack = row.getAttribute('data-search') || '';
+        row.style.display = (!q || haystack.includes(q)) ? '' : 'none';
       });
     });
   }
 
-  // When Batch Move Units button clicked
-  if(batchMoveBtn) {
-    batchMoveBtn.addEventListener('click', function() {
-      var checkedSerials = [];
-      Array.from(getOrderCheckboxes()).forEach(function(cb) {
-        if(cb.checked) {
-          checkedSerials.push(cb.value);
-        }
-      });
-      if(checkedSerials.length > 0) {
-        textarea.value = checkedSerials.join('\n');
-        selectedSerialsHint.textContent = "Selected serials:\n" + checkedSerials.join('\n');
-      } else {
-        textarea.value = '';
-        selectedSerialsHint.textContent = '';
-      }
-      // Show modal after setting textarea
-      var batchMoveModal = new bootstrap.Modal(document.getElementById('batchMoveModal'));
-      batchMoveModal.show();
+  function getOrderCheckboxes() { return document.querySelectorAll('.order-select'); }
+
+  var selectAllCb = document.getElementById('select-all-orders');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function() {
+      getOrderCheckboxes().forEach(cb => cb.checked = this.checked);
     });
   }
 
   function getCheckedOrders() {
-    var checked = [];
-    Array.from(getOrderCheckboxes()).forEach(function(cb) {
-      if (cb.checked) {
-        var row = cb.closest('tr');
-        // 13th <td> contains the Status column
-        var statusCell = row.querySelector('td:nth-child(13)');
-        checked.push({
-          asset: cb.value.split('|')[0],
-          serial: cb.value.split('|')[1] || '',
-          status: statusCell ? statusCell.textContent.trim().toLowerCase() : ''
-        });
-      }
-    });
-    return checked;
+    return Array.from(getOrderCheckboxes()).filter(cb => cb.checked).map(cb => ({
+      asset: cb.value.split('|')[0],
+      serial: cb.value.split('|')[1] || '',
+      // Status is td:nth-child(10) in the new table layout
+      status: cb.closest('tr').querySelector('td:nth-child(10)')?.textContent.trim().toLowerCase() || ''
+    }));
   }
 
-  if(batchForm) {
-    batchForm.addEventListener('submit', function(e) {
-      // Remove any existing hidden serials
-      batchForm.querySelectorAll('input[name="serials"]').forEach(el => el.remove());
-      var serials = [];
+  /* Batch Move */
+  var batchMoveBtn = document.getElementById('batch-move-btn');
+  var batchForm = document.querySelector('#batchMoveModal form');
+  var textarea = batchForm?.querySelector('textarea[name="serials_raw"]');
+  var hint = document.getElementById('selected-serials-hint');
 
-      // Collect serials from checked checkboxes
-      Array.from(getOrderCheckboxes()).forEach(function(cb) {
-        if(cb.checked) {
-          serials.push(cb.value);
-        }
-      });
+  if (batchMoveBtn) {
+    batchMoveBtn.addEventListener('click', function() {
+      if (!confirm('Move selected units to next stage?')) return;
+      var serials = getCheckedOrders().map(o => o.serial);
+      if (textarea) { textarea.value = serials.join('\n'); }
+      if (hint) { hint.textContent = serials.length ? 'Selected: ' + serials.join(', ') : ''; }
+      new bootstrap.Modal(document.getElementById('batchMoveModal')).show();
+    });
+  }
 
-      // If no checked checkboxes, fallback to textarea
-      if(serials.length === 0 && textarea.value) {
+  if (batchForm) {
+    batchForm.addEventListener('submit', function() {
+      this.querySelectorAll('input[name="serials"]').forEach(el => el.remove());
+      var serials = getCheckedOrders().map(o => o.serial);
+      if (serials.length === 0 && textarea.value) {
         serials = textarea.value.split(/[\s,]+/).filter(Boolean);
       }
-
-      serials.forEach(function(serial) {
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'serials';
-        input.value = serial;
-        batchForm.appendChild(input);
+      serials.forEach(s => {
+        var inp = document.createElement('input');
+        inp.type='hidden'; inp.name='serials'; inp.value=s;
+        this.appendChild(inp);
       });
     });
   }
 
-  var batchDeliveredBtn = document.getElementById('batch-delivered-btn');
-  var batchDeliveredForm = document.getElementById('batch-delivered-form');
-  var batchCreateSaleBtn = document.getElementById('batch-create-sale-btn');
-  var batchCreateSaleForm = document.getElementById('batch-create-sale-form');
-
-  batchDeliveredBtn.addEventListener('click', function () {
-    batchDeliveredForm.innerHTML = '';
-    var checked = getCheckedOrders().filter(o => o.status !== 'delivered');
-
-    if (checked.length === 0) {
-      alert('Please select at least one non-delivered unit.');
-      return;
-    }
-
-    checked.forEach(function (order) {
-      var input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'serials';
-      input.value = order.serial.split('|')[0];
-      batchDeliveredForm.appendChild(input);
-    });
-
-    batchDeliveredForm.submit();
-  });
-
-  if (batchCreateSaleBtn) {
-    batchCreateSaleBtn.addEventListener('click', function() {
-      // Only delivered units, and keep both serial and asset
-      var checked = getCheckedOrders().filter(o => o.status === 'delivered');
-      if (checked.length === 0) {
-        alert('Please select at least one delivered unit.');
-        return;
-      }
-
-      // Populate form
-      batchCreateSaleForm.innerHTML = '';
-
-      // Add customer ID
-      var firstCheckbox = document.querySelector('.order-select:checked');
-      var customerId = '';
-      if (firstCheckbox) {
-        var row = firstCheckbox.closest('tr');
-        customerId = row ? row.getAttribute('data-customer-id') : '';
-      }
-      if (customerId) {
-        var inputCustomer = document.createElement('input');
-        inputCustomer.type = 'hidden';
-        inputCustomer.name = 'customer_id';
-        inputCustomer.value = customerId;
-        batchCreateSaleForm.appendChild(inputCustomer);
-      }
-
-      // Add serial and asset inputs separately
-      checked.forEach(function (order) {
-        var serialInput = document.createElement('input');
-        serialInput.type = 'hidden';
-        serialInput.name = 'serials';
-        serialInput.value = order.serial;
-        batchCreateSaleForm.appendChild(serialInput);
-
-        var assetInput = document.createElement('input');
-        assetInput.type = 'hidden';
-        assetInput.name = 'assets';
-        assetInput.value = order.asset;
-        batchCreateSaleForm.appendChild(assetInput);
+  /* Batch Delivered */
+  var deliveredBtn = document.getElementById('batch-delivered-btn');
+  var deliveredForm = document.getElementById('batch-delivered-form');
+  if (deliveredBtn && deliveredForm) {
+    deliveredBtn.addEventListener('click', function() {
+      var checked = getCheckedOrders().filter(o => o.status === 'reserved');
+      if (checked.length === 0) { showToast('Select at least one reserved unit.', 'warning'); return; }
+      if (!confirm('Mark ' + checked.length + ' unit(s) as ready for pickup?')) return;
+      deliveredForm.innerHTML = '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
+      checked.forEach(o => {
+        var inp = document.createElement('input'); inp.type='hidden'; inp.name='serials'; inp.value=o.serial;
+        deliveredForm.appendChild(inp);
       });
-
-      batchCreateSaleForm.submit();
+      deliveredForm.submit();
     });
   }
 
-  // Unified batch Cancel Reservation handler
+  /* Create Sale — allow reserved or delivered */
+  var createSaleBtn = document.getElementById('batch-create-sale-btn');
+  var createSaleForm = document.getElementById('batch-create-sale-form');
+  if (createSaleBtn && createSaleForm) {
+    createSaleBtn.addEventListener('click', function() {
+      var checked = getCheckedOrders().filter(o => o.status === 'reserved' || o.status === 'delivered');
+      if (checked.length === 0) { showToast('Select at least one reserved or delivered unit.', 'warning'); return; }
+      createSaleForm.innerHTML = '';
+      var firstCb = document.querySelector('.order-select:checked');
+      if (firstCb) {
+        var customerId = firstCb.closest('tr').getAttribute('data-customer-id');
+        if (customerId) {
+          var ci = document.createElement('input'); ci.type='hidden'; ci.name='customer_id'; ci.value=customerId;
+          createSaleForm.appendChild(ci);
+        }
+      }
+      checked.forEach(o => {
+        var si = document.createElement('input'); si.type='hidden'; si.name='serials'; si.value=o.serial; createSaleForm.appendChild(si);
+        var ai = document.createElement('input'); ai.type='hidden'; ai.name='assets'; ai.value=o.asset; createSaleForm.appendChild(ai);
+      });
+      createSaleForm.submit();
+    });
+  }
+
+  /* Cancel Reservation */
   var cancelBtn = document.querySelector('#batch-cancel-form button[type="submit"]');
   var cancelForm = document.getElementById('batch-cancel-form');
   if (cancelBtn && cancelForm) {
     cancelBtn.addEventListener('click', function(e) {
       e.preventDefault();
-      // Remove any existing hidden serials
+      var serials = getCheckedOrders().map(o => o.serial);
+      if (serials.length === 0) { showToast('Select at least one unit to cancel.', 'warning'); return; }
+      if (!confirm('Cancel reservation for ' + serials.length + ' unit(s)?')) return;
       cancelForm.querySelectorAll('input[name="serials"]').forEach(el => el.remove());
-      var checkedSerials = [];
-      getOrderCheckboxes().forEach(function(cb) {
-        if(cb.checked) checkedSerials.push(cb.value);
-      });
-      if(checkedSerials.length === 0) {
-        alert("Please select at least one unit to cancel reservation.");
-        return;
-      }
-      checkedSerials.forEach(function(serial) {
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'serials';
-        input.value = serial;
-        cancelForm.appendChild(input);
+      serials.forEach(s => {
+        var inp = document.createElement('input'); inp.type='hidden'; inp.name='serials'; inp.value=s;
+        cancelForm.appendChild(inp);
       });
       cancelForm.submit();
     });
   }
 });
 </script>
-  </div>
 {% endblock %}

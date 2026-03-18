@@ -1,468 +1,941 @@
 {% extends "base.html" %}
 {% block title %}Admin Settings{% endblock %}
+{% block page_title %}Admin Settings{% endblock %}
 
 {% block content %}
-<div class="container py-4 px-4" style="max-width: 720px;">
-  <div class="accordion" id="adminSettingsAccordion">
-  <h4 class="mb-3 fw-semibold"><i class="bi bi-gear-fill me-2"></i> Admin Settings</h4>
+<style>
+.settings-layout{display:flex;gap:1.5rem;align-items:flex-start;}
+.settings-nav{width:210px;flex-shrink:0;position:sticky;top:1rem;max-height:calc(100vh - 5rem);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.4rem;}
+.settings-nav-section{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);padding:0.5rem 0.7rem 0.3rem;}
+.s-nav-item{display:flex;align-items:center;gap:0.55rem;padding:0.45rem 0.7rem;border-radius:var(--radius-md);font-size:0.83rem;color:var(--text-secondary);text-decoration:none;border-left:2px solid transparent;cursor:pointer;transition:all .12s;margin-bottom:1px;}
+.s-nav-item:hover{background:var(--surface-2);color:var(--text-primary);text-decoration:none;}
+.s-nav-item.active{border-left-color:var(--primary);color:var(--primary);background:rgba(59,130,246,.07);font-weight:600;}
+.s-nav-item i{width:15px;text-align:center;font-size:0.88rem;}
+.settings-content{flex:1;min-width:0;}
+.s-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.25rem;scroll-margin-top:1.25rem;}
+.s-heading{font-size:0.98rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.45rem;margin-bottom:0.2rem;}
+.s-subhead{font-size:0.8rem;color:var(--text-muted);margin-bottom:1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+.f-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:0.3rem;display:block;}
+.f-hint{font-size:0.75rem;color:var(--text-muted);margin-top:.18rem;}
+.sub-sep{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:1.1rem 0 .55rem;padding-bottom:.35rem;border-bottom:1px solid var(--border);}
+.sub-sep:first-child{margin-top:0;}
+.toggle-row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-lbl{font-size:.875rem;font-weight:600;color:var(--text-primary);}
+.toggle-desc{font-size:.77rem;color:var(--text-muted);margin-top:.1rem;}
+.mod-card{border:1px solid var(--border);border-radius:var(--radius-md);padding:.9rem 1rem;display:flex;align-items:flex-start;gap:.85rem;transition:border-color .15s;}
+.mod-card.off{opacity:.52;}
+.mod-icon{width:34px;height:34px;border-radius:var(--radius-md);background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+.mod-icon.on{background:rgba(59,130,246,.1);color:var(--primary);}
+#columnOrderList .list-group-item{border-radius:var(--radius-md)!important;margin-bottom:3px;background:var(--surface-2);border:1px solid var(--border);cursor:grab;}
+</style>
 
-  {% set seen = [] %}
-  {% for category, message in get_flashed_messages(with_categories=true) %}
-    {% if message not in seen %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-      {% set _ = seen.append(message) %}
-    {% endif %}
-  {% endfor %}
+{# ── Hidden logo upload form ─────────────────────────────────── #}
+<form method="POST" action="{{ url_for('admin_bp.upload_logo') }}"
+      enctype="multipart/form-data" id="logoUploadForm" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="file" name="logo_file" id="logoFileInput" accept=".png,.jpg,.jpeg,.gif,.webp,.svg"
+         onchange="document.getElementById('logoUploadForm').submit()">
+</form>
 
-  <form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{# ── Page header ─────────────────────────────────────────────── #}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Admin Settings</h1>
+    <div class="page-subtitle">Configure your workspace preferences</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('admin_bp.admin_self_test') }}" class="btn btn-ghost">
+      <i class="bi bi-activity"></i> Self-Test
+    </a>
+    <a href="{{ url_for('auth.register_user') }}" class="btn btn-ghost">
+      <i class="bi bi-person-plus"></i> Add User
+    </a>
+    <button type="submit" form="adminSettingsForm" class="btn btn-primary">
+      <i class="bi bi-save"></i> Save Settings
+    </button>
+  </div>
+</div>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingGeneral">
-        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGeneral" aria-expanded="true" aria-controls="collapseGeneral">
-          General Settings
-        </button>
-      </h2>
-      <div id="collapseGeneral" class="accordion-collapse collapse" aria-labelledby="headingGeneral" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="mb-3">
-            <label for="dashboard_name" class="form-label">Dashboard Name</label>
-            <input type="text" name="dashboard_name" id="dashboard_name" class="form-control" value="{{ settings.dashboard_name or '' }}">
+<div class="settings-layout animate-fade-up">
+
+  {# ══════════════════ LEFT NAV ══════════════════ #}
+  <nav class="settings-nav" id="settingsNav" aria-label="Settings sections">
+    <div class="settings-nav-section">Settings</div>
+    {% for icon, label, target in [
+      ('bi-building',        'Company',         'sec-company'),
+      ('bi-palette',         'Appearance',      'sec-appearance'),
+      ('bi-bell',            'Notifications',   'sec-notifications'),
+      ('bi-toggles',         'Modules',         'sec-modules'),
+      ('bi-receipt',         'Invoice',         'sec-invoice'),
+      ('bi-gear',            'Processing',      'sec-processing'),
+      ('bi-tag',             'Status Labels',   'sec-status'),
+      ('bi-table',           'Columns',         'sec-columns'),
+      ('bi-envelope-paper',  'Email Templates', 'sec-email'),
+    ] %}
+    <a class="s-nav-item" data-target="{{ target }}"
+       href="#{{ target }}" onclick="scrollTo('{{ target }}');return false;">
+      <i class="bi {{ icon }}"></i>{{ label }}
+    </a>
+    {% endfor %}
+    <div class="settings-nav-section" style="margin-top:.4rem;border-top:1px solid var(--border);padding-top:.6rem;">Management</div>
+    <a class="s-nav-item" data-target="sec-users"
+       href="#sec-users" onclick="scrollTo('sec-users');return false;">
+      <i class="bi bi-people"></i>Users
+    </a>
+    <a class="s-nav-item" data-target="sec-cf"
+       href="#sec-cf" onclick="scrollTo('sec-cf');return false;">
+      <i class="bi bi-input-cursor-text"></i>Custom Fields
+    </a>
+  </nav>
+
+  {# ══════════════════ MAIN CONTENT ══════════════════ #}
+  <div class="settings-content">
+
+    <form method="POST" id="adminSettingsForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {# ═══ 1. COMPANY ═══ #}
+      <div class="s-section" id="sec-company">
+        <div class="s-heading"><i class="bi bi-building"></i> Company</div>
+        <div class="s-subhead">Business identity shown on invoices, emails, and the sidebar.</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="f-label">Company Name</label>
+            <input type="text" name="company_name" class="form-control"
+                   placeholder="e.g. PCMart Electronics" value="{{ settings.company_name or '' }}">
+            <div class="f-hint">Shown on invoices and emails.</div>
           </div>
-
-          <div class="mb-3">
-            <label for="dashboard_logo" class="form-label">Logo URL</label>
-            <input type="text" name="dashboard_logo" id="dashboard_logo" class="form-control" value="{{ settings.dashboard_logo or '' }}">
+          <div class="col-md-6">
+            <label class="f-label">Dashboard Name</label>
+            <input type="text" name="dashboard_name" class="form-control"
+                   value="{{ settings.dashboard_name or '' }}">
+            <div class="f-hint">Shown in browser tab and sidebar header.</div>
           </div>
-
-          <div class="mb-3">
-            <label for="support_email" class="form-label">Support Email</label>
-            <input type="email" name="support_email" id="support_email" class="form-control" value="{{ settings.support_email or '' }}">
+          <div class="col-md-6">
+            <label class="f-label">Company Logo</label>
+            {% if settings.dashboard_logo %}
+            <div style="margin-bottom:.6rem;padding:.5rem .7rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);display:inline-flex;align-items:center;gap:.65rem;">
+              <img src="{{ settings.dashboard_logo }}" alt="Logo" style="max-height:38px;max-width:130px;object-fit:contain;">
+              <span style="font-size:.74rem;color:var(--text-muted);">Current</span>
+            </div><br>
+            {% endif %}
+            <button type="button" class="btn btn-ghost btn-sm mb-1"
+                    onclick="document.getElementById('logoFileInput').click()">
+              <i class="bi bi-upload me-1"></i>{% if settings.dashboard_logo %}Replace{% else %}Upload{% endif %} Logo
+            </button>
+            <div class="f-hint">PNG, JPG, SVG — max 2 MB. Or paste URL:</div>
+            <input type="text" name="dashboard_logo" class="form-control form-control-sm mt-2"
+                   placeholder="/static/img/logo.png" value="{{ settings.dashboard_logo or '' }}">
           </div>
-
-          <div class="mb-3">
-            <label for="primary_color" class="form-label">Brand Primary Color (Hex)</label>
-            <input type="text" name="primary_color" id="primary_color" class="form-control" placeholder="#007bff" value="{{ settings.primary_color or '' }}">
+          <div class="col-md-6">
+            <label class="f-label">Support Email</label>
+            <input type="email" name="support_email" class="form-control"
+                   placeholder="admin@yourcompany.com" value="{{ settings.support_email or '' }}">
+            <div class="f-hint">Used for alert emails and on invoices.</div>
+            <label class="f-label mt-3">Company Email</label>
+            <input type="email" name="company_email" class="form-control"
+                   placeholder="info@yourcompany.com" value="{{ settings.company_email or '' }}">
           </div>
-
-          <div class="mb-3">
-            <label for="company_website" class="form-label">Company Website</label>
-            <input type="url" name="company_website" id="company_website" class="form-control" value="{{ settings.company_website or '' }}">
+          <div class="col-md-6">
+            <label class="f-label">Company Phone</label>
+            <input type="text" name="company_phone" class="form-control"
+                   placeholder="+1 555 000 0000" value="{{ settings.company_phone or '' }}">
           </div>
-
-          <div class="mb-3">
-            <label for="default_terms" class="form-label">Default Terms (footer / invoice)</label>
-            <textarea name="default_terms" id="default_terms" rows="3" class="form-control">{{ settings.default_terms or '' }}</textarea>
+          <div class="col-md-6">
+            <label class="f-label">Company Website</label>
+            <input type="url" name="company_website" class="form-control"
+                   placeholder="https://yourcompany.com" value="{{ settings.company_website or '' }}">
           </div>
-
-          <div class="mb-3">
-            <label for="sidebar_color" class="form-label">Sidebar Color (Hex)</label>
-            <input type="text" name="sidebar_color" id="sidebar_color" class="form-control" placeholder="#0d1b2a" value="{{ settings.sidebar_color or '' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="text_color" class="form-label">Sidebar Text Color (Hex)</label>
-            <input type="text" name="text_color" id="text_color" class="form-control" placeholder="#ffffff" value="{{ settings.text_color or '' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="button_radius" class="form-label">Button Radius (e.g. 4px, 30px)</label>
-            <input type="text" name="button_radius" id="button_radius" class="form-control" placeholder="30px" value="{{ settings.button_radius or '' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="timezone" class="form-label">Tenant Timezone</label>
-            <select name="timezone" id="timezone" class="form-select">
-              {% for tz in [
-                'UTC', 'Asia/Dubai', 'Asia/Kolkata', 'Europe/London', 'Europe/Berlin',
-                'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'
-              ] %}
-                <option value="{{ tz }}" {% if tenant_timezone == tz %}selected{% endif %}>{{ tz }}</option>
+          <div class="col-md-6">
+            <label class="f-label">Timezone</label>
+            <select name="timezone" class="form-select">
+              {% for tz in ['UTC','Asia/Dubai','Asia/Riyadh','Asia/Kuwait','Asia/Qatar',
+                            'Asia/Kolkata','Asia/Singapore','Asia/Tokyo',
+                            'Europe/London','Europe/Berlin','Europe/Paris',
+                            'America/New_York','America/Chicago','America/Denver',
+                            'America/Los_Angeles','Australia/Sydney','Pacific/Auckland'] %}
+              <option value="{{ tz }}" {% if tenant_timezone == tz %}selected{% endif %}>{{ tz }}</option>
               {% endfor %}
             </select>
           </div>
-
+          <div class="col-md-3">
+            <label class="f-label">Currency Code</label>
+            <input type="text" name="currency" class="form-control"
+                   placeholder="AED" maxlength="8" value="{{ settings.currency or 'AED' }}">
+            <div class="f-hint">e.g. AED, USD, GBP</div>
+          </div>
+          <div class="col-md-3">
+            <label class="f-label">VAT Rate (%)</label>
+            <input type="number" name="vat_rate" class="form-control"
+                   placeholder="5" min="0" max="100" step="0.01" value="{{ settings.vat_rate or '5' }}">
+          </div>
+          <div class="col-12">
+            <label class="f-label">Company Address</label>
+            <textarea name="company_address" rows="2" class="form-control"
+                      placeholder="123 Main St, City, Country">{{ settings.company_address or '' }}</textarea>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Inventory Notification Thresholds Accordion Item (moved outside General Settings) -->
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingThresholds">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThresholds" aria-expanded="false" aria-controls="collapseThresholds">
-          Inventory Notification Thresholds
-        </button>
-      </h2>
-      <div id="collapseThresholds" class="accordion-collapse collapse" aria-labelledby="headingThresholds" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label for="idle_threshold_days" class="form-label">Idle Inventory Threshold (days)</label>
-              <input type="number" name="idle_threshold_days" id="idle_threshold_days" class="form-control" value="{{ settings.idle_threshold_days or '7' }}">
+      {# ═══ 2. APPEARANCE ═══ #}
+      <div class="s-section" id="sec-appearance">
+        <div class="s-heading"><i class="bi bi-palette"></i> Appearance</div>
+        <div class="s-subhead">Customize colors, fonts, and visual style of the application.</div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="f-label">Brand Primary Color</label>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <input type="color" id="primaryColorPicker"
+                     value="{{ settings.primary_color or '#3b82f6' }}"
+                     style="width:42px;height:38px;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px;cursor:pointer;flex-shrink:0;">
+              <input type="text" name="primary_color" id="primaryColorText"
+                     class="form-control font-monospace" placeholder="#3b82f6"
+                     value="{{ settings.primary_color or '#3b82f6' }}">
             </div>
-
-            <div class="col-md-6">
-              <label for="aged_threshold_days" class="form-label">Aged Inventory Threshold (days)</label>
-              <input type="number" name="aged_threshold_days" id="aged_threshold_days" class="form-control" value="{{ settings.aged_threshold_days or '60' }}">
+            <div class="f-hint">Buttons, links, active states.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="f-label">Sidebar Background</label>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <input type="color" id="sidebarColorPicker"
+                     value="{{ settings.sidebar_color or '#0f172a' }}"
+                     style="width:42px;height:38px;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px;cursor:pointer;flex-shrink:0;">
+              <input type="text" name="sidebar_color" id="sidebarColorText"
+                     class="form-control font-monospace" placeholder="#0f172a"
+                     value="{{ settings.sidebar_color or '#0f172a' }}">
             </div>
-
-            <div class="col-md-6">
-              <label for="tech_delay_threshold_days" class="form-label">Technician Delay Threshold (days)</label>
-              <input type="number" name="tech_delay_threshold_days" id="tech_delay_threshold_days" class="form-control" value="{{ settings.tech_delay_threshold_days or '3' }}">
+            <div class="f-hint">Takes effect on next page load after save.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="f-label">Button Radius</label>
+            <input type="text" name="button_radius" class="form-control"
+                   placeholder="8px" value="{{ settings.button_radius or '8px' }}">
+            <div class="f-hint">0px = square &nbsp;·&nbsp; 8px = rounded &nbsp;·&nbsp; 20px = pill</div>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Font Size</label>
+            <div class="btn-group w-100" role="group">
+              {% for val, lbl in [('small','Small (12px)'),('default','Default (14px)'),('large','Large (16px)')] %}
+              <input type="radio" class="btn-check" name="font_size" id="fs_{{ val }}" value="{{ val }}"
+                {% if (settings.font_size == val) or (val == 'default' and settings.font_size not in ('small','large')) %}checked{% endif %}>
+              <label class="btn btn-outline-secondary" for="fs_{{ val }}" style="font-size:.82rem;">{{ lbl }}</label>
+              {% endfor %}
             </div>
-
-            <div class="col-md-6">
-              <label for="order_delay_threshold_days" class="form-label">Order Delay Threshold (days)</label>
-              <input type="number" name="order_delay_threshold_days" id="order_delay_threshold_days" class="form-control" value="{{ settings.order_delay_threshold_days or '3' }}">
-            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Custom CSS URL <span style="text-transform:none;font-weight:400;">(optional)</span></label>
+            <input type="text" name="custom_css_url" class="form-control"
+                   placeholder="https://example.com/custom.css" value="{{ settings.custom_css_url or '' }}">
+            <div class="f-hint">Loaded as an extra stylesheet on every page.</div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingInvoice">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInvoice" aria-expanded="false" aria-controls="collapseInvoice">
-          Invoice Branding
-        </button>
-      </h2>
-      <div id="collapseInvoice" class="accordion-collapse collapse" aria-labelledby="headingInvoice" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="mb-3">
-            <label for="invoice_logo" class="form-label">Invoice Logo URL</label>
-            <input type="text" name="invoice_logo" id="invoice_logo" class="form-control" value="{{ settings.invoice_logo or '' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="invoice_title" class="form-label">Invoice Title</label>
-            <input type="text" name="invoice_title" id="invoice_title" class="form-control" placeholder="e.g. Sales Invoice" value="{{ settings.invoice_title or '' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="invoice_footer" class="form-label">Invoice Footer Message</label>
-            <textarea name="invoice_footer" id="invoice_footer" rows="3" class="form-control" placeholder="Thank you for your business!">{{ settings.invoice_footer or '' }}</textarea>
-          </div>
-
-          <div class="mb-3">
-            <label for="invoice_terms" class="form-label">Invoice Payment Terms</label>
-            <textarea name="invoice_terms" id="invoice_terms" rows="2" class="form-control" placeholder="Payment due within 14 days.">{{ settings.invoice_terms or '' }}</textarea>
-          </div>
+      {# ═══ 3. NOTIFICATIONS ═══ #}
+      <div class="s-section" id="sec-notifications">
+        <div class="s-heading"><i class="bi bi-bell"></i> Notifications &amp; Alerts</div>
+        <div class="s-subhead">
+          Alert emails go to the <strong>Support Email</strong> above.
+          SMTP credentials are configured via <code>MAIL_SERVER</code> / <code>MAIL_USERNAME</code> / <code>MAIL_PASSWORD</code> in the <code>.env</code> file.
         </div>
-      </div>
-    </div>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingModules">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModules" aria-expanded="false" aria-controls="collapseModules">
-          Module Access
-        </button>
-      </h2>
-      <div id="collapseModules" class="accordion-collapse collapse" aria-labelledby="headingModules" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="enable_parts_module" name="enable_parts_module" value="true" {% if settings.enable_parts_module == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="enable_parts_module">Enable Parts Module</label>
-          </div>
-
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="enable_reports_module" name="enable_reports_module" value="true" {% if settings.enable_reports_module == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="enable_reports_module">Enable Reports Module</label>
-          </div>
-
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="enable_order_module" name="enable_order_module" value="true" {% if settings.enable_order_module == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="enable_order_module">Enable Customer Orders</label>
-          </div>
-
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" id="enable_export_module" name="enable_export_module" value="true" {% if settings.enable_export_module == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="enable_export_module">Enable Export Tools</label>
-          </div>
-
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" id="enable_csrf_protection" name="enable_csrf_protection" value="true" {% if settings.enable_csrf_protection == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="enable_csrf_protection">Enable CSRF Protection</label>
-          </div>
-
-          <input type="hidden" name="csrf_setting_key" value="enable_csrf_protection">
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme Settings Accordion Item -->
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingTheme">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTheme" aria-expanded="false" aria-controls="collapseTheme">
-          Theme Settings
-        </button>
-      </h2>
-      <div id="collapseTheme" class="accordion-collapse collapse" aria-labelledby="headingTheme" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="mb-3">
-            <label for="theme_color" class="form-label">Theme Mode</label>
-            <select name="theme_mode" id="theme_mode" class="form-select">
-              <option value="light" {% if settings.theme_mode == 'light' %}selected{% endif %}>Light</option>
-              <option value="dark" {% if settings.theme_mode == 'dark' %}selected{% endif %}>Dark</option>
-              <option value="auto" {% if settings.theme_mode == 'auto' %}selected{% endif %}>Auto</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label for="theme_preset" class="form-label">Theme Preset</label>
-            <select name="theme_preset" id="theme_preset" class="form-select">
-              <option value="default" {% if settings.theme_preset == 'default' %}selected{% endif %}>Default</option>
-              <option value="flatly" {% if settings.theme_preset == 'flatly' %}selected{% endif %}>Flatly</option>
-              <option value="darkly" {% if settings.theme_preset == 'darkly' %}selected{% endif %}>Darkly</option>
-              <option value="cyborg" {% if settings.theme_preset == 'cyborg' %}selected{% endif %}>Cyborg</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label for="font_size" class="form-label">Global Font Size</label>
-            <select name="font_size" id="font_size" class="form-select">
-              <option value="small" {% if settings.font_size == 'small' %}selected{% endif %}>Small</option>
-              <option value="default" {% if settings.font_size == 'default' %}selected{% endif %}>Default</option>
-              <option value="large" {% if settings.font_size == 'large' %}selected{% endif %}>Large</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label for="custom_css_url" class="form-label">Custom CSS URL (optional)</label>
-            <input type="text" name="custom_css_url" id="custom_css_url" class="form-control" value="{{ settings.custom_css_url or '' }}" placeholder="https://example.com/styles.css">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingLabels">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLabels" aria-expanded="false" aria-controls="collapseLabels">
-          Instance Table Column Labels
-        </button>
-      </h2>
-      <div id="collapseLabels" class="accordion-collapse collapse" aria-labelledby="headingLabels" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="mb-3">
-            <label for="label_serial_number" class="form-label">Serial Number Label</label>
-            <input type="text" name="label_serial_number" id="label_serial_number" class="form-control" value="{{ settings.label_serial_number or 'Serial' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_asset" class="form-label">Asset Tag Label</label>
-            <input type="text" name="label_asset" id="label_asset" class="form-control" value="{{ settings.label_asset or 'Asset' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_item_name" class="form-label">Item Name Label</label>
-            <input type="text" name="label_item_name" id="label_item_name" class="form-control" value="{{ settings.label_item_name or 'Item Name' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_make" class="form-label">Make Label</label>
-            <input type="text" name="label_make" id="label_make" class="form-control" value="{{ settings.label_make or 'Make' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_model" class="form-label">Model Label</label>
-            <input type="text" name="label_model" id="label_model" class="form-control" value="{{ settings.label_model or 'Model' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_display" class="form-label">Display Label</label>
-            <input type="text" name="label_display" id="label_display" class="form-control" value="{{ settings.label_display or 'Display' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_cpu" class="form-label">CPU Label</label>
-            <input type="text" name="label_cpu" id="label_cpu" class="form-control" value="{{ settings.label_cpu or 'Processor' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_ram" class="form-label">RAM Label</label>
-            <input type="text" name="label_ram" id="label_ram" class="form-control" value="{{ settings.label_ram or 'RAM' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_gpu1" class="form-label">GPU 1 Label</label>
-            <input type="text" name="label_gpu1" id="label_gpu1" class="form-control" value="{{ settings.label_gpu1 or 'GPU 1' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_gpu2" class="form-label">GPU 2 Label</label>
-            <input type="text" name="label_gpu2" id="label_gpu2" class="form-control" value="{{ settings.label_gpu2 or 'GPU 2' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_grade" class="form-label">Grade Label</label>
-            <input type="text" name="label_grade" id="label_grade" class="form-control" value="{{ settings.label_grade or 'Grade' }}">
-          </div>
-
-          <div class="mb-3">
-            <label for="label_location" class="form-label">Location Label</label>
-            <input type="text" name="label_location" id="label_location" class="form-control" value="{{ settings.label_location or 'Location' }}">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingVisibility">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVisibility" aria-expanded="false" aria-controls="collapseVisibility">
-          Instance Table Column Visibility
-        </button>
-      </h2>
-      <div id="collapseVisibility" class="accordion-collapse collapse" aria-labelledby="headingVisibility" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <!-- Unified product structure columns only -->
-          {% set unified_fields = [
-            ('show_column_asset', 'Asset'),
-            ('show_column_serial', 'Serial'),
-            ('show_column_item_name', 'Item Name'),
-            ('show_column_make', 'Make'),
-            ('show_column_model', 'Model'),
-            ('show_column_display', 'Display'),
-            ('show_column_cpu', 'CPU'),
-            ('show_column_ram', 'RAM'),
-            ('show_column_gpu1', 'GPU 1'),
-            ('show_column_gpu2', 'GPU 2'),
-            ('show_column_grade', 'Grade'),
-            ('show_column_location', 'Location'),
-            ('show_column_disk1size', 'Disk 1 Size'),
-            ('show_column_status', 'Status'),
-            ('show_column_process_stage', 'Process Stage'),
-            ('show_column_team', 'Team'),
-            ('show_column_shelf_bin', 'Shelf/Bin'),
-            ('show_column_is_sold', 'Is Sold'),
-            ('show_column_label', 'Label Button'),
-            ('show_column_action', 'Action Buttons')
+        <div class="sub-sep">Thresholds</div>
+        <div class="row g-3 mb-3">
+          {% for key, lbl, default, hint in [
+            ('idle_threshold_days',        'Idle Inventory',   '7',  'Days before a unit is flagged idle'),
+            ('aged_threshold_days',        'Aged Inventory',   '60', 'Days before a unit is flagged aged'),
+            ('tech_delay_threshold_days',  'Technician Delay', '3',  'Days before a tech is flagged slow'),
+            ('order_delay_threshold_days', 'Order Delay',      '3',  'Days before an order is flagged delayed'),
           ] %}
+          <div class="col-sm-6 col-lg-3">
+            <label class="f-label">{{ lbl }} (days)</label>
+            <input type="number" name="{{ key }}" class="form-control"
+                   value="{{ settings[key] or default }}" min="1">
+            <div class="f-hint">{{ hint }}</div>
+          </div>
+          {% endfor %}
+        </div>
 
-          {% for key, label in unified_fields %}
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="{{ key }}" name="{{ key }}" value="true" {% if settings[key] == 'true' %}checked{% endif %}>
-            <label class="form-check-label" for="{{ key }}">Show {{ label }}</label>
+        <div class="sub-sep">Email Alerts</div>
+        {% for name, id_name, label, desc in [
+          ('enable_email_alerts',     'enableEmailAlerts',    'Customer reservation emails',
+           'Emails customers when reserved and when ready for pickup.'),
+          ('enable_low_stock_alerts', 'enableLowStockAlerts', 'Low-stock email alerts',
+           'Daily summary when any part drops below minimum stock.'),
+          ('enable_sla_alerts',       'enableSlaAlerts',      'SLA overdue alerts',
+           'Daily summary listing units past their processing stage SLA.'),
+        ] %}
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-lbl">{{ label }}</div>
+            <div class="toggle-desc">{{ desc }}</div>
+          </div>
+          <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+            <input class="form-check-input" type="checkbox" role="switch" name="{{ name }}" id="{{ id_name }}"
+                   style="width:42px;height:23px;cursor:pointer;margin:0;"
+                   {% if settings[name] == 'true' %}checked{% endif %}>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# ═══ 4. MODULES ═══ #}
+      <div class="s-section" id="sec-modules">
+        <div class="s-heading"><i class="bi bi-toggles"></i> Module Access</div>
+        <div class="s-subhead">Disabled modules are hidden from the sidebar and blocked at the route level.</div>
+        <div class="row g-3">
+          {% for key, icon, label, desc in [
+            ('enable_parts_module',   'bi-tools',      'Parts Module',    'Parts inventory, stock tracking, and parts sales'),
+            ('enable_order_module',   'bi-bookmark',   'Customer Orders', 'Reservations, order tracking, and delivery management'),
+            ('enable_reports_module', 'bi-bar-chart',  'Reports',         'Stage times, aged inventory, and productivity reports'),
+            ('enable_export_module',  'bi-file-excel', 'Export Tools',    'Inventory export to CSV and Excel'),
+          ] %}
+          {% set on = settings[key] != 'false' %}
+          <div class="col-md-6">
+            <div class="mod-card {% if not on %}off{% endif %}">
+              <div class="mod-icon {% if on %}on{% endif %}">
+                <i class="bi {{ icon }}"></i>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+                  <span style="font-size:.875rem;font-weight:600;color:var(--text-primary);">{{ label }}</span>
+                  <div class="form-check form-switch" style="padding-left:0;margin:0;flex-shrink:0;">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="{{ key }}" name="{{ key }}" value="true"
+                           style="width:38px;height:21px;cursor:pointer;margin:0;"
+                           {% if on %}checked{% endif %}
+                           onchange="this.closest('.mod-card').classList.toggle('off',!this.checked);this.closest('.mod-card').querySelector('.mod-icon').classList.toggle('on',this.checked);">
+                  </div>
+                </div>
+                <div style="font-size:.77rem;color:var(--text-muted);margin-top:.2rem;">{{ desc }}</div>
+              </div>
+            </div>
           </div>
           {% endfor %}
         </div>
       </div>
-    </div>
 
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingOrder">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrder" aria-expanded="false" aria-controls="collapseOrder">
-          Instance Table Column Order
-        </button>
-      </h2>
-      <div id="collapseOrder" class="accordion-collapse collapse" aria-labelledby="headingOrder" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <p class="text-muted small">Drag to reorder how columns appear in the inventory table:</p>
+      {# ═══ 5. INVOICE BRANDING ═══ #}
+      <div class="s-section" id="sec-invoice">
+        <div class="s-heading"><i class="bi bi-receipt"></i> Invoice Branding</div>
+        <div class="s-subhead">Customize how invoices look when sent to customers or exported as PDF.</div>
 
-          <ul id="columnOrderList" class="list-group mb-3">
-            {% set all_columns = [
-              'asset', 'serial', 'item_name', 'make', 'model', 'display',
-              'cpu', 'ram', 'gpu1', 'gpu2', 'disk1size', 'grade', 'location',
-              'status', 'process_stage', 'team', 'shelf_bin',
-              'is_sold', 'label', 'action'
-            ] %}
-            {% set saved_order = (settings.column_order_instance_table or '').split(',') %}
-            {% set final_order = (saved_order + all_columns)|unique %}
-            {% for col in final_order %}
-              {% if col in all_columns %}
-                <li class="list-group-item" data-key="{{ col }}">{{ col.replace('_', ' ')|title }}</li>
-              {% endif %}
+        <div class="sub-sep">Identity</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="f-label">Invoice Logo URL <span style="text-transform:none;font-weight:400;">(overrides company logo)</span></label>
+            <input type="text" name="invoice_logo" class="form-control"
+                   placeholder="/static/img/invoice_logo.png" value="{{ settings.invoice_logo or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Invoice Title / Header Text</label>
+            <input type="text" name="invoice_title" class="form-control"
+                   placeholder="Sales Invoice" value="{{ settings.invoice_title or '' }}">
+            <div class="f-hint">Falls back to Company Name if blank.</div>
+          </div>
+          <div class="col-md-5">
+            <label class="f-label">Accent Color</label>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <input type="color" id="invoiceAccentPicker"
+                     value="{{ settings.invoice_accent_color or '#3b82f6' }}"
+                     style="width:42px;height:38px;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px;cursor:pointer;flex-shrink:0;">
+              <input type="text" name="invoice_accent_color" id="invoiceAccentText"
+                     class="form-control font-monospace" placeholder="#3b82f6"
+                     value="{{ settings.invoice_accent_color or '#3b82f6' }}">
+            </div>
+            <div class="f-hint">Header background &amp; grand total highlight.</div>
+          </div>
+          <div class="col-md-7 d-flex align-items-center">
+            <div class="toggle-row" style="border:none;padding:.4rem 0;width:100%;">
+              <div>
+                <div class="toggle-lbl" style="font-size:.84rem;">Show logo on invoice</div>
+                <div class="toggle-desc">Uncheck to hide logo from invoice &amp; PDF.</div>
+              </div>
+              <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="invoice_show_logo" id="invoiceShowLogo"
+                       style="width:42px;height:23px;cursor:pointer;margin:0;"
+                       {% if settings.invoice_show_logo != 'false' %}checked{% endif %}>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-sep">Notes &amp; Messages</div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="f-label">Invoice Header Note <span style="text-transform:none;font-weight:400;">(shown below company name)</span></label>
+            <textarea name="invoice_header_note" rows="2" class="form-control"
+                      placeholder="e.g. Thank you for your business!">{{ settings.invoice_header_note or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Invoice Footer Note</label>
+            <textarea name="invoice_footer_note" rows="2" class="form-control"
+                      placeholder="e.g. Payment due within 30 days.">{{ settings.invoice_footer_note or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Invoice Footer</label>
+            <textarea name="invoice_footer" rows="2" class="form-control"
+                      placeholder="Thank you for your business!">{{ settings.invoice_footer or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Payment Terms</label>
+            <textarea name="invoice_terms" rows="2" class="form-control"
+                      placeholder="Payment due within 14 days.">{{ settings.invoice_terms or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="f-label">Default Terms</label>
+            <textarea name="default_terms" rows="2" class="form-control">{{ settings.default_terms or '' }}</textarea>
+          </div>
+        </div>
+
+        <div class="sub-sep">Bank Details</div>
+        <div class="toggle-row" style="border:none;padding:.3rem 0 .6rem;">
+          <div>
+            <div class="toggle-lbl" style="font-size:.84rem;">Show bank details on invoice</div>
+          </div>
+          <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="invoice_show_bank_details" id="invoiceShowBank"
+                   style="width:42px;height:23px;cursor:pointer;margin:0;"
+                   {% if settings.invoice_show_bank_details == 'true' %}checked{% endif %}>
+          </div>
+        </div>
+        <label class="f-label">Bank Transfer Instructions</label>
+        <textarea name="invoice_bank_details" rows="4" class="form-control"
+                  placeholder="Bank: Example Bank&#10;Account Name: Your Company&#10;IBAN: AE00 0000 0000 0000 0000&#10;SWIFT: EXBKAEAD">{{ settings.invoice_bank_details or '' }}</textarea>
+      </div>
+
+      {# ═══ 6. PROCESSING ═══ #}
+      <div class="s-section" id="sec-processing">
+        <div class="s-heading"><i class="bi bi-gear"></i> Processing</div>
+        <div class="s-subhead">Configure teams available for check-in and stage assignment.</div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="f-label">Processing Teams</label>
+            <input type="text" name="processing_teams" class="form-control"
+                   placeholder="Tech A, Tech B, QC, Paint"
+                   value="{{ settings.processing_teams or '' }}">
+            <div class="f-hint">Comma-separated — e.g. Tech A, Tech B, QC, Paint</div>
+          </div>
+        </div>
+      </div>
+
+      {# ═══ 7. STATUS LABELS ═══ #}
+      <div class="s-section" id="sec-status">
+        <div class="s-heading"><i class="bi bi-tag"></i> Status Labels</div>
+        <div class="s-subhead">Rename each unit status to match your workflow. Leave blank to use the default.</div>
+        <div class="row g-3">
+          {% for key, default, dot in [
+            ('unprocessed',   'Unprocessed',   '#6b7280'),
+            ('under_process', 'In Processing', '#2563eb'),
+            ('processed',     'Processed',     '#059669'),
+            ('idle',          'Idle',          '#d97706'),
+            ('disputed',      'Disputed',      '#dc2626'),
+            ('sold',          'Sold',          '#7c3aed'),
+          ] %}
+          <div class="col-sm-6 col-md-4">
+            <label class="f-label">
+              <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{{ dot }};margin-right:4px;vertical-align:middle;"></span>
+              {{ default }}
+            </label>
+            <input type="text" name="label_status_{{ key }}" class="form-control"
+                   placeholder="{{ default }}"
+                   value="{{ settings.get('label_status_' ~ key, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ═══ 8. COLUMNS ═══ #}
+      <div class="s-section" id="sec-columns">
+        <div class="s-heading"><i class="bi bi-table"></i> Columns</div>
+        <div class="s-subhead">Configure inventory table column labels, visibility, and order.</div>
+
+        <div class="sub-sep">Column Labels</div>
+        <div class="row g-3 mb-2">
+          {% for key, label, default in [
+            ('label_serial_number', 'Serial Number', 'Serial'),
+            ('label_asset',         'Asset Tag',     'Asset'),
+            ('label_item_name',     'Item Name',     'Item Name'),
+            ('label_make',          'Make',          'Make'),
+            ('label_model',         'Model',         'Model'),
+            ('label_display',       'Display',       'Display'),
+            ('label_cpu',           'CPU',           'Processor'),
+            ('label_ram',           'RAM',           'RAM'),
+            ('label_disk1size',     'Disk Size',     'Disk'),
+            ('label_gpu1',          'GPU 1',         'GPU 1'),
+            ('label_gpu2',          'GPU 2',         'GPU 2'),
+            ('label_grade',         'Grade',         'Grade'),
+            ('label_location',      'Location',      'Location'),
+          ] %}
+          <div class="col-md-4">
+            <label class="f-label">{{ label }}</label>
+            <input type="text" name="{{ key }}" class="form-control"
+                   value="{{ settings[key] or default }}">
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="sub-sep">Column Visibility</div>
+        <div class="row g-1 mb-3">
+          {% set unified_fields = [
+            ('show_column_asset','Asset'),('show_column_serial','Serial'),
+            ('show_column_item_name','Item Name'),('show_column_make','Make'),
+            ('show_column_model','Model'),('show_column_display','Display'),
+            ('show_column_cpu','CPU'),('show_column_ram','RAM'),
+            ('show_column_disk1size','Disk Size'),('show_column_gpu1','GPU 1'),
+            ('show_column_gpu2','GPU 2'),('show_column_grade','Grade'),
+            ('show_column_location','Location'),('show_column_status','Status'),
+            ('show_column_process_stage','Process Stage'),('show_column_team','Team'),
+            ('show_column_shelf_bin','Shelf/Bin'),('show_column_is_sold','Is Sold'),
+            ('show_column_label','Label Button'),('show_column_action','Action Buttons'),
+            ('show_column_age_days','Age in Stock'),('show_column_asking_price','Asking Price'),
+            ('show_column_vendor','Vendor'),('show_column_po_number','PO Number'),
+          ] %}
+          {% for key, label in unified_fields %}
+          <div class="col-6 col-md-4 col-lg-3">
+            <div style="display:flex;align-items:center;gap:.45rem;padding:.25rem 0;">
+              <div class="form-check form-switch" style="padding-left:0;margin:0;">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="{{ key }}" name="{{ key }}" value="true"
+                       style="width:34px;height:19px;cursor:pointer;margin:0;"
+                       {% if settings[key] == 'true' %}checked{% endif %}>
+              </div>
+              <label for="{{ key }}" style="font-size:.82rem;cursor:pointer;margin:0;color:var(--text-primary);">{{ label }}</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="sub-sep">Column Order</div>
+        <p style="font-size:.81rem;color:var(--text-muted);margin-bottom:.65rem;">
+          <i class="bi bi-grip-vertical me-1"></i>Drag rows to reorder columns in the inventory table.
+        </p>
+        <ul id="columnOrderList" class="list-group mb-3" style="max-width:420px;">
+          {% set all_columns = ['asset','serial','item_name','make','model','display','cpu','ram','disk1size','gpu1','gpu2','grade','location','status','process_stage','team','shelf_bin','is_sold','age_days','asking_price','vendor','po_number','label','action'] %}
+          {% set saved_order = (settings.column_order_instance_table or '').split(',') %}
+          {% set final_order = (saved_order + all_columns)|unique %}
+          {% for col in final_order %}
+            {% if col in all_columns %}
+            <li class="list-group-item d-flex align-items-center gap-2" data-key="{{ col }}"
+                style="font-size:.84rem;padding:.42rem .75rem;">
+              <i class="bi bi-grip-vertical" style="color:var(--text-muted);"></i>
+              {{ col.replace('_',' ')|title }}
+            </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+        <input type="hidden" id="column_order_instance_table" name="column_order_instance_table"
+               value="{{ settings.column_order_instance_table or '' }}">
+      </div>
+
+      {# ═══ 9. EMAIL TEMPLATES ═══ #}
+      <div class="s-section" id="sec-email">
+        <div class="s-heading"><i class="bi bi-envelope-paper"></i> Email Templates</div>
+        <div class="s-subhead">Customise outgoing email bodies. Leave blank to use built-in defaults.</div>
+
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:.7rem 1rem;margin-bottom:1.25rem;">
+          <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.4rem;">Available Placeholders — click to copy</div>
+          <div class="d-flex flex-wrap gap-2">
+            {% for ph in ['{customer_name}','{company_name}','{unit_details}','{invoice_number}','{amount}','{due_date}','{portal_link}'] %}
+            <code style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.18rem .5rem;font-size:.79rem;cursor:pointer;"
+                  title="Click to copy"
+                  onclick="navigator.clipboard.writeText('{{ ph }}');showToast('Copied {{ ph }}','success',2000);">{{ ph }}</code>
             {% endfor %}
-          </ul>
-
-          <input type="hidden" id="column_order_instance_table" name="column_order_instance_table" value="{{ settings.column_order_instance_table or '' }}">
-          <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-          <script>
-          document.addEventListener("DOMContentLoaded", function () {
-            const list = document.getElementById("columnOrderList");
-            const input = document.getElementById("column_order_instance_table");
-
-            function updateColumnOrderInput() {
-              const order = Array.from(list.children).map(li => li.dataset.key);
-              input.value = order.join(",");
-            }
-
-            updateColumnOrderInput();
-
-            new Sortable(list, {
-              animation: 150,
-              onEnd: updateColumnOrderInput
-            });
-          });
-          </script>
-
-          {# Removed duplicate Save Settings button here #}
-        </div>
-      </div>
-    </div>
-    <div class="text-end mt-4">
-      <button type="submit" class="btn btn-primary btn-lg rounded-pill px-4">
-        <i class="bi bi-save me-1"></i> Save Settings
-      </button>
-    </div>
-  </form>
-
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="headingUsers">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseUsers" aria-expanded="false" aria-controls="collapseUsers">
-          Registered Users
-        </button>
-      </h2>
-      <div id="collapseUsers" class="accordion-collapse collapse" aria-labelledby="headingUsers" data-bs-parent="#adminSettingsAccordion">
-        <div class="accordion-body">
-          <div class="table-responsive">
-            <table class="table table-bordered table-hover table-sm align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Username</th>
-                  <th>Full Name</th>
-                  <th>Role</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for user in users %}
-                <tr>
-                  <td>{{ user.username }}</td>
-                  <td>{{ user.full_name or user.username }}</td>
-                  <td>{{ user.role }}</td>
-                  <td>
-                    <a href="{{ url_for('auth_bp.edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                    <form method="POST" action="{{ url_for('auth_bp.delete_user', user_id=user.id) }}" style="display:inline;">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this user?');">Delete</button>
-                    </form>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          <!-- Pagination controls for users list -->
-          <div class="d-flex justify-content-between align-items-center mt-3">
-            {% if pagination.has_prev %}
-              <a href="{{ url_for('admin_bp.admin_settings', page=pagination.prev_num) }}" class="btn btn-outline-primary">&laquo; Prev</a>
-            {% else %}
-              <span></span>
-            {% endif %}
-
-            <span class="text-muted">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-
-            {% if pagination.has_next %}
-              <a href="{{ url_for('admin_bp.admin_settings', page=pagination.next_num) }}" class="btn btn-outline-primary">Next &raquo;</a>
-            {% else %}
-              <span></span>
-            {% endif %}
           </div>
         </div>
+
+        <div class="row g-4">
+          {% for tpl_name, icon, ic_color, title, desc in [
+            ('email_tpl_reservation', 'bi-bookmark-check',       'var(--primary)',        'Reservation Confirmation',
+             'Sent when a unit is reserved. Placeholders: {customer_name}, {company_name}, {unit_details}, {portal_link}'),
+            ('email_tpl_ready',       'bi-bag-check',            'var(--color-success)',  'Ready for Pickup',
+             'Sent when a unit is ready. Placeholders: {customer_name}, {company_name}, {unit_details}, {portal_link}'),
+            ('email_tpl_invoice',     'bi-receipt',              'var(--color-warning)',  'Invoice Email',
+             'Sent with invoice PDF. Placeholders: {customer_name}, {company_name}, {invoice_number}, {amount}, {due_date}'),
+            ('email_tpl_low_stock',   'bi-exclamation-triangle', 'var(--color-danger)',   'Low Stock Alert',
+             'Internal alert to support email. Placeholders: {company_name}, {unit_details}'),
+          ] %}
+          <div class="col-12">
+            <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.3rem;">
+              <i class="bi {{ icon }}" style="color:{{ ic_color }};font-size:.95rem;"></i>
+              <span style="font-size:.875rem;font-weight:600;color:var(--text-primary);">{{ title }}</span>
+            </div>
+            <div style="font-size:.77rem;color:var(--text-muted);margin-bottom:.35rem;">{{ desc }}</div>
+            <textarea name="{{ tpl_name }}" rows="6" class="form-control font-monospace"
+                      style="font-size:.81rem;">{{ settings[tpl_name] or '' }}</textarea>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </form>{# end adminSettingsForm #}
+
+    {# ═══ USERS (outside form) ═══ #}
+    <div class="s-section" id="sec-users">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem;">
+        <div class="s-heading" style="margin:0;"><i class="bi bi-people"></i> Registered Users</div>
+        <a href="{{ url_for('auth.register_user') }}" class="btn btn-primary btn-sm">
+          <i class="bi bi-person-plus"></i> Add User
+        </a>
+      </div>
+      <div class="s-subhead">Manage user accounts and roles for this workspace.</div>
+
+      {% if users %}
+      <div style="overflow-x:auto;">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:2.2rem;"></th>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Role</th>
+              <th style="width:6rem;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>
+                <div style="width:30px;height:30px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;color:var(--text-secondary);">
+                  {{ (user.full_name or user.username)[0]|upper }}
+                </div>
+              </td>
+              <td style="font-size:.875rem;font-weight:500;">{{ user.full_name or '—' }}</td>
+              <td style="font-size:.82rem;color:var(--text-muted);font-family:monospace;">{{ user.username }}</td>
+              <td>
+                {% if user.role == 'admin' %}
+                  <span class="badge" style="background:#dbeafe;color:#1d4ed8;font-weight:600;">{{ user.role }}</span>
+                {% elif user.role == 'supervisor' %}
+                  <span class="badge" style="background:#fef3c7;color:#b45309;font-weight:600;">{{ user.role }}</span>
+                {% else %}
+                  <span class="badge" style="background:var(--surface-2);color:var(--text-secondary);font-weight:600;">{{ user.role }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="btn btn-ghost btn-sm" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="POST" action="{{ url_for('auth.delete_user', user_id=user.id) }}"
+                        style="display:inline;" onsubmit="return confirm('Delete {{ user.username }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--color-danger);" title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if pagination %}
+      <div class="table-footer">
+        <span style="font-size:.82rem;color:var(--text-muted);">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+        <div class="d-flex gap-2">
+          {% if pagination.has_prev %}
+          <a href="{{ url_for('admin_bp.admin_settings', page=pagination.prev_num) }}" class="btn btn-ghost btn-sm">&laquo; Prev</a>
+          {% endif %}
+          {% if pagination.has_next %}
+          <a href="{{ url_for('admin_bp.admin_settings', page=pagination.next_num) }}" class="btn btn-ghost btn-sm">Next &raquo;</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% else %}
+      <div class="empty-state" style="padding:1.5rem 0;">
+        <i class="bi bi-people"></i>
+        <p>No users found.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ═══ CUSTOM FIELDS (outside form) ═══ #}
+    <div class="s-section" id="sec-cf">
+      <div class="s-heading"><i class="bi bi-input-cursor-text"></i> Custom Fields</div>
+      <div class="s-subhead">
+        Extra fields attached to every unit — e.g. "Condition Notes", "Asset Category".
+        Values are set per-unit in the Edit Instance screen.
+      </div>
+
+      {% if custom_fields %}
+      <div style="overflow-x:auto;margin-bottom:1.25rem;">
+        <table class="table table-sm align-middle mb-0" id="custom-fields-table">
+          <thead>
+            <tr>
+              <th style="width:1.8rem;"></th>
+              <th>Label</th>
+              <th>Type</th>
+              <th>Options</th>
+              <th style="width:5rem;text-align:center;">Required</th>
+              <th style="width:4.5rem;text-align:center;">In List</th>
+              <th style="width:4.5rem;text-align:center;">Invoice</th>
+              <th style="width:5.5rem;"></th>
+            </tr>
+          </thead>
+          <tbody id="cf-sortable">
+            {% for cf in custom_fields %}
+            <tr data-cf-id="{{ cf.id }}" style="cursor:grab;">
+              <td><i class="bi bi-grip-vertical text-muted"></i></td>
+              <td>
+                <div style="font-weight:600;font-size:.875rem;">{{ cf.field_label }}</div>
+                <div style="font-size:.73rem;color:var(--text-muted);font-family:monospace;">{{ cf.field_key }}</div>
+              </td>
+              <td><span class="badge" style="background:var(--surface-2);color:var(--text-secondary);">{{ cf.field_type }}</span></td>
+              <td style="font-size:.8rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);">
+                {% if cf.field_options %}{{ cf.field_options }}{% else %}—{% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if cf.is_required %}<i class="bi bi-check-circle-fill" style="color:var(--color-success);"></i>
+                {% else %}<i class="bi bi-dash" style="color:var(--text-muted);"></i>{% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if cf.show_in_list %}<i class="bi bi-check-circle-fill" style="color:var(--color-success);"></i>
+                {% else %}<i class="bi bi-dash" style="color:var(--text-muted);"></i>{% endif %}
+              </td>
+              <td style="text-align:center;">
+                {% if cf.show_in_invoice %}<i class="bi bi-check-circle-fill" style="color:var(--color-success);"></i>
+                {% else %}<i class="bi bi-dash" style="color:var(--text-muted);"></i>{% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-ghost btn-sm" type="button"
+                          onclick="openEditCfModal({{ cf.id }}, '{{ cf.field_label|e }}', '{{ cf.field_type }}', {{ cf.field_options or 'null' }}, {{ 'true' if cf.is_required else 'false' }}, {{ 'true' if cf.show_in_list else 'false' }}, {{ 'true' if cf.show_in_invoice else 'false' }})">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <form method="POST" action="{{ url_for('admin_bp.delete_custom_field', field_id=cf.id) }}"
+                        style="display:inline"
+                        onsubmit="return confirm('Delete field \'{{ cf.field_label|e }}\'? All stored values will also be deleted.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-ghost btn-sm" style="color:var(--color-danger);" type="submit">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:1.25rem 0;margin-bottom:.75rem;">
+        <i class="bi bi-input-cursor-text" style="font-size:2rem;"></i>
+        <p>No custom fields yet.</p>
+      </div>
+      {% endif %}
+
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:1rem 1.1rem;">
+        <div style="font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:.75rem;">
+          <i class="bi bi-plus-circle me-1"></i>Add New Field
+        </div>
+        <form method="POST" action="{{ url_for('admin_bp.add_custom_field') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-4">
+              <label class="f-label">Label <span class="text-danger">*</span></label>
+              <input type="text" name="field_label" class="form-control form-control-sm"
+                     placeholder="e.g. Condition Notes" required>
+            </div>
+            <div class="col-6 col-sm-2">
+              <label class="f-label">Type</label>
+              <select name="field_type" class="form-select form-select-sm" id="add-cf-type">
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="select">Select</option>
+                <option value="date">Date</option>
+              </select>
+            </div>
+            <div class="col-12 col-sm-4" id="add-cf-options-wrap" style="display:none;">
+              <label class="f-label">Options (comma-separated)</label>
+              <input type="text" name="field_options" class="form-control form-control-sm"
+                     placeholder="Good, Fair, Poor">
+            </div>
+            <div class="col-12">
+              <div class="d-flex gap-3 flex-wrap mt-1" style="font-size:.83rem;">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="is_required" id="add-cf-req">
+                  <label class="form-check-label" for="add-cf-req">Required</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="show_in_list" id="add-cf-list">
+                  <label class="form-check-label" for="add-cf-list">Show in inventory list</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="show_in_invoice" id="add-cf-inv">
+                  <label class="form-check-label" for="add-cf-inv">Show on invoice</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-auto mt-2">
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i> Add Field
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
-  </div> <!-- end accordion -->
+
+  </div>{# end settings-content #}
+</div>{# end settings-layout #}
+
+{# ── Edit Custom Field Modal ─────────────────────────────────── #}
+<div class="modal fade" id="editCfModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Custom Field</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editCfForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Label</label>
+            <input type="text" name="field_label" id="edit-cf-label" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Type</label>
+            <select name="field_type" id="edit-cf-type" class="form-select">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="select">Select</option>
+              <option value="date">Date</option>
+            </select>
+          </div>
+          <div class="mb-3" id="edit-cf-options-wrap">
+            <label class="form-label">Options (comma-separated)</label>
+            <input type="text" name="field_options" id="edit-cf-options" class="form-control"
+                   placeholder="Good, Fair, Poor">
+          </div>
+          <div class="d-flex gap-3 flex-wrap" style="font-size:.84rem;">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_required" id="edit-cf-req">
+              <label class="form-check-label" for="edit-cf-req">Required</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="show_in_list" id="edit-cf-list">
+              <label class="form-check-label" for="edit-cf-list">Show in inventory list</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="show_in_invoice" id="edit-cf-inv">
+              <label class="form-check-label" for="edit-cf-inv">Show on invoice</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  // ── Column order drag-and-drop ──────────────────────────────
+  const colList  = document.getElementById('columnOrderList');
+  const colInput = document.getElementById('column_order_instance_table');
+  if (colList && colInput) {
+    function updateColOrder() {
+      colInput.value = Array.from(colList.children).map(li => li.dataset.key).join(',');
+    }
+    updateColOrder();
+    new Sortable(colList, { animation: 150, onEnd: updateColOrder, handle: '.bi-grip-vertical' });
+  }
+
+  // ── Live color picker sync ──────────────────────────────────
+  function syncColor(pickerId, textId) {
+    const picker = document.getElementById(pickerId);
+    const text   = document.getElementById(textId);
+    if (!picker || !text) return;
+    picker.addEventListener('input', () => { text.value = picker.value; });
+    text.addEventListener('input', () => {
+      const v = text.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) picker.value = v;
+    });
+  }
+  syncColor('primaryColorPicker',  'primaryColorText');
+  syncColor('sidebarColorPicker',  'sidebarColorText');
+  syncColor('invoiceAccentPicker', 'invoiceAccentText');
+
+  // ── CF type → show/hide options ────────────────────────────
+  function cfTypeToggle(selId, wrapId) {
+    const sel  = document.getElementById(selId);
+    const wrap = document.getElementById(wrapId);
+    if (!sel || !wrap) return;
+    function tog() { wrap.style.display = sel.value === 'select' ? '' : 'none'; }
+    sel.addEventListener('change', tog);
+    tog();
+  }
+  cfTypeToggle('add-cf-type',  'add-cf-options-wrap');
+  cfTypeToggle('edit-cf-type', 'edit-cf-options-wrap');
+
+  // ── Custom Fields drag-to-reorder ──────────────────────────
+  const cfBody = document.getElementById('cf-sortable');
+  if (cfBody) {
+    new Sortable(cfBody, {
+      animation: 150,
+      handle: '.bi-grip-vertical',
+      onEnd: function() {
+        const rows    = cfBody.querySelectorAll('tr[data-cf-id]');
+        const payload = Array.from(rows).map((r, i) => ({ id: parseInt(r.dataset.cfId), order: i }));
+        fetch('{{ url_for("admin_bp.reorder_custom_fields") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+          body: JSON.stringify(payload)
+        });
+      }
+    });
+  }
+
+  // ── Active nav on scroll (IntersectionObserver) ─────────────
+  const sections = document.querySelectorAll('.s-section[id]');
+  const navLinks = document.querySelectorAll('.s-nav-item[data-target]');
+  function setActive(id) {
+    navLinks.forEach(a => a.classList.toggle('active', a.dataset.target === id));
+  }
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); });
+  }, { rootMargin: '-25% 0px -65% 0px' });
+  sections.forEach(s => obs.observe(s));
+  if (sections.length) setActive(sections[0].id);
+});
+
+// ── Smooth scroll ───────────────────────────────────────────
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Edit CF modal ───────────────────────────────────────────
+function openEditCfModal(id, label, type, options, isRequired, showInList, showInInvoice) {
+  document.getElementById('editCfForm').action = '/admin/custom_fields/' + id + '/edit';
+  document.getElementById('edit-cf-label').value = label;
+  const typeEl = document.getElementById('edit-cf-type');
+  typeEl.value = type;
+  typeEl.dispatchEvent(new Event('change'));
+  const optEl = document.getElementById('edit-cf-options');
+  if (options && Array.isArray(options)) {
+    optEl.value = options.join(', ');
+  } else if (options && typeof options === 'string') {
+    try { optEl.value = JSON.parse(options).join(', '); } catch(e) { optEl.value = ''; }
+  } else { optEl.value = ''; }
+  document.getElementById('edit-cf-req').checked  = isRequired;
+  document.getElementById('edit-cf-list').checked = showInList;
+  document.getElementById('edit-cf-inv').checked  = showInInvoice;
+  new bootstrap.Modal(document.getElementById('editCfModal')).show();
+}
+</script>
 {% endblock %}

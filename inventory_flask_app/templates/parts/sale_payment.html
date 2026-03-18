@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}New Parts Sale — Payment{% endblock %}
+{% block page_title %}New Parts Sale{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">New Parts Sale</h1>
+    <div class="page-subtitle">Step 3 of 3 — Payment & confirm</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sale_invoice_type') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<div class="animate-fade-up" style="margin-bottom:1.75rem;">
+  <div style="display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+    {% for label, active in [('1. Cart', false), ('2. Customer', false), ('3. Payment', true)] %}
+    <div style="flex:1;padding:0.6rem 0.5rem;text-align:center;font-size:0.78rem;font-weight:{{ '700' if active else '500' }};
+                background:{{ 'var(--primary)' if active else 'transparent' }};
+                color:{{ '#fff' if active else 'var(--text-muted)' }};
+                {{ 'border-right:1px solid var(--border);' if not loop.last }}">
+      {{ label }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="animate-fade-up">
+  <div class="row g-3">
+
+    <!-- Left: Order Summary -->
+    <div class="col-12 col-lg-7">
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-body" style="padding:1.5rem;">
+          <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:1rem;">Order Summary</h3>
+
+          <!-- Customer -->
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+            <span style="color:var(--text-muted);">Customer</span>
+            <strong>{{ customer.customer_name }}</strong>
+          </div>
+
+          <!-- Invoice type -->
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem;">
+            <span style="color:var(--text-muted);">Invoice Type</span>
+            <span>
+              {% if invoice_data.type == 'attached' and invoice_data.sale_id %}
+                <span class="status-pill" style="background:#fef3c7;color:#92400e;">Attached to existing sale</span>
+              {% else %}
+                <span class="status-pill" style="background:#eff6ff;color:#1d4ed8;">Parts-Only (PRT-XXXX)</span>
+              {% endif %}
+            </span>
+          </div>
+
+          <!-- Items -->
+          <div style="margin-top:0.75rem;">
+            <table style="width:100%;font-size:0.84rem;border-collapse:collapse;">
+              <thead>
+                <tr style="color:var(--text-muted);font-size:0.78rem;">
+                  <th style="padding:0.35rem 0;font-weight:600;text-align:left;">Part</th>
+                  <th style="padding:0.35rem 0;font-weight:600;text-align:center;">Qty</th>
+                  <th style="padding:0.35rem 0;font-weight:600;text-align:right;">Price</th>
+                  <th style="padding:0.35rem 0;font-weight:600;text-align:right;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in cart %}
+                <tr style="border-top:1px solid var(--border);">
+                  <td style="padding:0.5rem 0;">
+                    <div style="font-weight:600;">{{ item.part_name }}</div>
+                    <div style="font-size:0.76rem;color:var(--text-muted);">
+                      {{ item.part_number }}
+                      {% if item.location_name %}&nbsp;·&nbsp;{{ item.location_name }}{% endif %}
+                      {% if item.bin_name %}&nbsp;/&nbsp;{{ item.bin_name }}{% endif %}
+                    </div>
+                  </td>
+                  <td style="padding:0.5rem 0;text-align:center;">{{ item.quantity }}</td>
+                  <td style="padding:0.5rem 0;text-align:right;">AED {{ '%.2f'|format(item.unit_price) }}</td>
+                  <td style="padding:0.5rem 0;text-align:right;font-weight:600;">AED {{ '%.2f'|format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="padding:0.75rem 0 0;text-align:right;font-weight:700;font-size:0.95rem;border-top:2px solid var(--border);">Total</td>
+                  <td style="padding:0.75rem 0 0;text-align:right;font-weight:800;font-size:1.05rem;color:var(--primary);border-top:2px solid var(--border);">AED {{ '%.2f'|format(subtotal) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Payment form -->
+    <div class="col-12 col-lg-5">
+      <div class="card">
+        <div class="card-body" style="padding:1.5rem;">
+          <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:1.25rem;">Payment</h3>
+
+          <form method="post" id="paymentForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+              <label class="form-label">Payment Method <span style="color:var(--color-danger);">*</span></label>
+              <div style="display:flex;gap:0.5rem;">
+                {% for method, label, icon in [('cash', 'Cash', 'bi-cash-coin'), ('card', 'Card', 'bi-credit-card'), ('credit', 'Credit', 'bi-person-check')] %}
+                <label style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.3rem;padding:0.75rem 0.5rem;border:2px solid var(--border);border-radius:var(--radius-md);cursor:pointer;transition:all 0.15s;" class="pm-label" data-method="{{ method }}">
+                  <input type="radio" name="payment_method" value="{{ method }}" {% if method == 'cash' %}checked{% endif %} style="display:none;">
+                  <i class="bi {{ icon }}" style="font-size:1.25rem;"></i>
+                  <span style="font-size:0.78rem;font-weight:600;">{{ label }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Credit warning -->
+            <div id="credit-warn" style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--radius-md);padding:0.6rem 0.85rem;font-size:0.82rem;color:#92400e;margin-bottom:1rem;">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              This will add <strong>AED {{ '%.2f'|format(subtotal) }}</strong> to {{ customer.customer_name }}'s outstanding parts balance.
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Notes <span style="font-size:0.75rem;color:var(--text-muted);">(optional)</span></label>
+              <textarea name="notes" class="form-control" rows="3" placeholder="Internal notes…"></textarea>
+            </div>
+
+            <!-- Generate Invoice toggle -->
+            <div class="mb-4">
+              <label class="form-label">Generate Invoice?</label>
+              <div style="display:flex;gap:0.5rem;">
+                <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem 0.5rem;border:2px solid var(--primary);border-radius:var(--radius-md);cursor:pointer;background:var(--surface-2);font-size:0.85rem;font-weight:600;" class="inv-label" data-val="yes">
+                  <input type="radio" name="generate_invoice" value="yes" checked style="display:none;">
+                  <i class="bi bi-file-earmark-text" style="color:var(--primary);"></i> Yes — View Invoice
+                </label>
+                <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem 0.5rem;border:2px solid var(--border);border-radius:var(--radius-md);cursor:pointer;font-size:0.85rem;font-weight:600;" class="inv-label" data-val="no">
+                  <input type="radio" name="generate_invoice" value="no" style="display:none;">
+                  <i class="bi bi-check2-circle" style="color:var(--color-success);"></i> No — Just Record
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100" style="font-size:1rem;padding:0.75rem;">
+              <i class="bi bi-check-circle me-1"></i> Complete Sale
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  /* Invoice toggle */
+  const invLabels = document.querySelectorAll('.inv-label');
+  function updateInvUI() {
+    invLabels.forEach(function(lbl) {
+      const radio = lbl.querySelector('input[type=radio]');
+      lbl.style.borderColor = radio.checked ? 'var(--primary)' : 'var(--border)';
+      lbl.style.background  = radio.checked ? 'var(--surface-2)' : 'transparent';
+    });
+  }
+  invLabels.forEach(function(lbl) {
+    lbl.addEventListener('click', function() {
+      this.querySelector('input').checked = true;
+      updateInvUI();
+    });
+  });
+  updateInvUI();
+
+  /* Payment method */
+  const labels = document.querySelectorAll('.pm-label');
+  function updatePaymentUI() {
+    const creditWarn = document.getElementById('credit-warn');
+    labels.forEach(function(lbl) {
+      const radio = lbl.querySelector('input[type=radio]');
+      if (radio.checked) {
+        lbl.style.borderColor = 'var(--primary)';
+        lbl.style.background = 'var(--surface-2)';
+      } else {
+        lbl.style.borderColor = 'var(--border)';
+        lbl.style.background = 'transparent';
+      }
+      if (radio.value === 'credit' && radio.checked) {
+        creditWarn.style.display = '';
+      }
+    });
+    const anyCredit = [...labels].some(function(l) { return l.querySelector('input').value === 'credit' && l.querySelector('input').checked; });
+    if (!anyCredit) creditWarn.style.display = 'none';
+  }
+  labels.forEach(function(lbl) {
+    lbl.addEventListener('click', function() {
+      this.querySelector('input').checked = true;
+      updatePaymentUI();
+    });
+  });
+  updatePaymentUI();
+}());
+</script>
+{% endblock %}

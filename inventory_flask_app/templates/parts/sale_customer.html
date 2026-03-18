@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}New Parts Sale — Customer{% endblock %}
+{% block page_title %}New Parts Sale{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">New Parts Sale</h1>
+    <div class="page-subtitle">Step 2 of 3 — Select customer</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sell', resume='1') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Cart
+    </a>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<div class="animate-fade-up" style="margin-bottom:1.75rem;">
+  <div style="display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+    {% for label, active in [('1. Cart', false), ('2. Customer', true), ('3. Payment', false)] %}
+    <div style="flex:1;padding:0.6rem 0.5rem;text-align:center;font-size:0.78rem;font-weight:{{ '700' if active else '500' }};
+                background:{{ 'var(--primary)' if active else 'transparent' }};
+                color:{{ '#fff' if active else 'var(--text-muted)' }};
+                {{ 'border-right:1px solid var(--border);' if not loop.last }}">
+      {{ label }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Cart summary badge -->
+{% if cart %}
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <span><i class="bi bi-cart3 me-1" style="color:var(--primary);"></i><strong>{{ cart|length }} item{{ 's' if cart|length != 1 }}</strong></span>
+    <span style="color:var(--text-muted);">Total: <strong>AED {{ '%.2f'|format(cart|sum(attribute='subtotal')) }}</strong></span>
+  </div>
+</div>
+{% endif %}
+
+<div class="animate-fade-up" style="max-width:560px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="post" id="customerForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="customer_type" id="customer-type-input" value="existing">
+
+        <!-- Toggle buttons -->
+        <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-existing" onclick="showExisting()">
+            <i class="bi bi-person-check"></i> Existing Customer
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-walkin" onclick="showWalkin()">
+            <i class="bi bi-person-walking"></i> Walk-in Customer
+          </button>
+        </div>
+
+        <!-- Existing customer -->
+        <div id="existing-section">
+          <div class="mb-4">
+            <label class="form-label">Customer <span style="color:var(--color-danger);">*</span></label>
+            <select name="customer_id" id="customer-select" class="form-select" style="width:100%;">
+              <option value="">Search or select a customer…</option>
+              {% for c in customers %}
+              <option value="{{ c.id }}">{{ c.name }}{% if c.phone %} · {{ c.phone }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            {% for c in customers %}
+            {% if c.parts_balance and c.parts_balance > 0 %}
+            <div id="balance-warn-{{ c.id }}" class="balance-warn" style="display:none;margin-top:0.35rem;font-size:0.78rem;color:var(--color-warning);">
+              <i class="bi bi-exclamation-triangle"></i> Outstanding parts balance: <strong>${{ '%.2f'|format(c.parts_balance) }}</strong>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Walk-in -->
+        <div id="walkin-section" style="display:none;">
+          <div class="mb-4">
+            <label class="form-label">Customer Name <span style="font-size:0.75rem;color:var(--text-muted);">(optional)</span></label>
+            <input type="text" name="customer_name" class="form-control" placeholder="e.g. John Smith or Walk-in Customer">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          Continue to Payment <i class="bi bi-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(function() {
+  $('#customer-select').select2({ placeholder: 'Search or select a customer…', width: '100%', allowClear: true });
+  $('#customer-select').on('change', function() {
+    $('.balance-warn').hide();
+    const id = $(this).val();
+    if (id) { const w = document.getElementById('balance-warn-' + id); if (w) $(w).show(); }
+  });
+});
+function showExisting() {
+  document.getElementById('existing-section').style.display = '';
+  document.getElementById('walkin-section').style.display = 'none';
+  document.getElementById('customer-type-input').value = 'existing';
+  document.getElementById('btn-existing').className = 'btn btn-primary btn-sm';
+  document.getElementById('btn-walkin').className = 'btn btn-ghost btn-sm';
+}
+function showWalkin() {
+  document.getElementById('existing-section').style.display = 'none';
+  document.getElementById('walkin-section').style.display = '';
+  document.getElementById('customer-type-input').value = 'walkin';
+  document.getElementById('btn-existing').className = 'btn btn-ghost btn-sm';
+  document.getElementById('btn-walkin').className = 'btn btn-primary btn-sm';
+}
+</script>
+{% endblock %}

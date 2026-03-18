@@ -1,16 +1,40 @@
-
-
 {% extends "base.html" %}
+{% block title %}Return Lookup{% endblock %}
+{% block page_title %}Return Lookup{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h2>Lookup Return by Serial</h2>
-  <form method="POST">
-    <div class="mb-3">
-      <label for="serial" class="form-label">Enter Serial Number</label>
-      <input type="text" class="form-control" id="serial" name="serial" placeholder="Scan or type serial..." required>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Return Lookup</h1>
+    <div class="page-subtitle">Search by serial number, asset tag, or invoice number</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:440px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-4">
+          <label class="form-label">Serial / Asset / Invoice #</label>
+          <input type="text" class="form-control" name="serial"
+                 placeholder="Scan or type serial, asset tag, or invoice number…"
+                 autofocus required>
+          <div class="form-text" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.35rem;">
+            <i class="bi bi-info-circle"></i>
+            Accepts serial numbers, asset tags, and invoice numbers (e.g. INV-2026-0042)
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i> Search
+        </button>
+      </form>
     </div>
-    <button type="submit" class="btn btn-primary">Search</button>
-    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-secondary">Cancel</a>
-  </form>
+  </div>
 </div>
 {% endblock %}

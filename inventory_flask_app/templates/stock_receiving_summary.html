@@ -1,115 +1,170 @@
 {% extends "base.html" %}
 {% block title %}Receiving Summary{% endblock %}
+{% block page_title %}Receiving Summary{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-<h3 class="mb-4">
-  📋 Receiving Summary for PO: {{ po.po_number }}
-  <small class="text-muted ms-2">(Internal ID: {{ po.id }})</small>
-</h3>
-
-<div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+<div class="page-header animate-fade-up">
   <div>
-    <span class="badge bg-success me-3">✅ Matched: {{ matched_count }}</span>
-    <span class="badge bg-danger me-3">❌ Extra: {{ extra_count }}</span>
-    <span class="badge bg-warning text-dark me-3">⚠ Missing: {{ missing_count }}</span>
-    <span class="badge bg-primary">📦 Total: {{ total_count }}</span>
+    <h1 class="page-title">Receiving Summary — {{ po.po_number }}</h1>
+    <div class="page-subtitle">
+      Vendor: <strong>{{ po.vendor.name if po.vendor else 'No Vendor' }}</strong>
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Scan
+    </a>
   </div>
 </div>
 
-<div class="table-responsive">
-<table class="table table-bordered table-hover table-sm align-middle">
-  <thead class="table-light">
-    <tr>
-      <th class="text-center text-nowrap">#</th>
-      <th class="text-nowrap">Asset</th>
-      <th class="text-nowrap">Serial</th>
-      <th class="text-nowrap">Item Name</th>
-      <th class="text-nowrap">Make</th>
-      <th class="text-nowrap">Model</th>
-      <th class="text-nowrap">CPU</th>
-      <th class="text-nowrap">RAM</th>
-      <th class="text-nowrap">Grade</th>
-      <th class="text-nowrap">Display</th>
-      <th class="text-nowrap">GPU 1</th>
-      <th class="text-nowrap">GPU 2</th>
-      <th class="text-nowrap">Location</th>
-      <th class="text-nowrap">Status</th>
-      <th class="text-nowrap">Label</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in serials %}
-    <tr>
-      <td class="text-center text-nowrap">{{ loop.index }}</td>
-      <td class="text-nowrap">{{ item.asset }}</td>
-      <td class="text-nowrap">{{ item.serial }}</td>
-      <td class="text-nowrap">{{ item.item_name }}</td>
-      <td class="text-nowrap">{{ item.make }}</td>
-      <td class="text-nowrap">{{ item.model }}</td>
-      <td class="text-nowrap">{{ item.cpu }}</td>
-      <td class="text-nowrap">{{ item.ram }}</td>
-      <td class="text-nowrap">{{ item.grade }}</td>
-      <td class="text-nowrap">{{ item.display }}</td>
-      <td class="text-nowrap">{{ item.gpu1 }}</td>
-      <td class="text-nowrap">{{ item.gpu2 }}</td>
-      <td class="text-nowrap">
-        {% if item.location_id %}
-          <a href="{{ url_for('stock_bp.add_location') }}" class="text-decoration-underline">{{ item.location }}</a>
+<!-- Stats -->
+<div class="animate-fade-up" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;">
+    <span style="color:var(--color-success);font-weight:600;">Matched</span>
+    <span style="margin-left:0.5rem;font-weight:700;">{{ matched_count }}</span>
+  </div>
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;">
+    <span style="color:var(--color-danger);font-weight:600;">Extra</span>
+    <span style="margin-left:0.5rem;font-weight:700;">{{ extra_count }}</span>
+  </div>
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;">
+    <span style="color:var(--color-warning);font-weight:600;">Missing</span>
+    <span style="margin-left:0.5rem;font-weight:700;">{{ missing_count }}</span>
+  </div>
+  {% if prev_count %}
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;">
+    <span style="color:var(--primary);font-weight:600;">Prev. Received</span>
+    <span style="margin-left:0.5rem;font-weight:700;">{{ prev_count }}</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Export links -->
+{% if matched_count or missing_count %}
+<div class="animate-fade-up d-flex gap-2 mb-3">
+  {% if matched_count %}
+  <a href="{{ url_for('stock_bp.stock_receiving_export', category='matched') }}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-download"></i> Export Matched CSV
+  </a>
+  {% endif %}
+  {% if missing_count %}
+  <a href="{{ url_for('stock_bp.stock_receiving_export', category='missing') }}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-download"></i> Export Missing CSV
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Summary table -->
+<div class="animate-fade-up table-card mb-4">
+  <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Serial</th>
+          <th>Asset</th>
+          <th>Item</th>
+          <th>Make</th>
+          <th>Model</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th>Grade</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          {% if row.poi %}
+            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.poi.serial }}</span></td>
+            <td>{{ row.poi.asset_tag or '—' }}</td>
+            <td>{{ row.poi.item_name or '—' }}</td>
+            <td>{{ row.poi.make or '—' }}</td>
+            <td>{{ row.poi.model or '—' }}</td>
+            <td>{{ row.poi.cpu or '—' }}</td>
+            <td>{{ row.poi.ram or '—' }}</td>
+            <td>{{ row.poi.grade or '—' }}</td>
+          {% else %}
+            {# Extra row — not on PO #}
+            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.extra_value }}</span></td>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+          {% endif %}
+          <td>
+            {% if row.match_status == 'matched' %}
+              <span class="status-pill status-processed">Matched</span>
+            {% elif row.match_status == 'extra' %}
+              <span class="status-pill status-disputed">Extra</span>
+            {% elif row.match_status == 'previously_received' %}
+              <span class="status-pill" style="background:var(--surface-3);color:var(--text-muted);">Prev. Received</span>
+            {% else %}
+              <span class="status-pill status-idle">Missing</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.match_status in ('matched', 'previously_received') and row.instance_id %}
+              <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=row.instance_id) }}"
+                 class="btn btn-ghost btn-sm" title="View instance">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+            {% endif %}
+          </td>
+        </tr>
         {% else %}
-          {{ item.location or '' }}
-        {% endif %}
-      </td>
-      <td class="text-nowrap">
-        {% if item.match_status == 'Matched' %}
-          <span class="badge bg-success">Matched</span>
-        {% elif item.match_status == 'Extra' %}
-          <span class="badge bg-danger">Extra</span>
-        {% elif item.match_status == 'Missing' %}
-          <span class="badge bg-warning text-dark">Missing</span>
-        {% else %}
-          <span class="badge bg-secondary">Unknown</span>
-        {% endif %}
-      </td>
-      <td class="text-nowrap">
-        {% if item.match_status == 'Matched' and item.instance_id %}
-          <a href="{{ url_for('stock_bp.print_label', instance_id=item.instance_id) }}"
-             class="btn btn-sm btn-outline-dark" target="_blank">🖨️ Print Label</a>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-
-
-<div class="d-grid gap-2 d-md-flex justify-content-md-between mt-3">
-  <a href="{{ url_for('stock_bp.stock_receiving_scan') }}" class="btn btn-outline-secondary btn-lg w-100">⬅ Back to Scan</a>
-</div>
-
-
-<form method="POST" action="{{ url_for('stock_bp.stock_receiving_confirm') }}">
-  <div class="mb-3 mt-4">
-    <label for="status_choice" class="form-label fw-bold">Assign matched items to:</label>
-    <select name="status_choice" id="status_choice" class="form-select form-select-lg" required>
-      <option value="">-- Select Status --</option>
-      <option value="unprocessed">Unprocessed</option>
-      <option value="under_process">Under Process</option>
-      <option value="processed">Processed</option>
-      <option value="sold">Sold</option>
-    </select>
+        <tr>
+          <td colspan="11" style="text-align:center;color:var(--text-muted);padding:1.5rem;">
+            No items to display
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-  <div class="mb-3 mt-3">
-    <label for="location_choice" class="form-label fw-bold">Place imported items in location:</label>
-    <select name="location_choice" id="location_choice" class="form-select form-select-lg" required>
-      <option value="">-- Select Location --</option>
-      {% for location in locations %}
-        <option value="{{ location.id }}">{{ location.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <button type="submit" class="btn btn-success btn-lg w-100 mt-2">✅ Import Matched Items</button>
-</form>
 </div>
+
+<!-- Confirm form -->
+{% if matched_count %}
+<div class="animate-fade-up card" style="max-width:520px;">
+  <div class="card-body" style="padding:1.5rem;">
+    <div style="font-size:0.85rem;font-weight:600;margin-bottom:1rem;">
+      Import {{ matched_count }} Matched Item{{ 's' if matched_count != 1 }} into Inventory
+    </div>
+    <form method="POST" action="{{ url_for('stock_bp.stock_receiving_confirm') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">Assign Status</label>
+        <select name="status_choice" class="form-select" required>
+          <option value="">Select status…</option>
+          <option value="unprocessed">Unprocessed</option>
+          <option value="under_process">Under Process</option>
+          <option value="processed">Processed</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Place in Location <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+        <select name="location_choice" class="form-select">
+          <option value="">— No location —</option>
+          {% for location in locations %}
+            <option value="{{ location.id }}"
+              {% if po.location_id == location.id %}selected{% endif %}>
+              {{ location.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-check2-circle"></i> Import Matched Items
+      </button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="empty-state animate-fade-up">
+  <i class="bi bi-inbox"></i>
+  <p>No matched items to import. Go back and scan some units.</p>
+</div>
+{% endif %}
+
 {% endblock %}

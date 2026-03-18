@@ -1,0 +1,950 @@
+{% extends "base.html" %}
+{% block title %}Parts Scanner{% endblock %}
+{% block page_title %}Parts Scanner{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Scanner workspace (mirrors stock scanner style) ── */
+  .scanner-workspace {
+    background: #0f172a;
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    box-shadow: var(--shadow-xl);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .scanner-workspace::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(16,185,129,0.10) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .scan-input-wrap { position: relative; margin-bottom: 0.75rem; }
+  .scan-input-icon {
+    position: absolute; left: 1.1rem; top: 50%; transform: translateY(-50%);
+    color: #64748b; font-size: 1.6rem; pointer-events: none; z-index: 2;
+    transition: color 0.2s;
+  }
+  .scan-input-wrap:focus-within .scan-input-icon { color: #6ee7b7; }
+  #scanInput {
+    width: 100%;
+    font-size: 1.6rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(16,185,129,0.35);
+    border-radius: var(--radius-lg);
+    color: #ffffff;
+    padding: 1.2rem 3.5rem 1.2rem 3.5rem;
+    outline: none;
+    transition: border-color var(--transition-base), box-shadow var(--transition-base),
+                background var(--transition-base);
+    animation: pulse-glow-green 3s ease-in-out infinite;
+  }
+  #scanInput::placeholder { color: #9ca3af; font-size: 1rem; letter-spacing: 0.02em; font-weight: 400; }
+  #scanInput:focus {
+    border-color: #10b981;
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 0 0 4px rgba(16,185,129,0.18), 0 0 32px rgba(16,185,129,0.12);
+    animation: none;
+  }
+  @keyframes pulse-glow-green {
+    0%, 100% { border-color: rgba(16,185,129,0.30); box-shadow: none; }
+    50%       { border-color: rgba(16,185,129,0.55); box-shadow: 0 0 0 4px rgba(16,185,129,0.08), 0 0 24px rgba(16,185,129,0.10); }
+  }
+  .scan-clear-btn {
+    position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #64748b; font-size: 1.3rem; cursor: pointer;
+    padding: 0.4rem; border-radius: var(--radius-sm); transition: color var(--transition-fast); z-index: 2; line-height: 1;
+  }
+  .scan-clear-btn:hover { color: #f87171; }
+
+  .scan-spinner {
+    display: none; align-items: center; gap: 0.6rem;
+    font-size: 0.82rem; color: #94a3b8; margin-bottom: 0.75rem; min-height: 28px;
+  }
+  .scan-spinner.active { display: flex; }
+  .scan-spinner .spinner-border { width: 1rem; height: 1rem; border-width: 2px; color: #6ee7b7; }
+
+  .scanner-hint {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.78rem; color: #6b7280; margin-bottom: 1.5rem; flex-wrap: wrap; line-height: 1.5;
+  }
+  .scanner-hint kbd {
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.72rem;
+    color: #cbd5e1; font-family: monospace;
+  }
+
+  .result-card {
+    opacity: 0; transform: translateY(22px);
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
+    pointer-events: none;
+  }
+  .result-card.result-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+  .found-panel {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+  }
+  .found-part-name {
+    font-size: 1.25rem; font-weight: 700; color: #f1f5f9;
+    letter-spacing: -0.025em; margin-bottom: 0.25rem;
+  }
+  .not-found-panel {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .part-meta-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: rgba(255,255,255,0.08); border-radius: 20px;
+    padding: 0.2rem 0.65rem; font-size: 0.75rem; color: #94a3b8;
+    margin-right: 0.35rem; margin-bottom: 0.35rem;
+  }
+  .low-stock-badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: rgba(239,68,68,0.18); color: #fca5a5;
+    border: 1px solid rgba(239,68,68,0.35);
+    border-radius: 20px; padding: 0.2rem 0.65rem; font-size: 0.75rem; font-weight: 700;
+  }
+  .part-action-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.45rem 0.9rem; border-radius: var(--radius-md);
+    font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0;
+    background: rgba(255,255,255,0.07);
+    transition: background 0.15s, border-color 0.15s;
+    text-decoration: none;
+  }
+  .part-action-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  .part-action-btn.btn-success-dark { border-color: rgba(16,185,129,0.4); color: #6ee7b7; }
+  .part-action-btn.btn-success-dark:hover { background: rgba(16,185,129,0.15); color: #a7f3d0; }
+  .part-action-btn.btn-warning-dark { border-color: rgba(245,158,11,0.4); color: #fcd34d; }
+  .part-action-btn.btn-warning-dark:hover { background: rgba(245,158,11,0.15); color: #fde68a; }
+  .part-action-btn.btn-blue-dark { border-color: rgba(59,130,246,0.4); color: #93c5fd; }
+  .part-action-btn.btn-blue-dark:hover { background: rgba(59,130,246,0.15); color: #bfdbfe; }
+  .part-action-btn.btn-purple-dark { border-color: rgba(139,92,246,0.4); color: #ddd6fe; }
+  .part-action-btn.btn-purple-dark:hover { background: rgba(139,92,246,0.15); color: #ede9fe; }
+
+  .stock-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+  .stock-table th, .stock-table td {
+    padding: 0.4rem 0.75rem; text-align: left; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .stock-table th { color: #64748b; font-weight: 600; font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stock-table td { color: #cbd5e1; }
+  .stock-table tr:last-child td { border-bottom: none; }
+
+  .movement-row { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.78rem; }
+  .movement-row:last-child { border-bottom: none; }
+  .movement-badge {
+    display: inline-block; border-radius: 4px; padding: 0.1rem 0.45rem;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .mb-stock_in  { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+  .mb-stock_out { background: rgba(245,158,11,0.18); color: #fcd34d; }
+  .mb-consume   { background: rgba(139,92,246,0.18); color: #ddd6fe; }
+  .mb-transfer  { background: rgba(59,130,246,0.18); color: #93c5fd; }
+  .mb-sell      { background: rgba(239,68,68,0.18); color: #fca5a5; }
+
+  /* dark modal */
+  .modal-dark .modal-content { background: #1e293b; border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+  .modal-dark .modal-header  { border-bottom: 1px solid rgba(255,255,255,0.10); }
+  .modal-dark .modal-footer  { border-top: 1px solid rgba(255,255,255,0.10); }
+  .modal-dark .modal-title   { color: #f1f5f9; }
+  .modal-dark .form-label    { color: #94a3b8; font-size: 0.82rem; font-weight: 600; }
+  .modal-dark .form-control,
+  .modal-dark .form-select   {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    color: #f1f5f9; border-radius: var(--radius-sm);
+  }
+  .modal-dark .form-control:focus,
+  .modal-dark .form-select:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.20); outline: none; }
+  .modal-dark .form-control option,
+  .modal-dark .form-select option { background: #1e293b; }
+  .modal-dark .btn-close { filter: invert(1) opacity(0.6); }
+</style>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Parts Scanner</h1>
+    <div class="page-subtitle">Scan a barcode or search by part number / name</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost">
+      <i class="bi bi-list-ul"></i> Parts List
+    </a>
+    <a href="{{ url_for('parts_bp.add_part') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Part
+    </a>
+  </div>
+</div>
+
+<!-- Scanner workspace -->
+<div class="scanner-workspace animate-fade-up">
+
+  <div class="scan-input-wrap">
+    <i class="bi bi-upc-scan scan-input-icon"></i>
+    <input id="scanInput" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Scan barcode or type part number / name…"
+           value="{{ prefill }}">
+    <button class="scan-clear-btn" id="clearBtn" title="Clear" style="display:none;">
+      <i class="bi bi-x-circle-fill"></i>
+    </button>
+  </div>
+
+  <div class="scan-spinner" id="spinner">
+    <div class="spinner-border"></div>
+    <span>Looking up part…</span>
+  </div>
+
+  <div class="scanner-hint">
+    <i class="bi bi-keyboard"></i>
+    Press <kbd>Enter</kbd> to search &nbsp;·&nbsp;
+    Results appear below &nbsp;·&nbsp;
+    <kbd>Esc</kbd> to clear
+  </div>
+
+  <!-- Result area -->
+  <div class="result-card" id="resultCard">
+
+    <!-- FOUND -->
+    <div class="found-panel" id="foundPanel" style="display:none;">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-2">
+        <div>
+          <div class="found-part-name" id="rPartName"></div>
+          <div style="font-family:monospace;font-size:0.82rem;color:#64748b;" id="rPartNumber"></div>
+        </div>
+        <div id="rLowStockBadge" class="low-stock-badge" style="display:none;">
+          <i class="bi bi-exclamation-triangle-fill"></i> LOW STOCK
+        </div>
+      </div>
+
+      <div id="rMeta" style="margin-bottom:1rem;"></div>
+
+      <!-- Stock table -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:0.4rem;">Stock by Location</div>
+        <table class="stock-table">
+          <thead><tr><th>Location</th><th>Bin</th><th style="text-align:right;">Qty</th></tr></thead>
+          <tbody id="rStockBody"></tbody>
+        </table>
+        <div style="margin-top:0.5rem;font-size:0.8rem;color:#94a3b8;">
+          Total: <strong id="rTotalStock" style="color:#f1f5f9;"></strong>
+          &nbsp;·&nbsp; Min: <strong id="rMinStock" style="color:#94a3b8;"></strong>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;" id="rActions">
+        <button class="part-action-btn btn-success-dark" id="btnStockIn">
+          <i class="bi bi-box-arrow-in-down"></i> Stock In
+        </button>
+        <button class="part-action-btn btn-warning-dark" id="btnStockOut">
+          <i class="bi bi-box-arrow-up"></i> Stock Out
+        </button>
+        <a class="part-action-btn btn-blue-dark" id="btnSell" href="#">
+          <i class="bi bi-bag-check"></i> Sell
+        </a>
+        <button class="part-action-btn btn-purple-dark" id="btnUse">
+          <i class="bi bi-tools"></i> Use in Repair
+        </button>
+        <button class="part-action-btn" id="btnTransfer">
+          <i class="bi bi-arrows-move"></i> Transfer
+        </button>
+        <button class="part-action-btn btn-blue-dark" id="btnMoveToBin" style="display:none;">
+          <i class="bi bi-box-arrow-in-right"></i> <span id="btnMoveToBinLabel">Assign to Bin</span>
+        </button>
+        <a class="part-action-btn" id="btnDetail" href="#">
+          <i class="bi bi-eye"></i> Details
+        </a>
+      </div>
+
+      <!-- Recent movements -->
+      <div id="rMovementsWrap">
+        <div style="font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:0.4rem;">Recent Movements</div>
+        <div id="rMovements"></div>
+      </div>
+    </div>
+
+    <!-- NOT FOUND -->
+    <div class="not-found-panel" id="notFoundPanel" style="display:none;">
+      <i class="bi bi-search" style="font-size:2rem;color:#ef4444;opacity:0.7;margin-bottom:0.75rem;display:block;"></i>
+      <div style="font-size:1.1rem;font-weight:700;color:#fca5a5;margin-bottom:0.4rem;">Part not found</div>
+      <div style="font-size:0.85rem;color:#94a3b8;margin-bottom:1rem;" id="notFoundQuery"></div>
+      <a id="btnAddFromScan" href="{{ url_for('parts_bp.add_part') }}"
+         class="part-action-btn btn-success-dark" style="display:inline-flex;">
+        <i class="bi bi-plus-circle"></i> Add New Part
+      </a>
+    </div>
+
+  </div><!-- /result-card -->
+</div><!-- /scanner-workspace -->
+
+
+<!-- ══ STOCK IN MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="modalStockIn" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('parts_bp.stock_in') }}" id="formStockIn">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" id="siPartId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-box-arrow-in-down me-2 text-success"></i>Stock In — <span id="siPartName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <select name="location_id" id="siLocation" class="form-select" required>
+              <option value="">— select —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3" id="siToBinWrap" style="display:none;">
+            <label class="form-label">Bin <span style="color:#64748b;font-size:0.75rem;">(optional)</span></label>
+            <select name="bin_id" id="siToBin" class="form-select">
+              <option value="">— no specific bin —</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Note <span style="color:#64748b;">(optional)</span></label>
+            <input type="text" name="note" class="form-control" placeholder="Delivery note, PO number…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Add Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STOCK OUT MODAL ═════════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="modalStockOut" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('parts_bp.stock_out') }}" id="formStockOut">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" id="soPartId">
+        <input type="hidden" name="location_id" id="soLocationHidden">
+        <input type="hidden" name="bin_id" id="soBinHidden">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-box-arrow-up me-2 text-warning"></i>Stock Out — <span id="soPartName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">From Stock</label>
+            <select id="soFromStock" class="form-select" required>
+              <option value="">— select location / bin —</option>
+            </select>
+            <div id="soNoStock" style="display:none;font-size:0.78rem;color:var(--color-danger);margin-top:0.3rem;">
+              <i class="bi bi-exclamation-triangle"></i> No stock available for this part.
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" id="soQty" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Note <span style="color:#64748b;">(optional)</span></label>
+            <input type="text" name="note" class="form-control" placeholder="Reason…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning" style="color:#1e293b;"><i class="bi bi-check-circle"></i> Remove Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ USE IN REPAIR MODAL ════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="modalUse" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('parts_bp.consume') }}" id="formUse">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" id="usePartId">
+        <input type="hidden" name="location_id" id="useLocationHidden">
+        <input type="hidden" name="bin_id" id="useBinHidden">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-tools me-2" style="color:#a78bfa;"></i>Use in Repair — <span id="usePartName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Take From</label>
+            <select id="useFromStock" class="form-select" required>
+              <option value="">— select location / bin —</option>
+            </select>
+            <div id="useNoStock" style="display:none;font-size:0.78rem;color:var(--color-danger);margin-top:0.3rem;">
+              <i class="bi bi-exclamation-triangle"></i> No stock available for this part.
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" id="useQty" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Unit Serial / Asset Tag <span style="color:#64748b;">(optional)</span></label>
+            <input type="text" name="unit_serial" class="form-control" placeholder="e.g. SN123456"
+                   autocomplete="off" id="useSerialInput">
+            <div id="useSerialHint" style="font-size:0.75rem;color:#6ee7b7;margin-top:0.25rem;"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Note <span style="color:#64748b;">(optional)</span></label>
+            <input type="text" name="note" class="form-control" placeholder="Repair description…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Record Usage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TRANSFER MODAL ═════════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="modalTransfer" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('parts_bp.transfer') }}" id="formTransfer">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" id="trPartId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-arrows-move me-2"></i>Transfer — <span id="trPartName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">From Location</label>
+            <select name="from_location_id" id="trFromLocation" class="form-select" required>
+              <option value="">— select —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3" id="trFromBinWrap" style="display:none;">
+            <label class="form-label">From Bin <span style="color:#64748b;font-size:0.75rem;">(optional)</span></label>
+            <select name="from_bin_id" id="trFromBin" class="form-select">
+              <option value="">— no specific bin —</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">To Location</label>
+            <select name="to_location_id" id="trToLocation" class="form-select" required>
+              <option value="">— select —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3" id="trToBinWrap" style="display:none;">
+            <label class="form-label">To Bin <span style="color:#64748b;font-size:0.75rem;">(optional)</span></label>
+            <select name="to_bin_id" id="trToBin" class="form-select">
+              <option value="">— no specific bin —</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MOVE TO BIN MODAL ══════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="modalMoveToBin" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="moveToBinTitle"><i class="bi bi-box-arrow-in-right me-2" style="color:#93c5fd;"></i><span id="moveToBinTitleText">Assign to Bin</span> — <span id="mtbPartName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3" id="mtbCurrentWrap" style="display:none;">
+          <label class="form-label">Current Location / Bin</label>
+          <div id="mtbCurrentInfo" style="font-size:0.85rem;color:#94a3b8;background:rgba(255,255,255,0.04);border-radius:var(--radius-sm);padding:0.4rem 0.75rem;"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">From Location <span style="color:var(--color-danger);">*</span></label>
+          <select id="mtbFromLocation" class="form-select" required>
+            <option value="">— select —</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3" id="mtbFromBinWrap" style="display:none;">
+          <label class="form-label">From Bin <span style="font-size:0.75rem;color:#64748b;">(optional)</span></label>
+          <select id="mtbFromBin" class="form-select">
+            <option value="">— no specific bin —</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">To Location <span style="color:var(--color-danger);">*</span></label>
+          <select id="mtbToLocation" class="form-select" required>
+            <option value="">— select —</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3" id="mtbToBinWrap" style="display:none;">
+          <label class="form-label">To Bin <span style="font-size:0.75rem;color:#64748b;">(optional)</span></label>
+          <select id="mtbToBin" class="form-select">
+            <option value="">— no specific bin —</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Quantity <span style="color:var(--color-danger);">*</span></label>
+          <input type="number" id="mtbQty" class="form-control" min="1" value="1" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="mtbSubmit"><i class="bi bi-check-circle"></i> Move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+(function() {
+  'use strict';
+
+  var CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  var input    = document.getElementById('scanInput');
+  var clearBtn = document.getElementById('clearBtn');
+  var spinner  = document.getElementById('spinner');
+  var card     = document.getElementById('resultCard');
+  var found    = document.getElementById('foundPanel');
+  var notFound = document.getElementById('notFoundPanel');
+
+  var _currentPart    = null;
+  var _mtbCurrentPart = null;
+  var _debounce       = null;
+
+  /* ── auto-focus + keep focus ── */
+  input.focus();
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.modal') && !e.target.closest('a') && !e.target.closest('button')) {
+      input.focus();
+    }
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { clearInput(); }
+  });
+
+  /* ── clear ── */
+  function clearInput() {
+    input.value = '';
+    clearBtn.style.display = 'none';
+    hideResult();
+    input.focus();
+  }
+  clearBtn.addEventListener('click', clearInput);
+  input.addEventListener('input', function() {
+    clearBtn.style.display = input.value ? '' : 'none';
+  });
+
+  /* ── trigger on Enter or debounce ── */
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(_debounce);
+      doLookup(input.value.trim());
+    }
+  });
+  input.addEventListener('input', function() {
+    clearTimeout(_debounce);
+    var q = input.value.trim();
+    if (q.length >= 3) {
+      _debounce = setTimeout(function() { doLookup(q); }, 400);
+    }
+  });
+
+  /* ── lookup ── */
+  function doLookup(q) {
+    if (!q) return;
+    showSpinner();
+    hideResult();
+    fetch('/parts/api/lookup?q=' + encodeURIComponent(q), {
+      headers: { 'X-CSRFToken': CSRF }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      hideSpinner();
+      if (data.found) { renderFound(data.part); }
+      else            { renderNotFound(q); }
+    })
+    .catch(function() { hideSpinner(); renderNotFound(q); });
+  }
+
+  /* ── render found ── */
+  function renderFound(p) {
+    _currentPart = p;
+    document.getElementById('rPartName').textContent   = p.name;
+    document.getElementById('rPartNumber').textContent = p.part_number;
+    document.getElementById('rTotalStock').textContent = p.total_stock;
+    document.getElementById('rMinStock').textContent   = p.min_stock;
+    document.getElementById('rLowStockBadge').style.display = p.low_stock ? '' : 'none';
+
+    /* meta chips */
+    var chips = '';
+    if (p.part_type)  chips += chip('bi-tag',          p.part_type);
+    if (p.vendor)     chips += chip('bi-shop',          p.vendor);
+    if (p.barcode)    chips += chip('bi-upc',           p.barcode);
+    if (p.price != null) chips += chip('bi-currency-dollar', p.price.toFixed(2));
+    document.getElementById('rMeta').innerHTML = chips;
+
+    /* stock table */
+    var rows = '';
+    if (p.stocks.length) {
+      p.stocks.forEach(function(s) {
+        var qClass = s.quantity === 0 ? 'color:#ef4444;' : (s.quantity < p.min_stock ? 'color:#fcd34d;' : '');
+        rows += '<tr>'
+          + '<td>' + esc(s.location_name) + '</td>'
+          + '<td style="color:#64748b;">' + (s.bin_name ? esc(s.bin_name) : '—') + '</td>'
+          + '<td style="text-align:right;font-weight:700;' + qClass + '">' + s.quantity + '</td>'
+          + '</tr>';
+      });
+    } else {
+      rows = '<tr><td colspan="3" style="color:#64748b;font-style:italic;">No stock recorded</td></tr>';
+    }
+    document.getElementById('rStockBody').innerHTML = rows;
+
+    /* action buttons */
+    document.getElementById('btnStockIn').onclick  = function() { openModal('StockIn', p); };
+    document.getElementById('btnStockOut').onclick = function() { openModal('StockOut', p); };
+    document.getElementById('btnUse').onclick      = function() { openModal('Use', p); };
+    document.getElementById('btnTransfer').onclick = function() { openModal('Transfer', p); };
+    document.getElementById('btnSell').href        = p.url_sell;
+    document.getElementById('btnDetail').href      = p.url_detail;
+
+    /* Assign/Move to Bin button */
+    var hasBin = p.stocks.some(function(s) { return s.bin_name; });
+    var mtbBtn = document.getElementById('btnMoveToBin');
+    document.getElementById('btnMoveToBinLabel').textContent = hasBin ? 'Move to Bin' : 'Assign to Bin';
+    mtbBtn.style.display = '';
+    mtbBtn.onclick = function() { openModal('MoveToBin', p); };
+
+    /* recent movements */
+    var mHtml = '';
+    if (p.recent_movements.length) {
+      p.recent_movements.forEach(function(m) {
+        mHtml += '<div class="movement-row">'
+          + '<span class="movement-badge mb-' + m.type + '">' + m.type.replace('_', ' ') + '</span>'
+          + '<span style="color:#94a3b8;flex-shrink:0;">' + esc(m.date) + '</span>'
+          + '<span style="color:#f1f5f9;font-weight:600;">×' + m.qty + '</span>'
+          + '<span style="color:#64748b;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">'
+          + esc(m.location_str || '') + (m.note ? ' · ' + esc(m.note) : '') + '</span>'
+          + '<span style="color:#475569;">' + esc(m.user) + '</span>'
+          + '</div>';
+      });
+    } else {
+      mHtml = '<div style="color:#64748b;font-size:0.78rem;font-style:italic;">No movements yet</div>';
+    }
+    document.getElementById('rMovements').innerHTML = mHtml;
+
+    notFound.style.display = 'none';
+    found.style.display    = '';
+    showResult();
+  }
+
+  function chip(icon, text) {
+    return '<span class="part-meta-chip"><i class="bi ' + icon + '"></i>' + esc(text) + '</span>';
+  }
+
+  /* ── render not found ── */
+  function renderNotFound(q) {
+    document.getElementById('notFoundQuery').textContent = '"' + q + '"';
+    found.style.display    = 'none';
+    notFound.style.display = '';
+    showResult();
+  }
+
+  /* ── modal openers ── */
+  function openModal(type, p) {
+    if (type === 'StockIn') {
+      document.getElementById('siPartId').value   = p.id;
+      document.getElementById('siPartName').textContent = p.name;
+      // Reset bin dropdown
+      document.getElementById('siLocation').value = '';
+      document.getElementById('siToBin').innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('siToBinWrap').style.display = 'none';
+      new bootstrap.Modal(document.getElementById('modalStockIn')).show();
+    } else if (type === 'StockOut') {
+      document.getElementById('soPartId').value   = p.id;
+      document.getElementById('soPartName').textContent = p.name;
+      document.getElementById('soLocationHidden').value = '';
+      document.getElementById('soBinHidden').value = '';
+      fillFromStock('soFromStock', 'soNoStock', p.stocks);
+      new bootstrap.Modal(document.getElementById('modalStockOut')).show();
+    } else if (type === 'Use') {
+      document.getElementById('usePartId').value  = p.id;
+      document.getElementById('usePartName').textContent = p.name;
+      document.getElementById('useLocationHidden').value = '';
+      document.getElementById('useBinHidden').value = '';
+      fillFromStock('useFromStock', 'useNoStock', p.stocks);
+      new bootstrap.Modal(document.getElementById('modalUse')).show();
+    } else if (type === 'Transfer') {
+      document.getElementById('trPartId').value   = p.id;
+      document.getElementById('trPartName').textContent = p.name;
+      // Reset from/to bin dropdowns
+      document.getElementById('trFromLocation').value = '';
+      document.getElementById('trFromBin').innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('trFromBinWrap').style.display = 'none';
+      document.getElementById('trToLocation').value = '';
+      document.getElementById('trToBin').innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('trToBinWrap').style.display = 'none';
+      // Pre-select from-location if only one stock entry
+      if (p.stocks.length === 1 && p.stocks[0].location_id) {
+        document.getElementById('trFromLocation').value = p.stocks[0].location_id;
+        loadPartBins('trFromBin', 'trFromBinWrap', p.stocks[0].location_id, p.stocks[0].bin_id || null);
+      }
+      new bootstrap.Modal(document.getElementById('modalTransfer')).show();
+    } else if (type === 'MoveToBin') {
+      var hasBin = p.stocks.some(function(s) { return s.bin_name; });
+      document.getElementById('moveToBinTitleText').textContent = hasBin ? 'Move to Bin' : 'Assign to Bin';
+      document.getElementById('mtbPartName').textContent = p.name;
+      // Pre-select from-location if only one stock location
+      var fromSel = document.getElementById('mtbFromLocation');
+      fromSel.value = '';
+      document.getElementById('mtbFromBin').innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('mtbFromBinWrap').style.display = 'none';
+      document.getElementById('mtbToLocation').value = '';
+      document.getElementById('mtbToBin').innerHTML = '<option value="">— no specific bin —</option>';
+      document.getElementById('mtbToBinWrap').style.display = 'none';
+      document.getElementById('mtbQty').value = p.total_stock || 1;
+      if (p.stocks.length === 1) {
+        fromSel.value = p.stocks[0].location_id;
+        mtbLoadBins('from', p.stocks[0].location_id, p.stocks[0].bin_id || null);
+      }
+      document.getElementById('_mtbPartId') && (document.getElementById('_mtbPartId').value = p.id);
+      _mtbCurrentPart = p;
+      new bootstrap.Modal(document.getElementById('modalMoveToBin')).show();
+    }
+  }
+
+  /* ── unit serial autocomplete (use modal) ── */
+  var _serialDebounce = null;
+  document.getElementById('useSerialInput').addEventListener('input', function() {
+    clearTimeout(_serialDebounce);
+    var val = this.value.trim();
+    var hint = document.getElementById('useSerialHint');
+    if (val.length < 3) { hint.textContent = ''; return; }
+    _serialDebounce = setTimeout(function() {
+      fetch('/parts/ajax_lookup_unit?serial=' + encodeURIComponent(val))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          hint.textContent = d.found ? ('✓ ' + d.item_name + ' · ' + d.status) : '✗ Unit not found';
+          hint.style.color = d.found ? '#6ee7b7' : '#f87171';
+        });
+    }, 300);
+  });
+
+  /* ── helpers ── */
+  function showSpinner() { spinner.classList.add('active'); }
+  function hideSpinner() { spinner.classList.remove('active'); }
+  function showResult()  { card.classList.add('result-visible'); }
+  function hideResult()  { card.classList.remove('result-visible'); }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ── Generic bin loader for Stock In / Transfer modals ── */
+  function loadPartBins(selId, wrapId, locationId, preSelectId) {
+    var sel  = document.getElementById(selId);
+    var wrap = document.getElementById(wrapId);
+    sel.innerHTML = '<option value="">— no specific bin —</option>';
+    if (!locationId) { wrap.style.display = 'none'; return; }
+    fetch('/parts/api/bins?location_id=' + locationId, { headers: { 'X-CSRFToken': CSRF } })
+      .then(function(r) { return r.json(); })
+      .then(function(bins) {
+        bins.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+          sel.appendChild(opt);
+        });
+        wrap.style.display = bins.length > 0 ? '' : 'none';
+        if (preSelectId) { sel.value = String(preSelectId); }
+      });
+  }
+
+  /* ── Stock In: load bins when location changes ── */
+  document.getElementById('siLocation').addEventListener('change', function() {
+    loadPartBins('siToBin', 'siToBinWrap', this.value, null);
+  });
+
+  /* ── Transfer: load from/to bins when locations change ── */
+  document.getElementById('trFromLocation').addEventListener('change', function() {
+    loadPartBins('trFromBin', 'trFromBinWrap', this.value, null);
+  });
+  document.getElementById('trToLocation').addEventListener('change', function() {
+    loadPartBins('trToBin', 'trToBinWrap', this.value, null);
+  });
+
+  /* ── From-Stock select: sync hidden location_id + bin_id fields ── */
+  function wireFromStock(fromStockId, locHiddenId, binHiddenId, qtyInputId) {
+    document.getElementById(fromStockId).addEventListener('change', function() {
+      if (this.value) {
+        var d = JSON.parse(this.value);
+        document.getElementById(locHiddenId).value = d.location_id || '';
+        document.getElementById(binHiddenId).value = d.bin_id != null ? d.bin_id : '';
+        if (qtyInputId) {
+          var qEl = document.getElementById(qtyInputId);
+          if (qEl && d.max_qty) { qEl.max = d.max_qty; }
+        }
+      } else {
+        document.getElementById(locHiddenId).value = '';
+        document.getElementById(binHiddenId).value = '';
+      }
+    });
+  }
+  wireFromStock('soFromStock', 'soLocationHidden', 'soBinHidden', 'soQty');
+  wireFromStock('useFromStock', 'useLocationHidden', 'useBinHidden', 'useQty');
+
+  /* ── Populate a from-stock select from p.stocks ── */
+  function fillFromStock(selId, noStockId, stocks) {
+    var sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">— select location / bin —</option>';
+    var hasStock = false;
+    stocks.forEach(function(s) {
+      if (s.quantity > 0) {
+        hasStock = true;
+        var opt = document.createElement('option');
+        var label = s.location_name;
+        label += s.bin_name ? ' — ' + s.bin_name : ' — No bin';
+        label += ' (' + s.quantity + ' available)';
+        opt.value = JSON.stringify({location_id: s.location_id, bin_id: s.bin_id !== undefined ? s.bin_id : null, max_qty: s.quantity});
+        opt.textContent = label;
+        sel.appendChild(opt);
+      }
+    });
+    document.getElementById(noStockId).style.display = hasStock ? 'none' : '';
+    // Auto-select if only one stock entry
+    var available = stocks.filter(function(s) { return s.quantity > 0; });
+    if (available.length === 1) {
+      sel.value = JSON.stringify({location_id: available[0].location_id, bin_id: available[0].bin_id !== undefined ? available[0].bin_id : null, max_qty: available[0].quantity});
+      sel.dispatchEvent(new Event('change'));
+    }
+  }
+
+  /* ── Move to Bin modal logic ── */
+  function mtbLoadBins(side, locationId, preSelectId) {
+    var selId = side === 'from' ? 'mtbFromBin' : 'mtbToBin';
+    var wrapId = side === 'from' ? 'mtbFromBinWrap' : 'mtbToBinWrap';
+    var sel  = document.getElementById(selId);
+    var wrap = document.getElementById(wrapId);
+    sel.innerHTML = '<option value="">— no specific bin —</option>';
+    if (!locationId) { wrap.style.display = 'none'; return; }
+    fetch('/parts/api/bins?location_id=' + locationId, { headers: { 'X-CSRFToken': CSRF } })
+      .then(function(r) { return r.json(); })
+      .then(function(bins) {
+        if (bins.length === 0) { wrap.style.display = 'none'; return; }
+        bins.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+          sel.appendChild(opt);
+        });
+        wrap.style.display = '';
+        if (preSelectId) { sel.value = preSelectId; }
+      });
+  }
+
+  document.getElementById('mtbFromLocation').addEventListener('change', function() {
+    mtbLoadBins('from', this.value);
+  });
+  document.getElementById('mtbToLocation').addEventListener('change', function() {
+    mtbLoadBins('to', this.value);
+  });
+
+  document.getElementById('mtbSubmit').addEventListener('click', function() {
+    var p = _mtbCurrentPart;
+    if (!p) return;
+    var fromLoc = document.getElementById('mtbFromLocation').value;
+    var fromBin = document.getElementById('mtbFromBin').value;
+    var toLoc   = document.getElementById('mtbToLocation').value;
+    var toBin   = document.getElementById('mtbToBin').value;
+    var qty     = parseInt(document.getElementById('mtbQty').value, 10);
+    if (!fromLoc || !toLoc || !qty) {
+      showToast('Fill in From Location, To Location, and Quantity.', 'warning');
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Moving…';
+    fetch('/parts/api/move_to_bin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        part_id: p.id,
+        from_location_id: parseInt(fromLoc),
+        from_bin_id: fromBin ? parseInt(fromBin) : null,
+        to_location_id: parseInt(toLoc),
+        to_bin_id: toBin ? parseInt(toBin) : null,
+        quantity: qty,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalMoveToBin')).hide();
+        showToast(data.message, 'success');
+        doLookup(p.part_number);
+      } else {
+        showToast(data.message || 'Move failed.', 'danger');
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Move';
+    })
+    .catch(function() {
+      showToast('Network error.', 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Move';
+    });
+  });
+
+  /* ── auto-trigger if prefill was passed ── */
+  {% if prefill %}
+  doLookup({{ prefill | tojson }});
+  {% endif %}
+
+}());
+</script>
+{% endblock %}
+{% endblock %}

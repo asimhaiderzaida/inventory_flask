@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ location.name }} — Contents{% endblock %}
+{% block page_title %}{{ location.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ location.name }}</h1>
+    <div class="page-subtitle">
+      {% set total_managed = managed_bins|length %}
+      {% set total_units = namespace(n=0) %}
+      {% for b in managed_bins %}{% set total_units.n = total_units.n + bin_stats.get(b.id).total if bin_stats.get(b.id) else total_units.n %}{% endfor %}
+      {{ total_managed }} bin{{ 's' if total_managed != 1 else '' }} defined
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.manage_locations') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Locations
+    </a>
+    <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}" class="btn btn-ghost">
+      <i class="bi bi-grid-3x3-gap"></i> Manage Bins
+    </a>
+  </div>
+</div>
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" style="margin-bottom:1rem;">
+  <ol class="breadcrumb" style="font-size:0.82rem;margin:0;">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('stock_bp.manage_locations') }}" style="text-decoration:none;color:var(--primary);">
+        <i class="bi bi-building me-1"></i>Locations
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">{{ location.name }}</li>
+  </ol>
+</nav>
+
+<div class="animate-fade-up">
+
+  {% if managed_bins %}
+  <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;">
+    Defined Bins
+  </h6>
+  <div class="row g-3 mb-4">
+    {% for b in managed_bins %}
+    {% set stats = bin_stats.get(b.id) %}
+    <div class="col-6 col-md-4 col-lg-3">
+      <a href="{{ url_for('stock_bp.bin_detail', bin_id=b.id) }}"
+         style="text-decoration:none;">
+        <div class="card" style="transition:box-shadow 0.15s;cursor:pointer;" onmouseover="this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.boxShadow=''">
+          <div class="card-body" style="padding:1rem;">
+            <div style="font-family:monospace;font-weight:700;font-size:1.1rem;margin-bottom:0.5rem;">
+              {{ b.name }}
+            </div>
+            {% if b.description %}
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ b.description }}
+            </div>
+            {% endif %}
+            <div style="font-size:1.5rem;font-weight:700;color:var(--primary);line-height:1;">
+              {{ stats.total if stats else 0 }}
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">unit{{ 's' if (stats.total if stats else 0) != 1 else '' }}</div>
+            <div style="margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
+              {% if stats and stats.processed %}
+              <span class="status-pill status-processed" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ stats.processed }} proc.</span>
+              {% endif %}
+              {% if stats and stats.unprocessed %}
+              <span class="status-pill status-unprocessed" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ stats.unprocessed }} unproc.</span>
+              {% endif %}
+              {% if stats and stats.under_process %}
+              <span class="status-pill status-under_process" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ stats.under_process }} in proc.</span>
+              {% endif %}
+              {% if stats and stats.other %}
+              <span class="status-pill status-idle" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ stats.other }} other</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if legacy_rows %}
+  <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;margin-top:1.5rem;">
+    Legacy / Unmanaged Bins
+    <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);margin-left:0.5rem;">(shelf_bin text only — not linked to a Bin record)</span>
+  </h6>
+  <div class="row g-3 mb-4">
+    {% for row in legacy_rows %}
+    <div class="col-6 col-md-4 col-lg-3">
+      <a href="{{ url_for('stock_bp.bin_contents', bin_code=row.shelf_bin or 'UNASSIGNED', location_id=location.id) }}"
+         style="text-decoration:none;">
+        <div class="card" style="transition:box-shadow 0.15s;cursor:pointer;border-style:dashed;" onmouseover="this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.boxShadow=''">
+          <div class="card-body" style="padding:1rem;">
+            <div style="font-family:monospace;font-weight:700;font-size:1.1rem;margin-bottom:0.5rem;color:var(--text-muted);">
+              {{ row.shelf_bin or '(no bin)' }}
+            </div>
+            <div style="font-size:1.5rem;font-weight:700;color:var(--primary);line-height:1;">{{ row.total }}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">unit{{ 's' if row.total != 1 else '' }}</div>
+            <div style="margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.25rem;">
+              {% if row.processed %}<span class="status-pill status-processed" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ row.processed }} proc.</span>{% endif %}
+              {% if row.unprocessed %}<span class="status-pill status-unprocessed" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ row.unprocessed }} unproc.</span>{% endif %}
+              {% if row.under_process %}<span class="status-pill status-under_process" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ row.under_process }} in proc.</span>{% endif %}
+              {% if row.other %}<span class="status-pill status-idle" style="font-size:0.68rem;padding:0.1em 0.5em;">{{ row.other }} other</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not managed_bins and not legacy_rows %}
+  <div class="empty-state">
+    <i class="bi bi-box-seam"></i>
+    <p>No active units assigned to this location.</p>
+    <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Bins
+    </a>
+  </div>
+  {% endif %}
+
+  {% if movements %}
+  <div class="table-card mt-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Recent Movements</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Unit</th>
+            <th>Action</th>
+            <th>Note</th>
+            <th>By</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in movements %}
+          <tr>
+            <td>
+              <a href="{{ url_for('stock_bp.unit_history', serial=m.product_instance.serial) }}"
+                 style="font-family:monospace;font-size:0.82rem;">{{ m.product_instance.serial or m.product_instance_id }}</a>
+            </td>
+            <td><span style="font-size:0.8rem;color:var(--text-muted);">{{ m.action }}</span></td>
+            <td style="font-size:0.82rem;">{{ m.note or '—' }}</td>
+            <td style="font-size:0.82rem;">{{ m.mover.username if m.mover else '—' }}</td>
+            <td style="font-size:0.82rem;white-space:nowrap;">{{ m.moved_at.strftime('%b %d %H:%M') if m.moved_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

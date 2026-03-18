@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Returns Report{% endblock %}
+{% block page_title %}Returns Report{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Returns Report</h1>
+    <div class="page-subtitle">
+      {{ total }} return{{ 's' if total != 1 }}
+      {% if start_date or end_date %} — {{ start_date or '…' }} → {{ end_date or 'today' }}{% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.returns_export', start_date=start_date, end_date=end_date) }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+    </a>
+    <a href="{{ url_for('reports_bp.reports_index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Reports
+    </a>
+  </div>
+</div>
+
+<!-- Date filter -->
+<div class="animate-fade-up" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <form method="get" class="d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label">From</label>
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="form-control" style="width:160px;">
+    </div>
+    <div>
+      <label class="form-label">To</label>
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="form-control" style="width:160px;">
+    </div>
+    <button type="submit" class="btn btn-primary">Apply</button>
+    {% if start_date or end_date %}
+    <a href="{{ url_for('reports_bp.returns_report') }}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Serial</th>
+          <th>Asset</th>
+          <th>Model</th>
+          <th>Reason</th>
+          <th>Condition</th>
+          <th>Action</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data %}
+        <tr>
+          <td style="font-size:0.82rem;white-space:nowrap;color:var(--text-secondary);">
+            {{ row.return_date.strftime('%d %b %Y') if row.return_date else '—' }}
+          </td>
+          <td style="font-family:monospace;font-size:0.84rem;">{{ row.serial or '—' }}</td>
+          <td style="font-size:0.84rem;color:var(--text-secondary);">{{ row.asset or '—' }}</td>
+          <td style="font-weight:500;">{{ row.model }}</td>
+          <td style="font-size:0.84rem;">{{ row.reason or '—' }}</td>
+          <td>
+            {% if row.condition %}
+            <span class="status-pill status-{% if row.condition in ['good', 'working'] %}processed{% elif row.condition in ['damaged', 'faulty'] %}disputed{% else %}unprocessed{% endif %}">
+              {{ row.condition }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.84rem;">{{ row.action or '—' }}</td>
+          <td style="font-size:0.82rem;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ row.notes or '' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-arrow-return-left"></i>
+              <p>No returns in this period</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data %}
+  <div class="table-footer">
+    <span style="font-size:0.82rem;color:var(--text-muted);">{{ total }} record{{ 's' if total != 1 }}</span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

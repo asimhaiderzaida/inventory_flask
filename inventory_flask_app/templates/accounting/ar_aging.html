@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}AR Aging{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">AR Aging Report</h1>
+    <p class="page-subtitle">Outstanding receivables as of {{ today.strftime('%d %b %Y') }}</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('accounting_bp.ar_aging') }}?export=csv" class="btn btn-outline-secondary">
+      <i class="bi bi-download me-1"></i> Export CSV
+    </a>
+    <a href="{{ url_for('accounting_bp.receivables') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Receivables
+    </a>
+  </div>
+</div>
+
+<!-- Bucket summary cards -->
+<div class="row g-3 mb-4 animate-fade-up">
+  {% for key, bucket in buckets.items() %}
+  {% set border_colors = {'current': '#10b981', '1_30': '#f59e0b', '31_60': '#fd7e14', '61_90': '#ef4444', '90plus': '#1e293b'} %}
+  <div class="col-6 col-sm-4 col-xl">
+    <div class="card h-100" style="border-top: 3px solid {{ border_colors[key] }};">
+      <div class="card-body">
+        <div class="small text-muted mb-1">{{ bucket.label }}</div>
+        <div class="fs-5 fw-bold" style="color:{{ border_colors[key] }};">
+          {{ currency }} {{ '{:,.2f}'.format(bucket.total) }}
+        </div>
+        <div class="small text-muted mt-1">
+          {{ bucket['items']|length }} record{{ 's' if bucket['items']|length != 1 }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Grand total card -->
+  <div class="col-6 col-sm-4 col-xl">
+    <div class="card h-100 {% if grand_total > 0 %}border-danger{% endif %}">
+      <div class="card-body">
+        <div class="small text-muted mb-1">Grand Total</div>
+        <div class="fs-5 fw-bold {% if grand_total > 0 %}text-danger{% else %}text-success{% endif %}">
+          {{ currency }} {{ '{:,.2f}'.format(grand_total) }}
+        </div>
+        <div class="small text-muted mt-1">All buckets</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if grand_total == 0 %}
+<div class="empty-state animate-fade-up">
+  <i class="bi bi-check-circle" style="color:var(--color-success);font-size:3rem;"></i>
+  <p>No outstanding receivables — all accounts are clear!</p>
+</div>
+{% else %}
+
+<!-- Bucket detail tables -->
+{% set badge_styles = {
+  'current': 'background:#10b981;color:#fff;',
+  '1_30':    'background:#f59e0b;color:#fff;',
+  '31_60':   'background:#fd7e14;color:#fff;',
+  '61_90':   'background:#ef4444;color:#fff;',
+  '90plus':  'background:#1e293b;color:#fff;',
+} %}
+
+{% for key, bucket in buckets.items() %}
+{% if bucket['items'] %}
+<div class="table-card animate-fade-up mb-3">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span>
+      <span class="badge" style="{{ badge_styles[key] }}">{{ bucket.label }}</span>
+      <span class="ms-2 small text-muted">{{ bucket['items']|length }} record{{ 's' if bucket['items']|length != 1 }}</span>
+    </span>
+    <span class="fw-bold {% if key != 'current' %}text-danger{% else %}text-success{% endif %}">
+      {{ currency }} {{ '{:,.2f}'.format(bucket.total) }}
+    </span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Invoice</th>
+          <th>Due Date</th>
+          <th class="text-end">Amount Due</th>
+          <th class="text-end">Paid</th>
+          <th class="text-end">Balance</th>
+          <th style="width:1px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ar in bucket['items'] %}
+        <tr>
+          <td class="fw-semibold">{{ ar.customer.name if ar.customer else '—' }}</td>
+          <td>
+            {% if ar.invoice %}
+            <span style="font-family:monospace;font-size:0.82rem;">{{ ar.invoice.invoice_number or '—' }}</span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if ar.due_date %}
+            <span class="{% if key != 'current' %}fw-semibold text-danger{% endif %}">
+              {{ ar.due_date.strftime('%d %b %Y') }}
+            </span>
+            {% if key != 'current' %}
+            <br><span class="small text-muted">{{ ar.days_overdue }}d overdue</span>
+            {% endif %}
+            {% else %}
+            <span class="text-muted small">No due date</span>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ currency }} {{ '{:,.2f}'.format(ar.amount_due) }}</td>
+          <td class="text-end text-success">
+            {% if ar.amount_paid > 0 %}{{ currency }} {{ '{:,.2f}'.format(ar.amount_paid) }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end fw-bold text-danger">{{ currency }} {{ '{:,.2f}'.format(ar.balance) }}</td>
+          <td>
+            <a href="{{ url_for('accounting_bp.ar_detail', ar_id=ar.id) }}"
+               class="btn btn-ghost btn-sm" title="View / Record Payment">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+{% endblock %}

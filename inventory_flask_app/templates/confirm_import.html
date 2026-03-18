@@ -1,52 +1,64 @@
 {% extends "base.html" %}
+{% block title %}Confirm Import{% endblock %}
+{% block page_title %}Confirm Import{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
-    <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.4rem;">
-      <i class="bi bi-search me-2"></i>Preview Products to Import
-    </h2>
-    <div class="d-flex gap-2 flex-column flex-md-row">
-      <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
-        <i class="bi bi-check2-circle me-1"></i>Confirm Import
-      </button>
-      <a href="/upload_excel" class="btn btn-outline-secondary rounded-pill fw-semibold px-4 btn-lg w-100 mt-2">
-        <i class="bi bi-arrow-left-circle me-1"></i>Back to Upload
-      </a>
-    </div>
-    <form action="/confirm_import" method="POST">
-      <div id="loadingSpinner" class="text-center my-3" style="display:none;">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <div class="mt-2 text-primary fw-semibold">Importing, please wait...</div>
-      </div>
-      <div style="overflow-x:auto;">
-        <div class="text-muted small mb-2">Please review all imported fields, including Serial and Asset Tag.</div>
-        <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
-          <thead class="table-light">
-            <tr>
-              {% for col in columns %}
-              <th>{{ col }}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in data %}
-            <tr>
-              {% for col in columns %}
-              <td>{{ row[col] }}</td>
-              {% endfor %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </form>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Preview Products to Import</h1>
+    <div class="page-subtitle">Review before confirming</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('import_excel_bp.upload_excel') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Upload
+    </a>
   </div>
 </div>
+
+<div class="animate-fade-up">
+  <div class="table-card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.82rem;color:var(--text-muted);">Review all imported fields including Serial and Asset Tag.</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            {% for col in columns %}
+              <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            {% for col in columns %}
+              <td>{{ row[col] or '—' }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <form action="/confirm_import" method="POST" id="confirm-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div id="loadingMsg" style="display:none;text-align:center;margin-bottom:1rem;font-size:0.88rem;color:var(--text-muted);">
+      <div class="spinner-border spinner-border-sm" role="status"></div> Importing, please wait…
+    </div>
+    <button type="submit" id="confirm-btn" class="btn btn-primary" style="min-width:180px;">
+      <i class="bi bi-check2-circle"></i> Confirm Import
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-  document.querySelector('form').addEventListener('submit', function() {
-    document.getElementById('loadingSpinner').style.display = 'block';
-  });
+document.getElementById('confirm-form').addEventListener('submit', function() {
+  document.getElementById('loadingMsg').style.display = 'block';
+  setButtonLoading(document.getElementById('confirm-btn'), true);
+});
 </script>
 {% endblock %}

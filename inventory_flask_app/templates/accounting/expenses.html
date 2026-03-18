@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Expenses</h1>
+    <p class="page-subtitle">All recorded expenses</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('accounting_bp.add_expense') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i> Add Expense
+    </a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3 animate-fade-up">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-6 col-md-auto">
+        <label class="form-label small mb-1">Category</label>
+        <select name="category" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if filter_cat == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-auto">
+        <label class="form-label small mb-1">Method</label>
+        <select name="method" class="form-select form-select-sm">
+          <option value="">All Methods</option>
+          {% for val, label in payment_methods %}
+          <option value="{{ val }}" {% if filter_method == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-auto">
+        <label class="form-label small mb-1">From</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filter_date_from }}">
+      </div>
+      <div class="col-6 col-md-auto">
+        <label class="form-label small mb-1">To</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filter_date_to }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+        <a href="{{ url_for('accounting_bp.expenses') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-card animate-fade-up">
+  {% if expenses %}
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Category</th>
+        <th>Method</th>
+        <th>Vendor</th>
+        <th>Ref</th>
+        <th class="text-end">Amount ({{ currency }})</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for exp in expenses %}
+      <tr>
+        <td class="text-muted small">{{ exp.expense_date.strftime('%d %b %Y') }}</td>
+        <td>
+          {{ exp.description }}
+          {% if exp.notes %}
+          <i class="bi bi-chat-left-text text-muted ms-1" title="{{ exp.notes }}"
+             data-bs-toggle="tooltip"></i>
+          {% endif %}
+        </td>
+        <td class="small">
+          {% if exp.category %}
+          <i class="bi {{ exp.category.icon }} me-1"></i>{{ exp.category.name }}
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        <td class="small text-muted">{{ exp.payment_method | replace('_', ' ') | title }}</td>
+        <td class="small">{{ exp.vendor.name if exp.vendor else '—' }}</td>
+        <td class="small text-muted">{{ exp.reference or '—' }}</td>
+        <td class="text-end fw-semibold">{{ '{:,.2f}'.format(exp.amount) }}</td>
+        <td class="text-end">
+          <a href="{{ url_for('accounting_bp.edit_expense', expense_id=exp.id) }}"
+             class="btn btn-xs btn-outline-secondary me-1">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="post"
+                action="{{ url_for('accounting_bp.delete_expense', expense_id=exp.id) }}"
+                class="d-inline"
+                onsubmit="return confirm('Delete this expense?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-xs btn-outline-danger">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="table-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">{{ expenses | length }} record{{ 's' if expenses | length != 1 }}</span>
+    <span class="fw-bold">Total: {{ currency }} {{ '{:,.2f}'.format(total) }}</span>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-receipt-cutoff"></i>
+    <p>No expenses found.</p>
+    <a href="{{ url_for('accounting_bp.add_expense') }}" class="btn btn-primary btn-sm">Add First Expense</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

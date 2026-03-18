@@ -1,50 +1,64 @@
 {% set modal = False %}
 {% extends "base.html" %}
+{% block title %}Confirm Sale{% endblock %}
+{% block page_title %}Confirm Sale{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-3">
-  <h4 class="mt-4 mb-3 fw-semibold">🧾 Confirm Sale Details</h4>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Confirm Sale Details</h1>
+    <div class="page-subtitle">Enter prices and confirm to complete the sale</div>
+  </div>
+</div>
 
+<div class="animate-fade-up">
   <form method="POST" action="/confirm_sale">
-    <div class="table-responsive">
-      <table class="table table-bordered table-hover table-sm align-middle">
-        <thead class="table-light text-center">
-          <tr>
-            <th>Serial</th>
-            <th>Asset</th>
-            <th>Make</th>
-            <th>Model</th>
-            <th>CPU</th>
-            <th>RAM</th>
-            <th>Display</th>
-            <th>GPU 1</th>
-            <th>GPU 2</th>
-            <th>Grade</th>
-            <th>Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in instances %}
-          <tr>
-            <td>{{ item.serial }}</td>
-            <td>{{ item.asset }}</td>
-            <td>{{ item.make }}</td>
-            <td>{{ item.model }}</td>
-            <td>{{ item.cpu }}</td>
-            <td>{{ item.ram }}</td>
-            <td>{{ item.disk1size }}</td>
-            <td>{{ item.display }}</td>
-            <td>{{ item.gpu1 }}</td>
-            <td>{{ item.gpu2 }}</td>
-            <td>{{ item.grade }}</td>
-            <td>
-              <input type="number" step="0.01" min="0" name="price_{{ item.serial }}" class="form-control form-control-sm" required>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="table-card mb-4">
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Serial</th>
+              <th>Asset</th>
+              <th>Make</th>
+              <th>Model</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>Disk</th>
+              <th>Display</th>
+              <th>GPU 1</th>
+              <th>GPU 2</th>
+              <th>Grade</th>
+              <th>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in instances %}
+            <tr>
+              <td><span style="font-family:monospace;font-size:0.82rem;">{{ item.serial }}</span></td>
+              <td>{{ item.asset or '—' }}</td>
+              <td>{{ item.make or '—' }}</td>
+              <td>{{ item.model or '—' }}</td>
+              <td>{{ item.cpu or '—' }}</td>
+              <td>{{ item.ram or '—' }}</td>
+              <td>{{ item.disk1size or '—' }}</td>
+              <td>{{ item.display or '—' }}</td>
+              <td>{{ item.gpu1 or '—' }}</td>
+              <td>{{ item.gpu2 or '—' }}</td>
+              <td>{{ item.grade or '—' }}</td>
+              <td>
+                <input type="number" step="0.01" min="0" name="price_{{ item.serial }}" class="form-control form-control-sm" required style="min-width:100px;">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check2-circle"></i> Confirm Sale
+    </button>
   </form>
 </div>
 {% endblock %}

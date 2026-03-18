@@ -1,40 +1,53 @@
-
-
 {% extends "base.html" %}
 {% block title %}Add Location{% endblock %}
+{% block page_title %}Add Location{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h2 class="mb-4">Add Location</h2>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Add Location</h1>
+    <div class="page-subtitle">Manage warehouse and storage locations</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ next_url or url_for('stock_bp.manage_locations') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div class="animate-fade-up" style="max-width:440px;">
+  <div class="card mb-4">
+    <div class="card-body" style="padding:1.5rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ next_url or '' }}">
+        <div class="mb-4">
+          <label class="form-label">Location Name</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Warehouse A" required autofocus>
         </div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-
-  <form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="mb-3">
-      <label for="name" class="form-label fw-bold">Location Name</label>
-      <input type="text" name="name" id="name" class="form-control form-control-lg rounded-pill px-3" placeholder="e.g. Warehouse A" required>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-plus-circle"></i> Add Location
+        </button>
+      </form>
     </div>
-    <button type="submit" class="btn btn-primary rounded-pill">Add Location</button>
-  </form>
+  </div>
 
-  <hr class="my-4">
-  <h5 class="text-secondary">Existing Locations</h5>
-  <ul class="list-group">
-    {% for location in locations %}
-      <li class="list-group-item">{{ location.name }}</li>
+  <!-- Existing locations -->
+  <div class="table-card">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Existing Locations</span>
+    </div>
+    {% if locations %}
+      <div style="padding:0.5rem 0;">
+        {% for location in locations %}
+          <div style="padding:0.5rem 1.25rem;font-size:0.88rem;border-bottom:1px solid var(--border);">
+            <i class="bi bi-geo-alt" style="color:var(--text-muted);margin-right:0.5rem;"></i>{{ location.name }}
+          </div>
+        {% endfor %}
+      </div>
     {% else %}
-      <li class="list-group-item text-muted">No locations found.</li>
-    {% endfor %}
-  </ul>
+      <div style="padding:1.25rem;font-size:0.85rem;color:var(--text-muted);">No locations added yet.</div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

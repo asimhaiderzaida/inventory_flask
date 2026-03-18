@@ -1,17 +1,25 @@
 # Ignore Python cache
 __pycache__/
 *.pyc
+*.pyo
 
 # Ignore virtual environments
 venv/
 
 # Ignore local databases and test data
 *.db
+*.sqlite
 *.sqlite3
 *.csv
 *.log
 *.bak
 *.xlsx
+*.pdf
+
+# Uploads and user data
+uploads/
+/tmp/
+inventory_flask_app/static/data/
 
 # Flask instance folder (contains DB or secrets)
 instance/
@@ -19,6 +27,12 @@ inventory_flask_app/instance/
 
 # Ignore environment files
 .env
+.env.*
+!.env.example
+
+# Node / frontend build artifacts (leftover from removed Tailwind)
+node_modules/
+package-lock.json
 
 # Editor/OS generated files
 .vscode/

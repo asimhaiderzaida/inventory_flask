@@ -1,111 +1,664 @@
 {% extends "base.html" %}
 {% block title %}Scan PO Serials{% endblock %}
+{% block page_title %}Scan Serials{% endblock %}
+
+{% set init_pct = ((matched_count / total_expected * 100) | int) if total_expected else 0 %}
+
+{% block extra_head %}
+<style>
+/* ── Progress bar ────────────────────────────────────────── */
+.po-progress-track {
+  background: var(--surface-3, #F3F4F6);
+  border-radius: 99px;
+  height: 10px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+}
+.po-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--primary, #3B82F6);
+  transition: width 0.4s ease;
+}
+.po-progress-fill.complete { background: #10B981; }
+
+/* ── PO Info bar meta items ─────────────────────────────── */
+.po-meta {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+.po-meta-item { display: flex; flex-direction: column; gap: 0.1rem; }
+.po-meta-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.po-meta-value { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+
+/* ── Scan input ─────────────────────────────────────────── */
+.scan-input-wrap {
+  display: flex;
+  gap: 0.625rem;
+  align-items: stretch;
+}
+#scan-input {
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  border-width: 2px;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md, 8px);
+}
+#scan-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+.scan-add-btn {
+  padding: 0 1.4rem;
+  font-size: 1rem;
+  border-radius: var(--radius-md, 8px);
+  white-space: nowrap;
+}
+.scan-reset-btn {
+  padding: 0 1rem;
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  white-space: nowrap;
+}
+.scan-reset-btn:hover { background: #FEF2F2; }
+#scan-msg {
+  font-size: 0.84rem;
+  margin-top: 0.5rem;
+  min-height: 1.3em;
+  font-weight: 500;
+  padding-left: 0.25rem;
+}
+
+/* ── KPI cards ──────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.625rem; }
+.kpi-card {
+  border-radius: var(--radius-md, 8px);
+  padding: 1rem 1.125rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  cursor: default;
+  border-width: 1px;
+  border-style: solid;
+}
+.kpi-card.clickable { cursor: pointer; transition: filter 0.15s; }
+.kpi-card.clickable:hover { filter: brightness(0.94); }
+.kpi-label {
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.kpi-value { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+.kpi-card.kpi-green  { background: #F0FDF4; border-color: #BBF7D0; }
+.kpi-card.kpi-blue   { background: #EFF6FF; border-color: #BFDBFE; }
+.kpi-card.kpi-red    { background: #FEF2F2; border-color: #FECACA; }
+.kpi-card.kpi-gray   { background: var(--surface-2); border-color: var(--border); }
+.kpi-card.kpi-green .kpi-label { color: #166534; }
+.kpi-card.kpi-blue  .kpi-label { color: #1D4ED8; }
+.kpi-card.kpi-red   .kpi-label { color: #991B1B; }
+.kpi-card.kpi-gray  .kpi-label { color: var(--text-muted); }
+.kpi-card.kpi-green .kpi-value { color: #15803D; }
+.kpi-card.kpi-blue  .kpi-value { color: #1D4ED8; }
+.kpi-card.kpi-red   .kpi-value { color: #DC2626; }
+.kpi-card.kpi-gray  .kpi-value { color: var(--text-primary); }
+
+/* ── Row animation ──────────────────────────────────────── */
+@keyframes rowSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.row-new { animation: rowSlideIn 0.22s ease; }
+
+/* ── Expected units list ────────────────────────────────── */
+.exp-list-wrap {
+  overflow-y: auto;
+  flex: 1;
+}
+.exp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  font-size: 0.82rem;
+  transition: background 0.15s;
+  gap: 0.5rem;
+}
+.exp-item.received { background: #F0FDF4; }
+.exp-item.exp-hidden { display: none !important; }
+.exp-serial {
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.exp-model {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.exp-status-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2em 0.55em;
+  border-radius: 99px;
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+.exp-status-badge.received-badge { background: #DCFCE7; color: #166534; }
+.exp-status-badge.missing-badge  { background: #FEE2E2; color: #991B1B; }
+.exp-status-badge.expected-badge { background: var(--surface-3, #F3F4F6); color: var(--text-muted); }
+
+/* ── Bottom action bar ──────────────────────────────────── */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding: 1rem 0 0.5rem;
+  border-top: 1px solid var(--border);
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center mt-4">
-  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 680px; width: 100%; background: #f6f7fa;">
-    <div class="mb-3">
-      <h3 class="fw-bold text-primary mb-1" style="font-size: 1.45rem;">
-        <i class="bi bi-upc-scan me-2"></i>Scan Serials for PO #{{ po.id }}
-      </h3>
-      <div class="text-muted" style="font-size:1.04rem;">
-        <span class="fw-semibold">Vendor:</span> {{ po.vendor.name }}<br>
-        <span class="fw-semibold">Expected Serials:</span> {{ total_expected }}
-      </div>
-    </div>
-
-    <form method="POST" class="row g-2 mb-3">
-      <div class="col-12 col-md-8">
-        <input type="text" name="serial_input" class="form-control form-control-lg rounded-pill px-3 w-100" placeholder="Scan or type serial..." autofocus required>
-      </div>
-      <div class="col-12 col-md-4">
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold px-4 btn-lg w-100">
-          <i class="bi bi-plus-circle me-1"></i>Add
-        </button>
-      </div>
-    </form>
-    <form method="POST" class="mt-2">
-      <input type="hidden" name="reset_scanned" value="1">
-      <button type="submit" class="btn btn-outline-danger rounded-pill fw-semibold px-4 btn-lg mt-2">
-        <i class="bi bi-x-circle me-1"></i>Reset Scanned
-      </button>
-    </form>
-
-    <div class="row mb-3 text-center">
-      <div class="col-12">
-        <span class="badge bg-success rounded-pill px-3 py-2 fs-6">✅ Matched: {{ matched|length }}</span>
-        <span class="badge bg-danger rounded-pill px-3 py-2 fs-6 ms-2">❌ Extra: {{ extra|length }}</span>
-        <span class="badge bg-warning text-dark rounded-pill px-3 py-2 fs-6 ms-2">⚠️ Missing: {{ missing|length }}</span>
-      </div>
-    </div>
-
-    <h5 class="mt-3 mb-2">🗂️ Scanned Serials</h5>
-    <div style="overflow-x:auto;">
-      <div class="table-responsive">
-        <table class="table table-hover table-sm align-middle bg-white rounded-4 overflow-hidden">
-          <thead class="table-light">
-            <tr>
-              <th class="text-nowrap">#</th>
-              {% if settings.show_serial_number == 'true' %}
-                <th class="text-nowrap">{{ settings.label_serial_number or 'Serial' }}</th>
-              {% endif %}
-              {% if settings.show_column_asset_tag == 'true' %}
-                <th class="text-nowrap">{{ settings.label_asset_tag or 'Asset' }}</th>
-              {% endif %}
-              {% if settings.show_status == 'true' %}
-                <th class="text-nowrap">{{ settings.label_status or 'Status' }}</th>
-              {% endif %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in scanned %}
-              <tr>
-                <td class="text-nowrap">{{ loop.index }}</td>
-                {% if settings.show_serial_number == 'true' %}
-                  <td class="text-nowrap">{{ row['serial'] }}</td>
-                {% endif %}
-                {% if settings.show_column_asset_tag == 'true' %}
-                  <td class="text-nowrap">{{ row['asset'] }}</td>
-                {% endif %}
-                {% if settings.show_status == 'true' %}
-                  <td class="text-nowrap">
-                    {% if row['serial'] in matched %}
-                      <span class="badge bg-success rounded-pill">Matched</span>
-                    {% elif row['serial'] in extra %}
-                      <span class="badge bg-danger rounded-pill">Extra</span>
-                    {% endif %}
-                  </td>
-                {% endif %}
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="d-flex flex-column gap-2 mt-3">
-      <a href="{{ url_for('stock_bp.stock_receiving_select') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2"><i class="bi bi-arrow-left-circle me-1"></i>Back to PO Select</a>
-      <a href="{{ url_for('stock_bp.stock_receiving_summary') }}" class="btn btn-primary rounded-pill fw-semibold btn-lg w-100 mt-2"><i class="bi bi-arrow-right-circle me-1"></i>Next: Summary View</a>
-    </div>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Scan Serials — {{ po.po_number }}</h1>
+    <div class="page-subtitle">Scan or type each unit's serial / asset tag to record receipt</div>
   </div>
 </div>
-<audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
 
+<div class="animate-fade-up">
+  <div class="row g-4">
+
+    <!-- ═══════════════════════════════════════ LEFT COLUMN ═══ -->
+    <div class="col-lg-8">
+
+      <!-- 1. PO Info bar -->
+      <div class="card mb-3">
+        <div class="card-body" style="padding:1.125rem 1.5rem 1rem;">
+          <div class="po-meta">
+            <div class="po-meta-item">
+              <span class="po-meta-label">PO Number</span>
+              <span class="po-meta-value">{{ po.po_number }}</span>
+            </div>
+            <div class="po-meta-item">
+              <span class="po-meta-label">Vendor</span>
+              <span class="po-meta-value">{{ po.vendor.name if po.vendor else '—' }}</span>
+            </div>
+            <div class="po-meta-item">
+              <span class="po-meta-label">Location</span>
+              <span class="po-meta-value">{{ po.location.name if po.location else '—' }}</span>
+            </div>
+            <div class="po-meta-item">
+              <span class="po-meta-label">Expected</span>
+              <span class="po-meta-value">{{ total_expected }} units</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+            <span id="progress-text" style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">
+              {{ matched_count }} of {{ total_expected }} scanned ({{ init_pct }}%)
+            </span>
+            <span style="font-size:0.8rem;font-weight:700;color:{% if init_pct == 100 %}#10B981{% else %}var(--primary){% endif %};">
+              {{ init_pct }}%
+            </span>
+          </div>
+          <div class="po-progress-track">
+            <div id="progress-fill" class="po-progress-fill {% if init_pct == 100 %}complete{% endif %}"
+                 style="width:{{ init_pct }}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Scan input -->
+      <div class="card mb-3">
+        <div class="card-body" style="padding:1.25rem 1.5rem;">
+          <div class="scan-input-wrap">
+            <input type="text" id="scan-input" class="form-control flex-grow-1"
+                   placeholder="Scan or type serial / asset tag…" autofocus autocomplete="off"
+                   spellcheck="false" inputmode="text">
+            <button type="button" class="btn btn-primary scan-add-btn" id="add-btn">
+              <i class="bi bi-plus-circle-fill me-1"></i> Add
+            </button>
+            <button type="button" class="btn btn-outline-danger scan-reset-btn" id="reset-btn">
+              <i class="bi bi-x-circle me-1"></i> Reset
+            </button>
+          </div>
+          <div id="scan-msg"></div>
+        </div>
+      </div>
+
+      <!-- 3. KPI stats row -->
+      <div class="kpi-grid mb-3">
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">✅ Matched</div>
+          <div class="kpi-value" id="cnt-matched">{{ matched_count }}</div>
+        </div>
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">➕ Extra</div>
+          <div class="kpi-value" id="cnt-extra">{{ extra_count }}</div>
+        </div>
+        <div class="kpi-card kpi-red clickable" id="kpi-missing" title="Click to filter expected list to missing items">
+          <div class="kpi-label">❌ Missing</div>
+          <div class="kpi-value" id="cnt-missing">{{ missing_count }}</div>
+        </div>
+        <div class="kpi-card kpi-gray">
+          <div class="kpi-label">📋 Scanned</div>
+          <div class="kpi-value" id="cnt-total">{{ scanned_rows|length }}</div>
+        </div>
+      </div>
+
+      <!-- 4. Scanned items table -->
+      <div class="table-card">
+        <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.85rem;font-weight:600;">Scanned Items</span>
+          <span style="font-size:0.78rem;color:var(--text-muted);">Most recent first</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table" id="scanned-table" style="margin:0;">
+            <thead>
+              <tr>
+                <th style="width:2.5rem;">#</th>
+                <th>Serial</th>
+                <th>Asset Tag</th>
+                <th>Model</th>
+                <th>Make</th>
+                <th>CPU</th>
+                <th>RAM</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="scanned-tbody">
+              {% for row in scanned_rows %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial }}</span></td>
+                <td>{{ row.asset_tag or '—' }}</td>
+                <td>{{ row.model or '—' }}</td>
+                <td>{{ row.make or '—' }}</td>
+                <td>{{ row.cpu or '—' }}</td>
+                <td>{{ row.ram or '—' }}</td>
+                <td>
+                  {% if row.match == 'matched' %}
+                    <span class="status-pill status-processed">Matched</span>
+                  {% elif row.match == 'duplicate' %}
+                    <span class="status-pill" style="background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;">Duplicate</span>
+                  {% else %}
+                    <span class="status-pill" style="background:#EFF6FF;color:#1D4ED8;">Extra</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr id="empty-row">
+                <td colspan="8" class="text-center" style="color:var(--text-muted);padding:2rem;">
+                  <i class="bi bi-upc-scan" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;opacity:0.4;"></i>
+                  No items scanned yet
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-8 -->
+
+    <!-- ═══════════════════════════════════════ RIGHT COLUMN ═══ -->
+    <div class="col-lg-4">
+      <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 200px);min-height:420px;">
+
+        <!-- Header + search -->
+        <div style="padding:1rem 1.25rem 0.875rem;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <h6 style="font-weight:700;margin:0;font-size:0.9rem;">Expected Units</h6>
+            <span class="status-pill" style="background:var(--surface-2);color:var(--text-muted);">{{ total_expected }} total</span>
+          </div>
+          <input type="text" id="expected-search" class="form-control form-control-sm"
+                 placeholder="Filter by serial or model…" autocomplete="off">
+        </div>
+
+        <!-- Scrollable list -->
+        <div id="expected-list" class="exp-list-wrap">
+          {% if items %}
+            {% for item in items %}
+              {% set is_matched = item.serial.lower() in matched_serials %}
+              <div class="exp-item {% if is_matched %}received{% endif %}"
+                   data-serial="{{ item.serial.lower() }}"
+                   data-model="{{ (item.model or '')|lower }}"
+                   data-asset="{{ (item.asset_tag or '')|lower }}">
+                <div style="overflow:hidden;flex:1;min-width:0;">
+                  <div class="exp-serial">{{ item.serial }}</div>
+                  {% if item.model or item.make %}
+                  <div class="exp-model">{{ [item.make, item.model] | select | join(' ') }}</div>
+                  {% endif %}
+                </div>
+                <div style="flex-shrink:0;display:flex;align-items:center;gap:0.4rem;">
+                  <span class="exp-status-badge {% if is_matched %}received-badge{% else %}missing-badge{% endif %} item-status-badge">
+                    {% if is_matched %}Received{% else %}Missing{% endif %}
+                  </span>
+                  <span class="item-status-icon">
+                    {% if is_matched %}
+                      <i class="bi bi-check-circle-fill" style="color:#10B981;font-size:1rem;"></i>
+                    {% else %}
+                      <i class="bi bi-x-circle-fill" style="color:#EF4444;font-size:1rem;opacity:0.45;"></i>
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div style="padding:2.5rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+              <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:0.5rem;opacity:0.4;"></i>
+              No expected items on this PO.
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Quick stats footer -->
+        <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);background:var(--surface-2);flex-shrink:0;border-radius:0 0 var(--radius-md) var(--radius-md);">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.83rem;margin-bottom:0.3rem;">
+            <span style="color:var(--text-muted);font-weight:500;">Completion</span>
+            <strong id="completion-pct" style="font-size:1rem;">{{ init_pct }}%</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.83rem;">
+            <span style="color:var(--text-muted);font-weight:500;">Remaining</span>
+            <strong id="remaining-count">{{ missing_count }} units</strong>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /col-lg-4 -->
+
+  </div><!-- /row -->
+
+  <!-- Bottom action bar -->
+  <div class="action-bar">
+    <a href="{{ url_for('stock_bp.stock_receiving_select') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left me-1"></i> Back to PO Select
+    </a>
+    <a href="{{ url_for('stock_bp.stock_receiving_summary') }}" class="btn btn-primary btn-lg">
+      Next: Summary <i class="bi bi-arrow-right-circle-fill ms-1"></i>
+    </a>
+  </div>
+
+</div>
+
+<audio id="beep-sound" src="{{ url_for('static', filename='sound/beep.mp3') }}" preload="auto"></audio>
+<audio id="error-sound" src="{{ url_for('static', filename='sound/beep.mp3') }}" preload="auto"></audio>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
+(function () {
+  const scanInput  = document.getElementById('scan-input');
+  const addBtn     = document.getElementById('add-btn');
+  const resetBtn   = document.getElementById('reset-btn');
+  const tbody      = document.getElementById('scanned-tbody');
+  const msgEl      = document.getElementById('scan-msg');
+  const beep       = document.getElementById('beep-sound');
+
+  const cntMatched = document.getElementById('cnt-matched');
+  const cntExtra   = document.getElementById('cnt-extra');
+  const cntMissing = document.getElementById('cnt-missing');
+  const cntTotal   = document.getElementById('cnt-total');
+
+  const progressFill   = document.getElementById('progress-fill');
+  const progressText   = document.getElementById('progress-text');
+  const completionPct  = document.getElementById('completion-pct');
+  const remainingCount = document.getElementById('remaining-count');
+
+  const TOTAL_EXPECTED = {{ total_expected }};
+
+  let rowIndex = parseInt(cntTotal.textContent) || 0;
+  let missingFilterActive = false;
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
   function playBeep() {
-    const beep = document.getElementById("beep-sound");
-    if (beep) beep.play();
+    if (beep) { beep.currentTime = 0; beep.play().catch(() => {}); }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const serialInput = document.querySelector('input[name="serial_input"]');
-    if (serialInput) {
-      serialInput.addEventListener("change", function () {
-        if (this.value.trim()) {
-          playBeep();
-        }
-      });
+  function setMsg(text, color) {
+    msgEl.textContent = text;
+    msgEl.style.color = color || 'var(--text-muted)';
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // ── Update progress bar and right-column stats ────────────────────────────
+  function updateProgress(matchedCount, missingCount) {
+    const pct = TOTAL_EXPECTED > 0 ? Math.round(matchedCount / TOTAL_EXPECTED * 100) : 0;
+    progressFill.style.width = pct + '%';
+    progressText.textContent = matchedCount + ' of ' + TOTAL_EXPECTED + ' scanned (' + pct + '%)';
+    if (pct >= 100) progressFill.classList.add('complete');
+    else progressFill.classList.remove('complete');
+    completionPct.textContent  = pct + '%';
+    remainingCount.textContent = missingCount + ' units';
+  }
+
+  // ── Mark an expected item as received in right panel ──────────────────────
+  function markExpectedReceived(serial) {
+    const el = document.querySelector('.exp-item[data-serial="' + serial.toLowerCase() + '"]');
+    if (el && !el.classList.contains('received')) {
+      el.classList.add('received');
+      el.querySelector('.item-status-icon').innerHTML =
+        '<i class="bi bi-check-circle-fill" style="color:#10B981;font-size:1rem;"></i>';
+      const badge = el.querySelector('.item-status-badge');
+      if (badge) {
+        badge.textContent = 'Received';
+        badge.className = 'exp-status-badge received-badge item-status-badge';
+      }
     }
+  }
+
+  // ── Reset right panel icons ───────────────────────────────────────────────
+  function resetExpectedPanel() {
+    document.querySelectorAll('.exp-item').forEach(function(el) {
+      el.classList.remove('received');
+      el.querySelector('.item-status-icon').innerHTML =
+        '<i class="bi bi-x-circle-fill" style="color:#EF4444;font-size:1rem;opacity:0.45;"></i>';
+      const badge = el.querySelector('.item-status-badge');
+      if (badge) {
+        badge.textContent = 'Missing';
+        badge.className = 'exp-status-badge missing-badge item-status-badge';
+      }
+    });
+    // Clear any missing filter
+    if (missingFilterActive) toggleMissingFilter();
+  }
+
+  // ── Add a row to the scanned table ───────────────────────────────────────
+  function addRowToTable(row, index) {
+    const emptyRow = document.getElementById('empty-row');
+    if (emptyRow) emptyRow.remove();
+
+    let matchPill;
+    if (row.match === 'matched') {
+      matchPill = '<span class="status-pill status-processed">Matched</span>';
+    } else if (row.match === 'duplicate') {
+      matchPill = '<span class="status-pill" style="background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;">Duplicate</span>';
+    } else {
+      matchPill = '<span class="status-pill" style="background:#EFF6FF;color:#1D4ED8;">Extra</span>';
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = 'row-new';
+    tr.innerHTML =
+      '<td>' + index + '</td>' +
+      '<td><span style="font-family:monospace;font-size:0.82rem;">' + escHtml(row.serial) + '</span></td>' +
+      '<td>' + escHtml(row.asset_tag || '—') + '</td>' +
+      '<td>' + escHtml(row.model    || '—') + '</td>' +
+      '<td>' + escHtml(row.make     || '—') + '</td>' +
+      '<td>' + escHtml(row.cpu      || '—') + '</td>' +
+      '<td>' + escHtml(row.ram      || '—') + '</td>' +
+      '<td>' + matchPill + '</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+
+  // ── Main scan handler ─────────────────────────────────────────────────────
+  function doScan() {
+    const value = scanInput.value.trim();
+    if (!value) return;
+
+    addBtn.disabled = true;
+
+    fetch('{{ url_for("stock_bp.stock_receiving_scan_item") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.duplicate) {
+        setMsg('"' + value + '" already scanned.', 'var(--color-warning)');
+        scanInput.value = '';
+        scanInput.focus();
+        addBtn.disabled = false;
+        return;
+      }
+      if (data.error) {
+        setMsg(data.error, 'var(--color-danger)');
+        addBtn.disabled = false;
+        return;
+      }
+
+      rowIndex = data.total_scanned;
+      addRowToTable(data.row, rowIndex);
+
+      cntMatched.textContent = data.matched_count;
+      cntExtra.textContent   = data.extra_count;
+      cntMissing.textContent = data.missing_count;
+      cntTotal.textContent   = data.total_scanned;
+
+      updateProgress(data.matched_count, data.missing_count);
+
+      if (data.row.match === 'matched') {
+        markExpectedReceived(data.row.serial);
+      }
+
+      const isMatched = data.row.match === 'matched';
+      setMsg(
+        isMatched ? '✓ Matched: ' + data.row.serial : '⚠ Not on PO (extra): ' + value,
+        isMatched ? 'var(--color-success)' : 'var(--color-warning)'
+      );
+      playBeep();
+      scanInput.value = '';
+      scanInput.focus();
+      addBtn.disabled = false;
+    })
+    .catch(() => {
+      setMsg('Network error — please retry.', 'var(--color-danger)');
+      addBtn.disabled = false;
+    });
+  }
+
+  addBtn.addEventListener('click', doScan);
+
+  scanInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); doScan(); }
   });
+
+  // Auto-submit on barcode scanner input (fires change after rapid keystrokes)
+  let lastLen = 0;
+  scanInput.addEventListener('input', function () {
+    const len = this.value.length;
+    if (len > 4 && len === lastLen + 1) {
+      // Manual typing — do nothing special
+    }
+    lastLen = len;
+  });
+
+  // ── Reset ─────────────────────────────────────────────────────────────────
+  resetBtn.addEventListener('click', function () {
+    if (!confirm('Clear all scanned items and start over?')) return;
+    fetch('{{ url_for("stock_bp.stock_receiving_scan_reset") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(() => {
+      tbody.innerHTML =
+        '<tr id="empty-row"><td colspan="8" class="text-center" style="color:var(--text-muted);padding:2rem;">' +
+        '<i class="bi bi-upc-scan" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;opacity:0.4;"></i>' +
+        'No items scanned yet</td></tr>';
+      cntMatched.textContent = '0';
+      cntExtra.textContent   = '0';
+      cntTotal.textContent   = '0';
+      cntMissing.textContent = '{{ total_expected }}';
+      rowIndex = 0;
+      resetExpectedPanel();
+      updateProgress(0, {{ total_expected }});
+      setMsg('Scan list cleared.', 'var(--text-muted)');
+      scanInput.focus();
+    });
+  });
+
+  // ── Missing filter — toggles right panel to show only unscanned ───────────
+  function toggleMissingFilter() {
+    missingFilterActive = !missingFilterActive;
+    const kpi = document.getElementById('kpi-missing');
+    kpi.style.outline = missingFilterActive ? '2px solid #DC2626' : '';
+    document.querySelectorAll('.exp-item').forEach(function(el) {
+      if (missingFilterActive) {
+        if (el.classList.contains('received')) {
+          el.classList.add('exp-hidden');
+        }
+      } else {
+        el.classList.remove('exp-hidden');
+      }
+    });
+    // Re-apply search filter on top
+    applyExpectedSearch();
+  }
+
+  document.getElementById('kpi-missing').addEventListener('click', toggleMissingFilter);
+
+  // ── Expected list search ──────────────────────────────────────────────────
+  function applyExpectedSearch() {
+    const q = document.getElementById('expected-search').value.toLowerCase().trim();
+    document.querySelectorAll('.exp-item').forEach(function(el) {
+      if (missingFilterActive && el.classList.contains('received')) {
+        el.classList.add('exp-hidden');
+        return;
+      }
+      if (!q) {
+        el.classList.remove('exp-hidden');
+        return;
+      }
+      const serial = (el.dataset.serial || '');
+      const model  = (el.dataset.model  || '');
+      const asset  = (el.dataset.asset  || '');
+      const matches = serial.includes(q) || model.includes(q) || asset.includes(q);
+      if (matches) el.classList.remove('exp-hidden');
+      else         el.classList.add('exp-hidden');
+    });
+  }
+
+  document.getElementById('expected-search').addEventListener('input', applyExpectedSearch);
+
+  scanInput.focus();
+})();
 </script>
 {% endblock %}

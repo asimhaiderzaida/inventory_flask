@@ -1,71 +1,174 @@
 {% extends "base.html" %}
+{% block title %}Vendor Center{% endblock %}
+{% block page_title %}Vendor Center{% endblock %}
+
 {% block content %}
-<style>
-.vendor-center-card {
-  background: #f3f4f8;
-  border-radius: 1.1rem;
-  box-shadow: 0 2px 12px #0057b710;
-  border: none;
-}
-.table thead th {
-  background: #f8f9fa;
-  border-top: none;
-  font-weight: 600;
-}
-.table-hover tbody tr:hover {
-  background: #f1f5f9;
-}
-.btn-modern {
-  border-radius: 2rem !important;
-  font-weight: 500;
-  font-size: 0.99rem;
-}
-</style>
-<div class="container-fluid px-4 mt-4">
-  <div class="d-flex align-items-center flex-wrap gap-3 mb-4">
-    <h2 class="mb-0">Vendor Center</h2>
-    <form method="get" class="d-flex align-items-end flex-wrap gap-2 w-100">
-      <input type="text" name="search" class="form-control form-control-lg rounded-pill px-3" style="min-width:260px; max-width:340px; height: 48px;" placeholder="Search by vendor name" value="{{ search or '' }}">
-      <button type="submit" class="btn btn-outline-primary rounded-pill px-4" style="height: 48px;">Search</button>
-      <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success rounded-pill px-4" style="height: 48px;">Add Vendor</a>
-    </form>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Vendor Center</h1>
+    <div class="page-subtitle">Manage your vendors and suppliers</div>
   </div>
-  <div class="card vendor-center-card mt-2 w-100">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-      <table class="table table-hover table-bordered text-nowrap mb-0">
-        <thead>
-          <tr>
-            <th class="fw-semibold">Name</th>
-            <th class="fw-semibold">Phone</th>
-            <th class="fw-semibold">Email</th>
-            <th class="fw-semibold">Company</th>
-            <th class="fw-semibold">Assets</th>
-            <th class="fw-semibold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for vendor in vendors %}
-          <tr>
-            <td class="text-nowrap">{{ vendor.name }}</td>
-            <td class="text-nowrap">{{ vendor.phone or '' }}</td>
-            <td class="text-nowrap">{{ vendor.email or '' }}</td>
-            <td class="text-nowrap">{{ vendor.company or '' }}</td>
-            <td class="text-nowrap">{{ vendor.products|length }}</td>
-            <td>
-              <div class="d-grid gap-2 d-sm-flex">
-                <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-primary btn-modern w-100 w-sm-auto">View</a>
-                <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-sm btn-outline-secondary btn-modern w-100 w-sm-auto">Edit</a>
+  <div class="page-actions">
+    <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Add Vendor
+    </a>
+  </div>
+</div>
+
+<!-- Search + Sort -->
+<div class="animate-fade-up" style="margin-bottom:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+  <form method="get" class="d-flex gap-2 flex-wrap" style="flex:1;min-width:0;">
+    <input type="hidden" name="sort" value="{{ sort_by }}">
+    <input type="hidden" name="filter" value="{{ filt }}">
+    <input type="text" name="search" class="form-control" style="flex:1;min-width:180px;max-width:340px;"
+           placeholder="Search name, email, phone, city…" value="{{ search or '' }}">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+    {% if search %}
+    <a href="{{ url_for('vendors_bp.vendor_center', sort=sort_by, filter=filt) }}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+  <div style="display:flex;gap:0.4rem;align-items:center;font-size:0.82rem;color:var(--text-muted);">
+    Sort:
+    {% for val, label in [('name','Name'),('po_count','POs'),('last_po','Last PO')] %}
+    <a href="{{ url_for('vendors_bp.vendor_center', search=search, sort=val, filter=filt) }}"
+       class="btn btn-ghost btn-sm"
+       style="{% if sort_by == val %}color:var(--primary);font-weight:600;border-color:var(--primary);{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="animate-fade-up" style="border-bottom:1px solid var(--border);margin-bottom:1rem;">
+  <nav style="display:flex;gap:0;overflow-x:auto;">
+    {% for tab_id, label in [('all','All'),('active','Active'),('no_activity','No Activity')] %}
+    <a href="{{ url_for('vendors_bp.vendor_center', search=search, sort=sort_by, filter=tab_id) }}"
+       style="padding:0.55rem 1rem;font-size:0.83rem;font-weight:{% if filt == tab_id %}600{% else %}500{% endif %};
+              color:{% if filt == tab_id %}var(--primary){% else %}var(--text-secondary){% endif %};
+              border-bottom:2px solid {% if filt == tab_id %}var(--primary){% else %}transparent{% endif %};
+              text-decoration:none;white-space:nowrap;transition:color 0.15s;">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </nav>
+</div>
+
+<div class="table-card animate-fade-up">
+  {% if vendors %}
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Vendor</th>
+          <th class="d-none d-md-table-cell">Contact</th>
+          <th>POs</th>
+          <th>Units</th>
+          <th>Fulfillment</th>
+          <th>Last PO</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vendor in vendors %}
+        {% set ps = po_stats.get(vendor.id, {}) %}
+        {% set us = unit_stats.get(vendor.id, 0) %}
+        {% set fs = fulfill_stats.get(vendor.id, {}) %}
+        <tr>
+          <td>
+            <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}"
+               style="font-weight:600;color:var(--text-primary);text-decoration:none;">
+              {{ vendor.name }}
+            </a>
+            {% if vendor.city or vendor.country %}
+            <div style="font-size:0.75rem;color:var(--text-muted);">
+              <i class="bi bi-geo-alt" style="font-size:0.7rem;"></i>
+              {{ [vendor.city, vendor.country]|select|join(', ') }}
+            </div>
+            {% endif %}
+          </td>
+          <td class="d-none d-md-table-cell" style="font-size:0.82rem;">
+            {% if vendor.phone %}
+            <a href="tel:{{ vendor.phone }}" style="color:var(--text-secondary);text-decoration:none;display:block;">
+              <i class="bi bi-telephone" style="font-size:0.75rem;margin-right:0.2rem;"></i>{{ vendor.phone }}
+            </a>
+            {% endif %}
+            {% if vendor.email %}
+            <a href="mailto:{{ vendor.email }}" style="color:var(--text-secondary);text-decoration:none;display:block;">
+              <i class="bi bi-envelope" style="font-size:0.75rem;margin-right:0.2rem;"></i>{{ vendor.email }}
+            </a>
+            {% endif %}
+          </td>
+          <td style="font-size:0.84rem;font-weight:600;">{{ ps.po_count or 0 }}</td>
+          <td style="font-size:0.84rem;font-weight:600;">{{ us }}</td>
+          <td>
+            {% if fs and fs.rate is not none %}
+            {% set rate = fs.rate %}
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+              <div style="width:48px;height:5px;background:var(--surface-3);border-radius:999px;overflow:hidden;">
+                <div style="width:{{ rate }}%;height:100%;background:{% if rate >= 90 %}var(--color-success){% elif rate >= 70 %}var(--color-warning){% else %}var(--color-danger){% endif %};border-radius:999px;"></div>
               </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="text-center">No vendors found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      </div>
+              <span style="font-size:0.78rem;font-weight:600;color:{% if rate >= 90 %}var(--color-success){% elif rate >= 70 %}var(--color-warning){% else %}var(--color-danger){% endif %};">
+                {{ rate }}%
+              </span>
+            </div>
+            {% else %}
+            <span style="font-size:0.8rem;color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.8rem;color:var(--text-muted);">
+            {{ ps.last_po.strftime('%b %d, %Y') if ps.last_po else '—' }}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-eye"></i> View
+              </a>
+              <a href="{{ url_for('vendors_bp.edit_vendor', vendor_id=vendor.id) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if paginated.pages > 1 %}
+  <div class="table-footer" style="padding:0.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div style="font-size:0.82rem;color:var(--text-muted);">
+      Showing {{ (paginated.page - 1) * 25 + 1 }}–{{ [(paginated.page * 25), paginated.total]|min }} of {{ paginated.total }}
+    </div>
+    <div style="display:flex;gap:0.25rem;">
+      {% if paginated.has_prev %}
+      <a href="{{ url_for('vendors_bp.vendor_center', page=paginated.prev_num, search=search, sort=sort_by, filter=filt) }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+      {% for p in paginated.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <a href="{{ url_for('vendors_bp.vendor_center', page=p, search=search, sort=sort_by, filter=filt) }}"
+           class="btn btn-ghost btn-sm"
+           style="{% if p == paginated.page %}color:var(--primary);font-weight:600;{% endif %}">{{ p }}</a>
+        {% else %}
+        <span style="padding:0.25rem 0.4rem;color:var(--text-muted);">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if paginated.has_next %}
+      <a href="{{ url_for('vendors_bp.vendor_center', page=paginated.next_num, search=search, sort=sort_by, filter=filt) }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% endif %}
     </div>
   </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-shop"></i>
+    <p>No vendors found{% if search %} for "{{ search }}"{% endif %}</p>
+    <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-primary btn-sm">Add First Vendor</a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

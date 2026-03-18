@@ -1,49 +1,73 @@
 {% extends "public_base.html" %}
-{% block title %}Register Tenant{% endblock %}
+{% block title %}Create Workspace{% endblock %}
 
 {% block content %}
-<div class="container py-5 d-flex justify-content-center">
-  <div class="card shadow-sm" style="width: 100%; max-width: 400px;">
-    <div class="card-body p-4">
-      <h4 class="text-center mb-3 fw-semibold text-primary">🚀 Create New Workspace</h4>
-      <p class="text-muted text-center small">This will create a new workspace and admin account for your business.</p>
+<div style="width:100%;max-width:440px;animation:fade-up 0.35s ease both;">
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="POST" action="{{ url_for('auth_bp.register_tenant') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="mb-3">
-          <label for="tenant_name" class="form-label fw-semibold">Business Name</label>
-          <input type="text" class="form-control form-control-lg rounded-pill px-3" id="tenant_name" name="tenant_name" required>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category in ['error','danger'] else ('warning' if category == 'warning' else 'info') }} mb-3" role="alert">
+          {{ message }}
         </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
 
-        <div class="mb-3">
-          <label for="username" class="form-label fw-semibold">Admin Username</label>
-          <input type="text" class="form-control form-control-lg rounded-pill px-3" id="username" name="username" required>
-        </div>
+  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);border-radius:var(--radius-xl);padding:2.5rem 2rem;box-shadow:var(--shadow-xl);">
+    <div style="text-align:center;margin-bottom:2rem;">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:var(--primary);border-radius:14px;margin-bottom:1rem;">
+        <i class="bi bi-buildings" style="font-size:1.5rem;color:#fff;"></i>
+      </div>
+      <h1 style="font-size:1.35rem;font-weight:700;color:#fff;margin:0 0 0.25rem;">Create Workspace</h1>
+      <p style="font-size:0.82rem;color:rgba(255,255,255,0.45);margin:0;">Set up your business account</p>
+    </div>
 
-        <div class="mb-3">
-          <label for="password" class="form-label fw-semibold">Password</label>
-          <input type="password" class="form-control form-control-lg rounded-pill px-3" id="password" name="password" required>
-        </div>
+    <form method="POST" action="{{ url_for('auth.register_tenant') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="mb-3">
-          <label for="confirm" class="form-label fw-semibold">Confirm Password</label>
-          <input type="password" class="form-control form-control-lg rounded-pill px-3" id="confirm" name="confirm" required>
-        </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Business Name</label>
+        <input type="text" name="tenant_name" class="form-control" placeholder="e.g. My Company" required autofocus
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
+      </div>
 
-        <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-semibold px-4 w-100">➕ Create Tenant</button>
-      </form>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Admin Username</label>
+        <input type="text" name="username" class="form-control" placeholder="Choose a username" required
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Password</label>
+        <input type="password" name="password" class="form-control" placeholder="At least 6 characters" required
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Confirm Password</label>
+        <input type="password" name="confirm" class="form-control" placeholder="Re-enter password" required
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" style="font-size:0.95rem;min-height:46px;justify-content:center;">
+        <i class="bi bi-plus-circle"></i> Create Workspace
+      </button>
+    </form>
+
+    <div style="margin-top:1.5rem;text-align:center;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08);">
+      <a href="{{ url_for('auth.login') }}"
+        style="font-size:0.84rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.12s;"
+        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+        &larr; Back to Login
+      </a>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+.form-control::placeholder { color: rgba(255,255,255,0.25) !important; }
+</style>
 {% endblock %}

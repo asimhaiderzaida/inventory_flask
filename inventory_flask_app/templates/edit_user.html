@@ -1,23 +1,62 @@
 {% extends "base.html" %}
+{% block title %}Edit User{% endblock %}
+{% block page_title %}Edit User{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-  <h2>Edit User</h2>
-  <form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <div class="mb-3">
-      <label for="username">Username</label>
-      <input type="text" class="form-control" name="username" id="username" value="{{ user.username }}">
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Edit User</h1>
+    <div class="page-subtitle">{{ user.full_name or user.username }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('admin_bp.admin_settings') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:480px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="form-control"
+                 value="{{ user.full_name or '' }}" placeholder="e.g. Jane Smith">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select name="role" class="form-select">
+            <option value="admin"       {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+            <option value="technician"  {% if user.role == 'technician' %}selected{% endif %}>Technician</option>
+            <option value="sales"       {% if user.role == 'sales' %}selected{% endif %}>Sales</option>
+            <option value="supervisor"  {% if user.role == 'supervisor' %}selected{% endif %}>Supervisor</option>
+            <option value="staff"       {% if user.role == 'staff' %}selected{% endif %}>Staff</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label">New Password <span style="font-weight:400;color:var(--text-muted);">(leave blank to keep current)</span></label>
+          <input type="password" name="new_password" class="form-control"
+                 placeholder="Enter new password to change it" autocomplete="new-password">
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-save"></i> Save Changes
+          </button>
+          <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('admin_bp.admin_settings') }}'" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
     </div>
-    <div class="mb-3">
-      <label for="role">Role</label>
-      <select class="form-select" name="role" id="role">
-        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-        <option value="technician" {% if user.role == 'technician' %}selected{% endif %}>Technician</option>
-        <option value="sales" {% if user.role == 'sales' %}selected{% endif %}>Sales</option>
-      </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Save</button>
-    <a href="{{ url_for('auth_bp.register_user') }}" class="btn btn-secondary">Cancel</a>
-  </form>
+  </div>
 </div>
 {% endblock %}

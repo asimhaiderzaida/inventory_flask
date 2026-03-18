@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}New Parts Sale — Invoice Type{% endblock %}
+{% block page_title %}New Parts Sale{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">New Parts Sale</h1>
+    <div class="page-subtitle">Step 3 of 4 — Choose invoice type</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.sale_customer') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<div class="animate-fade-up" style="margin-bottom:1.75rem;">
+  <div style="display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+    {% for label, active in [('Cart', false), ('Customer', false), ('Invoice Type', true), ('Payment', false)] %}
+    <div style="flex:1;padding:0.6rem 0.5rem;text-align:center;font-size:0.78rem;font-weight:{{ '700' if active else '500' }};
+                background:{{ 'var(--primary)' if active else 'transparent' }};
+                color:{{ '#fff' if active else 'var(--text-muted)' }};
+                {{ 'border-right:1px solid var(--border);' if not loop.last }}">
+      {{ label }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Customer pill -->
+{% if customer %}
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.85rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+    <i class="bi bi-person-fill" style="color:var(--primary);"></i>
+    <strong>{{ customer.customer_name }}</strong>
+  </div>
+</div>
+{% endif %}
+
+<div class="animate-fade-up" style="max-width:580px;">
+  <form method="post" id="invTypeForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="linked_sale_id" id="linked-sale-id" value="">
+
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-body" style="padding:1.5rem;">
+
+        <!-- Option A -->
+        <label style="display:flex;align-items:flex-start;gap:0.9rem;padding:1rem;border:2px solid var(--border);border-radius:var(--radius-md);cursor:pointer;margin-bottom:0.75rem;transition:border-color 0.15s;" id="opt-a-wrap">
+          <input type="radio" name="invoice_type" value="standalone" id="opt-standalone" checked style="margin-top:3px;flex-shrink:0;">
+          <div>
+            <div style="font-weight:700;font-size:0.95rem;"><i class="bi bi-receipt me-1" style="color:var(--primary);"></i>Parts-Only Invoice</div>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">Generate a standalone <strong>PRT-XXXX</strong> invoice for these parts.</div>
+          </div>
+        </label>
+
+        <!-- Option B -->
+        <label style="display:flex;align-items:flex-start;gap:0.9rem;padding:1rem;border:2px solid var(--border);border-radius:var(--radius-md);cursor:pointer;transition:border-color 0.15s;" id="opt-b-wrap">
+          <input type="radio" name="invoice_type" value="attached" id="opt-attached" style="margin-top:3px;flex-shrink:0;">
+          <div style="width:100%;">
+            <div style="font-weight:700;font-size:0.95rem;"><i class="bi bi-link-45deg me-1" style="color:var(--color-warning);"></i>Attach to Existing Unit Sale</div>
+            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">Link these parts to an existing invoice/sale.</div>
+            <!-- Search box, visible when this option selected -->
+            <div id="sale-search-section" style="display:none;margin-top:0.85rem;">
+              <input type="text" id="sale-search-input" class="form-control form-control-sm" placeholder="Search by invoice number or customer name…">
+              <div id="sale-search-results" style="margin-top:0.5rem;"></div>
+              <div id="sale-selected" style="display:none;margin-top:0.5rem;padding:0.6rem 0.85rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.82rem;"></div>
+            </div>
+          </div>
+        </label>
+
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="submit" class="btn btn-primary">
+        Continue to Payment <i class="bi bi-arrow-right"></i>
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelectorAll('input[name="invoice_type"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    const isAttached = this.value === 'attached';
+    document.getElementById('sale-search-section').style.display = isAttached ? '' : 'none';
+    document.getElementById('opt-a-wrap').style.borderColor = !isAttached ? 'var(--primary)' : 'var(--border)';
+    document.getElementById('opt-b-wrap').style.borderColor =  isAttached ? 'var(--color-warning)' : 'var(--border)';
+  });
+});
+// Init
+document.getElementById('opt-a-wrap').style.borderColor = 'var(--primary)';
+
+let searchTimer;
+document.getElementById('sale-search-input').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('sale-search-results').innerHTML = ''; return; }
+  searchTimer = setTimeout(function() {
+    fetch('{{ url_for("parts_bp.api_sale_search") }}?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        const wrap = document.getElementById('sale-search-results');
+        if (!data.length) { wrap.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);">No sales found.</div>'; return; }
+        wrap.innerHTML = data.map(function(s) {
+          return '<div onclick="selectSale(' + JSON.stringify(s) + ')" style="padding:0.5rem 0.75rem;cursor:pointer;border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:0.35rem;font-size:0.82rem;background:var(--surface);">' +
+            '<strong>' + s.invoice_number + '</strong> — ' + s.customer_name +
+            ' <span style="color:var(--text-muted);">· ' + s.date + ' · ' + s.item_count + ' unit(s)</span></div>';
+        }).join('');
+      });
+  }, 350);
+});
+
+function selectSale(s) {
+  document.getElementById('linked-sale-id').value = s.sale_id || '';
+  document.getElementById('sale-search-results').innerHTML = '';
+  const sel = document.getElementById('sale-selected');
+  sel.style.display = '';
+  sel.innerHTML = '<i class="bi bi-check-circle" style="color:var(--color-success);"></i> Linked: <strong>' + s.invoice_number + '</strong> — ' + s.customer_name + ' (' + s.date + ')' +
+    ' <a href="#" onclick="clearSaleSelection(event)" style="margin-left:0.5rem;color:var(--color-danger);font-size:0.75rem;">Remove</a>';
+}
+function clearSaleSelection(e) {
+  e.preventDefault();
+  document.getElementById('linked-sale-id').value = '';
+  document.getElementById('sale-selected').style.display = 'none';
+}
+</script>
+{% endblock %}

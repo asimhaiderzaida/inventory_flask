@@ -1,39 +1,162 @@
 {% extends "base.html" %}
 {% block title %}Edit Vendor{% endblock %}
+{% block page_title %}Edit Vendor{% endblock %}
+
 {% block content %}
-<div class="container mt-4" style="max-width: 720px;">
-  <div class="card shadow-sm border-0 rounded-4">
-    <div class="card-body px-4 py-5">
-      <h3 class="mb-4 fw-bold text-primary">
-        <i class="bi bi-pencil-square me-2"></i>Edit Vendor
-      </h3>
-      <form method="POST" class="row g-3">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Vendor Name</label>
-      <input type="text" name="name" class="form-control form-control-lg" value="{{ vendor.name }}" required>
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Contact</label>
-      <input type="text" name="contact" class="form-control form-control-lg" value="{{ vendor.contact or '' }}">
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-control form-control-lg" value="{{ vendor.email or '' }}">
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Company</label>
-      <input type="text" name="company" class="form-control form-control-lg" value="{{ vendor.company or '' }}">
-    </div>
-    <div class="col-md-12 mb-3">
-      <label class="form-label">Address</label>
-      <textarea name="address" class="form-control form-control-lg" rows="2">{{ vendor.address or '' }}</textarea>
-    </div>
-    <div class="col-12 mt-3">
-      <button type="submit" class="btn btn-primary px-4 btn-lg w-100 mt-2">Save</button>
-      <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary ms-2 btn-lg w-100 mt-2">Back to Vendor Center</a>
-    </div>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Edit Vendor</h1>
+    <div class="page-subtitle">{{ vendor.name }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Profile
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:620px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Vendor Info -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;">Vendor Information</div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="form-label">Vendor Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" name="name" class="form-control" value="{{ vendor.name }}" required autofocus>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Contact Person</label>
+            <input type="text" name="contact" class="form-control" value="{{ vendor.contact or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            <input type="text" name="phone" class="form-control" value="{{ vendor.phone or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" value="{{ vendor.email or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Website</label>
+            <input type="url" name="website" class="form-control" value="{{ vendor.website or '' }}" placeholder="https://vendor.com">
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.25rem;">Address</div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="form-label">Street Address</label>
+            <textarea name="address" class="form-control" rows="2">{{ vendor.address or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">City</label>
+            <input type="text" name="city" class="form-control" value="{{ vendor.city or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Country</label>
+            <select class="form-select" name="country">
+              <option value="">— Select country —</option>
+              {% for c in [
+                'United Arab Emirates','Saudi Arabia','Kuwait','Qatar','Bahrain','Oman',
+                'United Kingdom','United States','Canada','Australia','India','Pakistan',
+                'Egypt','Jordan','Lebanon','Turkey','Germany','France','Netherlands',
+                'Singapore','Malaysia','Philippines','Nigeria','Kenya','South Africa',
+                'China','Hong Kong','Taiwan','Japan','South Korea','Other'
+              ] %}
+              <option value="{{ c }}" {% if vendor.country == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Commercial -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.25rem;">Commercial</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Payment Terms</label>
+            <select class="form-select" name="payment_terms">
+              <option value="">— Select terms —</option>
+              {% for t in ['Net 15','Net 30','Net 60','Net 90','COD','Prepaid','On Account'] %}
+              <option value="{{ t }}" {% if vendor.payment_terms == t %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.25rem;">Internal Notes</div>
+        <div class="mb-4">
+          <textarea class="form-control" name="notes" rows="3" placeholder="Quality notes, preferred contact hours, account details…">{{ vendor.notes or '' }}</textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('vendors_bp.vendor_profile', vendor_id=vendor.id) }}" class="btn btn-ghost flex-fill">Cancel</a>
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-save"></i> Save Changes
+          </button>
+        </div>
       </form>
     </div>
   </div>
+
+  <!-- Danger Zone -->
+  <div class="card" style="margin-top:1rem;border-color:var(--color-danger);">
+    <div class="card-body" style="padding:1.25rem 1.5rem;">
+      <div style="font-size:0.875rem;font-weight:600;color:var(--color-danger);margin-bottom:0.5rem;">
+        <i class="bi bi-exclamation-triangle me-2"></i>Danger Zone
+      </div>
+      <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+        Permanently delete this vendor. Cannot be undone.
+        Vendors with purchase orders or linked parts cannot be deleted.
+      </p>
+      <button type="button" class="btn btn-sm" style="background:#fef2f2;color:var(--color-danger);border:1px solid #fca5a5;" onclick="showDeleteModal()">
+        <i class="bi bi-trash3"></i> Delete Vendor
+      </button>
+    </div>
+  </div>
 </div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);overflow:hidden;">
+      <div class="modal-header" style="background:#fef2f2;border-bottom:1px solid #fca5a5;padding:1rem 1.5rem;">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <div style="width:32px;height:32px;background:var(--color-danger);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+            <i class="bi bi-trash3"></i>
+          </div>
+          <div style="font-weight:700;font-size:0.9rem;">Delete Vendor</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+        <p style="font-size:0.88rem;color:var(--text-secondary);margin:0;">
+          Permanently delete <strong>{{ vendor.name }}</strong>? This cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:0.85rem 1.5rem;">
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <form method="POST" action="{{ url_for('vendors_bp.delete_vendor', vendor_id=vendor.id) }}" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm" style="background:var(--color-danger);color:#fff;border:none;">
+            <i class="bi bi-trash3"></i> Yes, Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+function showDeleteModal() {
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}
 {% endblock %}

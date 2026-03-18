@@ -1,237 +1,862 @@
 {% extends "base.html" %}
+{% block title %}Process Stage Management{% endblock %}
+{% block page_title %}Process Stage Management{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
-    
-
-    <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.45rem;">
-      <i class="bi bi-tools me-2"></i>Process Stage Management (Batch)
-    </h2>
-
-    <form method="POST" class="mb-4">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-5 mb-2">
-          <label for="serials" class="form-label fw-semibold">
-            <i class="bi bi-upc-scan me-1"></i>Scan/Paste Serials
-            <small class="text-muted d-block">(One per line, comma, or space)</small>
-          </label>
-          <textarea name="serials" id="serials" class="form-control rounded-3" rows="3" placeholder="Scan or paste serial numbers..." required></textarea>
-        </div>
-        <div class="col-md-3 mb-2">
-          <label for="process_stage" class="form-label fw-semibold">
-            <i class="bi bi-diagram-3 me-1"></i>Next Stage
-          </label>
-          <select name="process_stage" id="process_stage" class="form-select rounded-pill form-select-sm" required>
-            <option value="">Select Stage</option>
-            <option value="specs">Specs</option>
-            <option value="deployment">Deployment</option>
-            <option value="screen_spot">Screen Spot</option>
-            <option value="parts_change">Parts Change</option>
-            <option value="paint">Paint</option>
-            <option value="qc">QC</option>
-            <option value="processed">Processed</option>
-          </select>
-        </div>
-        <div class="col-md-3 mb-2">
-          <label for="team_assigned" class="form-label fw-semibold">
-            <i class="bi bi-people me-1"></i>Assign Team
-          </label>
-          <input type="text" name="team_assigned" id="team_assigned" class="form-control rounded-pill form-control-sm" placeholder="Assigned Team" required>
-        </div>
-        <div class="col-md-1 d-grid mb-2">
-          <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill fw-semibold w-100" style="min-height: 38px;">
-            <i class="bi bi-arrow-repeat me-1"></i>Process
-          </button>
-        </div>
-      </div>
-    </form>
-
-    {% if results %}
-    <div class="d-flex justify-content-between align-items-center my-3">
-      <h5 class="fw-semibold mb-0 text-primary">✅ {{ results|length }} Units Processed</h5>
-      <form method="post" action="{{ url_for('stock_bp.export_instances') }}">
-        <input type="hidden" name="export_scope" value="processed_stage_batch">
-        <input type="hidden" name="instance_ids" value="{{ updated_ids | join(',') }}">
-        <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill" style="min-height: 38px;">
-          <i class="bi bi-download me-1"></i>Export Updated
-        </button>
-      </form>
-    </div>
-    <table class="table table-hover align-middle rounded-4 overflow-hidden bg-white">
-      <thead class="table-light">
-        <tr>
-          <th>Serial</th>
-          <th>Asset</th>
-          <th>Item Name</th>
-          <th>Make</th>
-          <th>Model</th>
-          <th>CPU</th>
-          <th>RAM</th>
-          <th>Grade</th>
-          <th>Display</th>
-          <th>GPU 1</th>
-          <th>GPU 2</th>
-          <th>Disk Size</th>
-          <th>Previous Stage</th>
-          <th>Result</th>
-          <th>Action</th>
-        </tr>
-        <tr>
-          <th colspan="14" class="pt-0">
-            <select id="filter-stage" class="form-select form-select-sm rounded-pill" aria-label="Filter by stage">
-              <option value="">Filter by Previous Stage</option>
-              <option value="specs">Specs</option>
-              <option value="deployment">Deployment</option>
-              <option value="screen_spot">Screen Spot</option>
-              <option value="parts_change">Parts Change</option>
-              <option value="paint">Paint</option>
-              <option value="qc">QC</option>
-              <option value="processed">Processed</option>
-            </select>
-          </th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in results %}
-        <tr>
-          <td>{{ row.serial or row.instance.serial if row.instance else '' }}</td>
-          <td>{{ row.asset or row.instance.asset if row.instance else '' }}</td>
-          <td>{{ row.item_name }}</td>
-          <td>{{ row.make }}</td>
-          <td>{{ row.model }}</td>
-          <td>{{ row.cpu }}</td>
-          <td>{{ row.ram }}</td>
-          <td>{{ row.grade }}</td>
-          <td>{{ row.display }}</td>
-          <td>{{ row.gpu1 }}</td>
-          <td>{{ row.gpu2 }}</td>
-          <td>{{ row.disk1size }}</td>
-          <td>{{ row.prev_stage }}</td>
-          <td>
-            {% if row.status == 'updated' %}
-              <span class="badge bg-success">Updated</span>
-            {% elif row.status == 'not_found' %}
-              <span class="badge bg-danger">Not Found</span>
-            {% elif row.status == 'no_change' %}
-              <span class="badge bg-secondary">Already at Stage</span>
-            {% else %}
-              <span class="badge bg-warning text-dark">{{ row.status }}</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if row.status == 'updated' and row.instance_id %}
-              <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance_id) }}" class="btn btn-sm btn-outline-dark" target="_blank">🖨️ Print</a>
-            {% else %}
-              <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% set updated_ids = results | selectattr('status', 'equalto', 'updated') | map(attribute='instance_id') | list %}
-    {% if updated_ids %}
-      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" class="mb-3">
-        {% for id in updated_ids %}
-          <input type="hidden" name="instance_ids" value="{{ id }}">
-        {% endfor %}
-        <div class="d-flex gap-3 my-3">
-          <button type="submit" name="action" value="check-in" class="btn btn-outline-success btn-lg rounded-pill flex-fill" style="min-height: 42px;">
-            <i class="bi bi-box-arrow-in-down me-1"></i> Check In All
-          </button>
-          <button type="submit" name="action" value="check-out" class="btn btn-outline-danger btn-lg rounded-pill flex-fill" style="min-height: 42px;">
-            <i class="bi bi-box-arrow-up-right me-1"></i> Check Out All
-          </button>
-        </div>
-        <div class="mb-3">
-          <input type="text" name="note" class="form-control rounded-pill" placeholder="Optional note (who, why, etc.)">
-        </div>
-      </form>
-    {% endif %}
-    {% endif %}
-
-    {% if my_units and my_units|length > 0 %}
-      <div class="card mb-3">
-        <div class="card-header bg-primary text-white">My Assigned Units</div>
-        <div class="card-body p-2">
-          <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
-            <table class="table table-sm table-bordered mb-0">
-              <thead>
-                <tr>
-                  <th>Serial</th>
-                  <th>Asset</th>
-                  <th>Item Name</th>
-                  <th>Model</th>
-                  <th>CPU</th>
-                  <th>RAM</th>
-                  <th>Stage</th>
-                  <th>Team</th>
-                  <th>Checked In</th>
-                  <th>Updated At</th>
-                  <th>Note</th>
-                  <th>Idle</th>
-                  <th>
-                    <input type="checkbox" id="select-all-inprocess">
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for i in my_units %}
-                  {% if i.assigned_to_user_id == current_user.id %}
-                    <tr>
-                      <td>{{ i.serial }}</td>
-                      <td>{{ i.asset }}</td>
-                      <td>{{ i.product.item_name if i.product else '' }}</td>
-                      <td>{{ i.product.model if i.product else '' }}</td>
-                      <td>{{ i.product.cpu if i.product else '' }}</td>
-                      <td>{{ i.product.ram if i.product else '' }}</td>
-                      <td>{{ i.process_stage }}</td>
-                      <td>{{ i.team_assigned }}</td>
-                      <td>{{ i.checkin_timestamp.strftime('%Y-%m-%d %H:%M') if i.checkin_timestamp else '-' }}</td>
-                      <td>{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '-' }}</td>
-                      <td>
-                        <input type="text" name="notes[{{ i.id }}]" class="form-control form-control-sm" placeholder="Optional note">
-                      </td>
-                      <td>
-                        <input type="checkbox" name="mark_idle_ids" value="{{ i.id }}">
-                      </td>
-                      <td>
-                        <input type="checkbox" name="instance_ids" value="{{ i.id }}" class="unit-checkbox">
-                      </td>
-                    </tr>
-                  {% endif %}
-                {% endfor %}
-              </tbody>
-            </table>
-            <div class="d-flex gap-2 my-2">
-              <button type="submit" name="action" value="check-in" class="btn btn-outline-success btn-sm rounded-pill" style="min-height: 36px;">
-                <i class="bi bi-box-arrow-in-down me-1"></i>Check In Selected
-              </button>
-              <button type="submit" name="action" value="check-out" class="btn btn-outline-danger btn-sm rounded-pill" style="min-height: 36px;">
-                <i class="bi bi-box-arrow-up-right me-1"></i>Check Out Selected
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    {% endif %}
-
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Process Stage Management</h1>
+    <div class="page-subtitle">Batch check-in / check-out and stage assignment</div>
   </div>
 </div>
+
+<!-- Tab nav -->
+<div class="animate-fade-up" style="margin-bottom:1.5rem;">
+  <div style="display:flex;gap:0.5rem;border-bottom:1px solid var(--border);padding-bottom:0;">
+    <a href="{{ url_for('stock_bp.process_stage_update', tab='under_process') }}"
+       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
+       {% if tab == 'under_process' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
+      <i class="bi bi-person-badge"></i> My Units
+    </a>
+    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}"
+       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
+       {% if tab == 'check_in' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
+      <i class="bi bi-box-arrow-in-down"></i> Check In
+    </a>
+    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_out') }}"
+       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
+       {% if tab == 'check_out' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
+      <i class="bi bi-box-arrow-up-right"></i> Check Out
+    </a>
+  </div>
+</div>
+
+<!-- ===== MY UNITS TAB ===== -->
+{% if tab == 'under_process' %}
+<div class="animate-fade-up">
+
+  {% if is_supervisor %}
+  <!-- Supervisor notice -->
+  <div style="display:flex;align-items:center;gap:0.5rem;padding:0.65rem 1rem;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-md);margin-bottom:1rem;font-size:0.83rem;">
+    <i class="bi bi-shield-check" style="color:#6366f1;font-size:1rem;"></i>
+    <span style="color:#4f46e5;font-weight:600;">Supervisor view</span>
+    <span style="color:var(--text-muted);">— showing all {{ my_units|length }} units currently in processing across all technicians.</span>
+  </div>
+  {% endif %}
+
+  {% if my_units and my_units|length > 0 %}
+    <div class="table-card">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.85rem;font-weight:600;">
+          <i class="bi bi-person-check" style="margin-right:0.4rem;"></i>
+          {% if is_supervisor %}Processing Overview — All Techs{% else %}My Assigned Units{% endif %}
+        </span>
+      </div>
+      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="tab" value="under_process">
+        <div style="overflow-x:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th class="d-none d-md-table-cell">Asset</th>
+                <th>Item</th>
+                <th class="d-none d-md-table-cell">Model</th>
+                <th class="d-none d-md-table-cell">CPU</th>
+                <th class="d-none d-md-table-cell">RAM</th>
+                <th>Stage</th>
+                <th class="d-none d-md-table-cell">Time in Stage</th>
+                <th class="d-none d-md-table-cell">Team</th>
+                {% if is_supervisor %}<th>Assignee</th>{% endif %}
+                <th>Updated</th>
+                {% if not is_supervisor %}<th>Note</th><th>Idle</th>{% endif %}
+                <th>{% if not is_supervisor %}<input type="checkbox" id="select-all-inprocess" style="cursor:pointer;">{% else %}Actions{% endif %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in my_units %}
+                {% set is_mine = (i.assigned_to_user_id == current_user.id) %}
+                {% if is_supervisor or is_mine %}
+                  {% set mins_in_stage = calc_duration_minutes(i.entered_stage_at) %}
+                  {% set dur_label = format_duration(mins_in_stage) %}
+                  {# Build SLA lookup for this unit's stage #}
+                  {% set ns = namespace(sla_h=0) %}
+                  {% for s in process_stages %}
+                    {% if s.name == i.process_stage and s.sla_hours %}
+                      {% set ns.sla_h = s.sla_hours %}
+                    {% endif %}
+                  {% endfor %}
+                  {% set is_overdue = (ns.sla_h > 0 and mins_in_stage is not none and (mins_in_stage / 60) > ns.sla_h) %}
+                  <tr {% if is_overdue %}style="background:rgba(239,68,68,0.04);"{% elif is_supervisor and not is_mine %}style="opacity:0.85;"{% endif %}>
+                    <td>
+                      <a href="{{ url_for('stock_bp.unit_history', serial=i.serial) }}" style="font-family:monospace;font-size:0.82rem;color:var(--primary);text-decoration:none;">{{ i.serial }}</a>
+                    </td>
+                    <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
+                    <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
+                    <td class="d-none d-md-table-cell">{{ (i.product.model if i.product else None) | nonan }}</td>
+                    <td class="d-none d-md-table-cell">{{ (i.product.cpu if i.product else None) | nonan }}</td>
+                    <td class="d-none d-md-table-cell">{{ (i.product.ram if i.product else None) | nonan }}</td>
+                    <td>
+                      <span class="status-pill status-under_process">{{ i.process_stage or '—' }}</span>
+                      {# Stage progress bar: stage index / total stages #}
+                      {% set ns2 = namespace(stage_idx=0) %}
+                      {% for s in process_stages %}
+                        {% if s.name == i.process_stage %}{% set ns2.stage_idx = loop.index %}{% endif %}
+                      {% endfor %}
+                      {% set total_stages = process_stages|length %}
+                      {% if ns2.stage_idx > 0 and total_stages > 0 %}
+                      {% set pct = ((ns2.stage_idx / total_stages) * 100)|round|int %}
+                      <div title="Stage {{ ns2.stage_idx }} of {{ total_stages }}" style="margin-top:0.3rem;height:4px;background:var(--surface-3);border-radius:4px;overflow:hidden;min-width:60px;">
+                        <div style="height:100%;width:{{ pct }}%;background:var(--primary);border-radius:4px;transition:width 0.3s;"></div>
+                      </div>
+                      <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.1rem;">{{ ns2.stage_idx }}/{{ total_stages }}</div>
+                      {% endif %}
+                    </td>
+                    <td class="d-none d-md-table-cell">
+                      <div style="display:inline-flex;flex-direction:column;gap:0.2rem;align-items:flex-start;">
+                        {% if dur_label %}
+                        <span style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.15rem 0.55rem;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;
+                          background:rgba(6,182,212,0.1);color:#0891b2;">
+                          <i class="bi bi-clock" style="font-size:0.7rem;"></i>{{ dur_label }}
+                        </span>
+                        {% else %}—{% endif %}
+                        {% if is_overdue %}
+                        <span style="display:inline-flex;align-items:center;gap:0.2rem;padding:0.1rem 0.45rem;border-radius:20px;font-size:0.68rem;font-weight:700;white-space:nowrap;
+                          background:rgba(239,68,68,0.15);color:var(--color-danger);">
+                          <i class="bi bi-exclamation-circle" style="font-size:0.65rem;"></i>OVERDUE
+                        </span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td class="d-none d-md-table-cell">{{ i.team_assigned or '—' }}</td>
+                    {% if is_supervisor %}
+                    <td>
+                      <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
+                        <span style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;">
+                          {{ (i.assigned_user.username[0]|upper) if i.assigned_user else '?' }}
+                        </span>
+                        {{ i.assigned_user.username if i.assigned_user else '—' }}
+                        {% if is_mine %}<span style="font-size:0.7rem;color:var(--primary);font-weight:600;">(you)</span>{% endif %}
+                      </span>
+                    </td>
+                    {% endif %}
+                    <td style="font-size:0.82rem;color:var(--text-muted);">{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '—' }}</td>
+                    {% if not is_supervisor %}
+                    <td><input type="text" name="notes[{{ i.id }}]" class="form-control form-control-sm" placeholder="Optional note" style="min-width:120px;"></td>
+                    <td style="text-align:center;"><input type="checkbox" name="mark_idle_ids" value="{{ i.id }}"></td>
+                    {% endif %}
+                    <td>
+                      {% if is_supervisor %}
+                      <div style="display:flex;gap:0.35rem;flex-wrap:nowrap;">
+                        <button type="button" class="btn btn-ghost btn-sm"
+                                style="color:#6366f1;padding:0.25rem 0.5rem;white-space:nowrap;"
+                                onclick="openReassignModal({{ i.id }}, '{{ i.serial }}', '{{ (i.assigned_user.username)|e if i.assigned_user else 'unassigned' }}', {{ (i.assigned_user.id) if i.assigned_user else 'null' }})"
+                                title="Reassign to another technician">
+                          <i class="bi bi-person-fill-gear"></i> Reassign
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm"
+                                style="color:#06b6d4;padding:0.25rem 0.5rem;white-space:nowrap;"
+                                onclick="openQuickStageModal({{ i.id }}, '{{ i.serial|e }}', '{{ (i.process_stage or '')|e }}')"
+                                title="Quick stage update">
+                          <i class="bi bi-arrow-right-circle"></i> Stage
+                        </button>
+                        <button type="submit"
+                                formaction="{{ url_for('stock_bp.force_checkout', instance_id=i.id) }}"
+                                formmethod="post"
+                                class="btn btn-ghost btn-sm"
+                                style="color:var(--color-danger);padding:0.25rem 0.5rem;white-space:nowrap;"
+                                onclick="return confirm('Force check-out {{ i.serial }}? It will be marked Processed and released from {{ (i.assigned_user.username)|e if i.assigned_user else 'no one' }}.')"
+                                title="Force check-out this unit">
+                          <i class="bi bi-box-arrow-up-right"></i> Force Out
+                        </button>
+                      </div>
+                      {% else %}
+                      <input type="checkbox" name="instance_ids" value="{{ i.id }}" class="unit-checkbox">
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-person-badge"></i>
+      <p>{% if is_supervisor %}No units are currently in processing.{% else %}You have no units currently assigned to you for processing.{% endif %}</p>
+      {% if not is_supervisor %}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+        <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}" class="btn btn-primary btn-sm">
+          <i class="bi bi-box-arrow-in-down"></i> Go to Check In
+        </a>
+        {% if unprocessed_count %}
+        <span style="font-size:0.82rem;color:var(--text-muted);">
+          {{ unprocessed_count }} unprocessed unit{{ 's' if unprocessed_count != 1 else '' }} available to check in
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if is_supervisor %}
+  <!-- ── Quick Stage Update Modal ── -->
+  <div id="quickStageModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div style="background:var(--surface-1);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:100%;max-width:400px;margin:1rem;overflow:hidden;">
+      <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
+        <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(6,182,212,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-arrow-right-circle-fill" style="color:#06b6d4;font-size:1.05rem;"></i>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;">Quick Stage Update</div>
+          <div id="quickStageSerial" style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;"></div>
+        </div>
+        <button onclick="closeQuickStageModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">✕</button>
+      </div>
+      <form id="quickStageForm" method="POST" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="status" value="under_process">
+        <div style="padding:1.25rem 1.5rem;">
+          <label class="form-label">New Stage</label>
+          <select name="process_stage" class="form-select" required>
+            <option value="">— Select stage —</option>
+            {% for s in process_stages %}
+            <option value="{{ s.name }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.5rem;">
+          <button type="button" class="btn btn-ghost" onclick="closeQuickStageModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#06b6d4;border-color:#06b6d4;">
+            <i class="bi bi-arrow-right-circle"></i> Update Stage
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Reassign Modal ── -->
+  <div id="reassignModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+    <div style="background:var(--surface-1);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:100%;max-width:440px;margin:1rem;overflow:hidden;">
+      <!-- Modal header -->
+      <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
+        <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-person-fill-gear" style="color:#6366f1;font-size:1.05rem;"></i>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;color:var(--text-primary);">Reassign Unit</div>
+          <div id="reassignSerial" style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;"></div>
+        </div>
+        <button onclick="closeReassignModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">✕</button>
+      </div>
+      <!-- Modal body -->
+      <form id="reassignForm" method="POST" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="padding:1.25rem 1.5rem;">
+          <div style="margin-bottom:1rem;">
+            <div style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:0.3rem;">Current Assignee</div>
+            <div id="currentAssignee" style="font-size:0.9rem;font-weight:500;color:var(--text-primary);"></div>
+          </div>
+          <div>
+            <label class="form-label">Reassign To</label>
+            <select name="new_user_id" class="form-select" required>
+              <option value="">— Select technician —</option>
+              {% for u in all_users %}
+              <option value="{{ u.id }}">{{ u.username }}{% if u.id == current_user.id %} (you){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="margin-top:0.75rem;">
+            <label class="form-label">Note (optional)</label>
+            <input type="text" name="reassign_note" class="form-control" placeholder="Reason for reassignment…">
+          </div>
+        </div>
+        <!-- Modal footer -->
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.5rem;">
+          <button type="button" class="btn btn-ghost" onclick="closeReassignModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#6366f1;border-color:#6366f1;">
+            <i class="bi bi-person-fill-gear"></i> Confirm Reassign
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ===== CHECK IN TAB ===== -->
+{% elif tab == 'check_in' %}
+<div class="animate-fade-up">
+
+  <!-- Stage + team lock -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:1.25rem;">
+      <div style="font-size:0.85rem;font-weight:600;margin-bottom:1rem;">Lock Stage &amp; Team</div>
+      <form id="checkin-lock-form" class="row g-3" onsubmit="return false;">
+        <div class="col-md-5">
+          <label class="form-label">Stage</label>
+          <select id="checkin-stage" class="form-select" required>
+            <option value="">Choose stage…</option>
+            {% for s in process_stages %}
+            <option value="{{ s.name }}">{{ s.name }}</option>
+            {% else %}
+            <option value="Intake Check">Intake Check</option>
+            <option value="Data Wipe">Data Wipe</option>
+            <option value="Repair">Repair</option>
+            <option value="QC Check">QC Check</option>
+            <option value="Packaging">Packaging</option>
+            <option value="Ready for Sale">Ready for Sale</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Team</label>
+          <select id="checkin-team" class="form-select" required>
+            <option value="">Choose team…</option>
+            {% for team in (teams or []) %}
+              <option value="{{ team }}">{{ team }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end gap-2">
+          <button type="button" class="btn btn-primary w-100" id="checkin-lock-btn" onclick="lockCheckinStageTeam(event)">
+            <i class="bi bi-lock"></i> Lock
+          </button>
+          <button type="button" class="btn btn-ghost w-100" id="checkin-unlock-btn" onclick="unlockCheckinStageTeam()" style="display:none;" title="Unlock to change stage/team (keeps scanned list intact)">
+            <i class="bi bi-unlock"></i> Unlock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scan input -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:1.25rem;">
+      <label class="form-label">Scan Serial</label>
+      <form onsubmit="return false;">
+        <input type="text" id="checkin-scan-input" class="form-control" placeholder="Scan serial…" autocomplete="off" autofocus
+          onkeydown="if(event.key==='Enter'){ scanCheckinSerial(); return false; }">
+        <input type="hidden" id="locked-stage" value="">
+        <input type="hidden" id="locked-team" value="">
+      </form>
+    </div>
+  </div>
+
+  <!-- Scanned units for check-in -->
+  <form method="POST" action="{{ url_for('stock_bp.checkin_checkout') }}" onsubmit="return confirmCheckinHasRows();">
+    <input type="hidden" name="action" value="check-in">
+    <input type="hidden" name="tab" value="check_in">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="process_stage" id="submit-locked-stage" value="">
+    <input type="hidden" name="team_assigned" id="submit-locked-team" value="">
+    <div class="table-card mb-4">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-list-check" style="margin-right:0.4rem;"></i>Scanned Units — Check In</span>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-check-circle"></i> Confirm Check-In
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="checkin-table">
+          <thead>
+            <tr>
+              <th>Serial</th>
+              <th class="d-none d-md-table-cell">Asset</th>
+              <th class="d-none d-md-table-cell">Model</th>
+              <th>Item</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="checkin-body">
+            {% for entry in session.scanned_checkin or [] %}
+            <tr data-serial="{{ entry.serial }}">
+              <td>
+                <input type="hidden" name="instance_ids" value="{{ entry.instance_id }}">
+                <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">{{ entry.serial }}</span>
+              </td>
+              <td class="d-none d-md-table-cell">{{ entry.asset or '—' }}</td>
+              <td class="d-none d-md-table-cell">{{ entry.model | nonan }}</td>
+              <td>{{ entry.item_name | nonan }}</td>
+              <td><input type="text" class="form-control form-control-sm" name="notes[{{ entry.serial }}]" value="{{ entry.note or '' }}" placeholder="Optional note" style="min-width:120px;"></td>
+              <td>
+                <button type="submit" formaction="{{ url_for('stock_bp.remove_checkin_scan', serial=entry.serial) }}" formmethod="post"
+                  class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:0.2rem 0.5rem;">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+
+  <!-- Results table -->
+  {% if results %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <span style="font-size:0.9rem;font-weight:600;color:var(--color-success);">
+      <i class="bi bi-check2-circle"></i> {{ results|length }} units processed
+    </span>
+    {% set updated_ids = results | selectattr('status', 'equalto', 'updated') | map(attribute='instance_id') | list %}
+    <form method="post" action="{{ url_for('stock_bp.export_instances') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="export_scope" value="processed_stage_batch">
+      <input type="hidden" name="instance_ids" value="{{ updated_ids | join(',') }}">
+      <button type="submit" class="btn btn-ghost btn-sm">
+        <i class="bi bi-download"></i> Export Updated
+      </button>
+    </form>
+  </div>
+
+  <div class="table-card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <select id="filter-stage" class="form-select form-select-sm" style="max-width:220px;" aria-label="Filter by previous stage">
+        <option value="">Filter by Previous Stage</option>
+        {% for s in process_stages %}
+        <option value="{{ s.name|lower }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th class="d-none d-md-table-cell">Asset</th>
+            <th>Item</th>
+            <th class="d-none d-md-table-cell">Make</th>
+            <th class="d-none d-md-table-cell">Model</th>
+            <th class="d-none d-md-table-cell">CPU</th>
+            <th class="d-none d-md-table-cell">RAM</th>
+            <th class="d-none d-md-table-cell">Grade</th>
+            <th class="d-none d-md-table-cell">Display</th>
+            <th class="d-none d-md-table-cell">GPU 1</th>
+            <th class="d-none d-md-table-cell">GPU 2</th>
+            <th class="d-none d-md-table-cell">Disk</th>
+            <th class="d-none d-md-table-cell">Prev Stage</th>
+            <th>Result</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in results %}
+          <tr data-prev="{{ (row.prev_stage or '')|lower }}">
+            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial or (row.instance.serial if row.instance else '') }}</span></td>
+            <td class="d-none d-md-table-cell">{{ row.asset or (row.instance.asset if row.instance else '') or '—' }}</td>
+            <td>{{ row.item_name | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.make | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.model | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.cpu | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.ram | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.grade | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.display | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.gpu1 | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.gpu2 | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.disk1size | nonan }}</td>
+            <td class="d-none d-md-table-cell">{{ row.prev_stage or '—' }}</td>
+            <td>
+              {% if row.status == 'updated' %}
+                <span class="status-pill status-processed">Updated</span>
+              {% elif row.status == 'not_found' %}
+                <span class="status-pill status-disputed">Not Found</span>
+              {% elif row.status == 'no_change' %}
+                <span class="status-pill" style="background:var(--surface-3);color:var(--text-muted);">No Change</span>
+              {% else %}
+                <span class="status-pill status-idle">{{ row.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.status == 'updated' and row.instance_id %}
+                <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance_id) }}" class="btn btn-ghost btn-sm" target="_blank">
+                  <i class="bi bi-printer"></i>
+                </a>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% endif %}
+
+</div>
+
+<!-- ===== CHECK OUT TAB ===== -->
+{% elif tab == 'check_out' %}
+<div class="animate-fade-up">
+
+  <!-- Scan input -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:1.25rem;">
+      <label class="form-label">Scan Serial to Check Out</label>
+      <form onsubmit="scanCheckoutSerial(event)">
+        <input type="text" id="checkout-scan-input" class="form-control" placeholder="Scan serial…" autocomplete="off" autofocus>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scanned units for check-out -->
+  <form method="POST" action="{{ url_for('stock_bp.checkin_checkout') }}" onsubmit="return confirmCheckoutHasRows();">
+    <input type="hidden" name="action" value="check-out">
+    <input type="hidden" name="tab" value="check_out">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="table-card mb-4">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-box-arrow-up-right" style="margin-right:0.4rem;"></i>Scanned Units — Check Out</span>
+        <button type="submit" class="btn btn-sm" style="background:var(--color-danger);color:#fff;">
+          <i class="bi bi-check-circle"></i> Confirm Check-Out
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="checkout-table">
+          <thead>
+            <tr>
+              <th>Serial / Info</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="checkout-body">
+            {% for entry in session.scanned_checkout or [] %}
+            <tr data-serial="{{ entry.serial }}">
+              <td>
+                <input type="hidden" name="instance_ids" value="{{ entry.instance_id }}">
+                <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">{{ entry.serial }}</span>
+                {% if entry.asset %}<br><small style="color:var(--text-muted);">Asset: {{ entry.asset }}</small>{% endif %}
+                {% if entry.model %}<br><small style="color:var(--text-muted);">Model: {{ entry.model }}</small>{% endif %}
+                {% if entry.item_name %}<br><small style="color:var(--text-muted);">Item: {{ entry.item_name }}</small>{% endif %}
+              </td>
+              <td><input type="text" class="form-control form-control-sm" name="notes[{{ entry.serial }}]" value="{{ entry.note or '' }}" placeholder="Optional note" style="min-width:140px;"></td>
+              <td>
+                <button type="submit" formaction="{{ url_for('stock_bp.remove_checkout_scan', serial=entry.serial) }}" formmethod="post"
+                  class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:0.2rem 0.5rem;">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+
+  <!-- My assigned units (reference) -->
+  {% if my_units and my_units|length > 0 %}
+    <div class="table-card">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-person-check" style="margin-right:0.4rem;"></i>My Assigned Units</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Serial</th>
+              <th class="d-none d-md-table-cell">Asset</th>
+              <th>Item</th>
+              <th class="d-none d-md-table-cell">Model</th>
+              <th class="d-none d-md-table-cell">CPU</th>
+              <th class="d-none d-md-table-cell">RAM</th>
+              <th>Stage</th>
+              <th class="d-none d-md-table-cell">Team</th>
+              <th class="d-none d-md-table-cell">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in my_units %}
+              {% if i.assigned_to_user_id == current_user.id %}
+                <tr>
+                  <td><span style="font-family:monospace;font-size:0.82rem;">{{ i.serial }}</span></td>
+                  <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
+                  <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
+                  <td class="d-none d-md-table-cell">{{ (i.product.model if i.product else None) | nonan }}</td>
+                  <td class="d-none d-md-table-cell">{{ (i.product.cpu if i.product else None) | nonan }}</td>
+                  <td class="d-none d-md-table-cell">{{ (i.product.ram if i.product else None) | nonan }}</td>
+                  <td>{{ i.process_stage or '—' }}</td>
+                  <td class="d-none d-md-table-cell">{{ i.team_assigned or '—' }}</td>
+                  <td class="d-none d-md-table-cell" style="font-size:0.82rem;color:var(--text-muted);">{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '—' }}</td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
 {% endblock %}
 
+{% block extra_scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+// Select-all for My Assigned Units
+document.addEventListener('DOMContentLoaded', function() {
   const selectAll = document.getElementById('select-all-inprocess');
-  const checkboxes = document.querySelectorAll('.unit-checkbox');
-
   if (selectAll) {
-    selectAll.addEventListener('change', function () {
-      checkboxes.forEach(cb => {
-        cb.checked = selectAll.checked;
+    selectAll.addEventListener('change', function() {
+      document.querySelectorAll('.unit-checkbox').forEach(cb => { cb.checked = selectAll.checked; });
+    });
+  }
+
+  // Results filter
+  const filter = document.getElementById('filter-stage');
+  if (filter) {
+    filter.addEventListener('change', function() {
+      const val = (this.value || '').toLowerCase();
+      document.querySelectorAll('table tbody tr[data-prev]').forEach(tr => {
+        const prev = tr.getAttribute('data-prev') || '';
+        tr.style.display = (!val || prev === val) ? '' : 'none';
       });
     });
   }
 });
 </script>
+
+<script>
+// ── Check-out AJAX scanner (fix 5: dedup by serial) ──
+function scanCheckoutSerial(event) {
+  event.preventDefault();
+  const input = document.getElementById('checkout-scan-input');
+  const serial = input.value.trim();
+  if (!serial) return;
+
+  fetch('/stock/checkout/scan_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+    body: JSON.stringify({ serial: serial })
+  })
+  .then(res => { if (!res.ok) throw new Error('Failed'); return res.json(); })
+  .then(data => {
+    if (data && data.entry) {
+      const tbody = document.getElementById('checkout-body');
+      if (tbody) {
+        // fix 5: remove duplicate row before appending
+        const existing = tbody.querySelector(`tr[data-serial="${data.entry.serial}"]`);
+        if (existing) existing.remove();
+        const row = document.createElement('tr');
+        row.setAttribute('data-serial', data.entry.serial);
+        row.innerHTML = `
+          <td>
+            <input type="hidden" name="instance_ids" value="${data.entry.instance_id}">
+            <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">${data.entry.serial}</span>
+            ${data.entry.asset ? `<br><small style="color:var(--text-muted)">Asset: ${data.entry.asset}</small>` : ''}
+            ${data.entry.model ? `<br><small style="color:var(--text-muted)">Model: ${data.entry.model}</small>` : ''}
+            ${data.entry.item_name ? `<br><small style="color:var(--text-muted)">Item: ${data.entry.item_name}</small>` : ''}
+          </td>
+          <td><input type="text" class="form-control form-control-sm" name="notes[${data.entry.serial}]" placeholder="Optional note" style="min-width:140px;"></td>
+          <td><button onclick="removeScan('${data.entry.serial}')" class="btn btn-ghost btn-sm" type="button" style="color:var(--color-danger);padding:0.2rem 0.5rem;"><i class="bi bi-x-lg"></i></button></td>
+        `;
+        tbody.appendChild(row);
+      } else {
+        location.reload();
+      }
+    } else {
+      showToast('Scan response error or duplicate.', 'warning');
+    }
+  })
+  .catch(() => showToast('Error scanning serial.', 'danger'));
+  input.value = '';
+  input.focus();
+}
+
+function removeScan(serial) {
+  fetch(`/stock/remove_checkout_scan/${serial}`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+  }).then(() => window.location.reload());
+}
+</script>
+
+<script>
+// ── Check-in AJAX scanner ──
+function scanCheckinSerial() {
+  const input = document.getElementById('checkin-scan-input');
+  const serial = input.value.trim();
+  if (!serial) return;
+
+  const stage = document.getElementById('locked-stage').value;
+  const team = document.getElementById('locked-team').value;
+  if (!stage || !team) {
+    showToast('Please lock a stage and team first.', 'warning');
+    return;
+  }
+
+  fetch('/stock/checkin/scan_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+    body: JSON.stringify({ serial, stage, team })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data && data.entry) {
+      const tbody = document.getElementById('checkin-body');
+      const existing = document.querySelector(`#checkin-body tr[data-serial="${serial}"]`);
+      if (existing) existing.remove();
+      const row = document.createElement('tr');
+      row.setAttribute('data-serial', serial);
+
+      // fix 12: show conflict warning inline if unit already assigned to another tech
+      const conflictHtml = data.entry.conflict_user
+        ? `<div style="margin-top:0.35rem;display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.55rem;border-radius:20px;font-size:0.73rem;font-weight:700;background:rgba(239,68,68,0.15);color:var(--color-danger);">
+            <i class="bi bi-exclamation-circle"></i>Assigned to ${data.entry.conflict_user} — will be skipped
+           </div>`
+        : '';
+
+      row.innerHTML = `
+        <td>
+          <input type="hidden" name="instance_ids" value="${data.entry.instance_id}">
+          <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">${serial}</span>
+          ${conflictHtml}
+        </td>
+        <td>${data.entry.asset || '—'}</td>
+        <td>${data.entry.model || '—'}</td>
+        <td>${data.entry.item_name || '—'}</td>
+        <td><input type="text" class="form-control form-control-sm" name="notes[${serial}]" placeholder="Optional note" style="min-width:120px;"></td>
+        <td><button type="submit" formaction="/stock/remove_checkin_scan/${encodeURIComponent(serial)}" formmethod="post" class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:0.2rem 0.5rem;"><i class="bi bi-x-lg"></i></button></td>
+      `;
+      tbody.appendChild(row);
+
+      if (data.entry.conflict_user) {
+        showToast(`⚠ ${serial} is assigned to ${data.entry.conflict_user} and will be skipped at confirm.`, 'warning');
+      }
+    } else {
+      showToast('Scan failed or unit not found.', 'warning');
+    }
+  })
+  .catch(() => showToast('Scan failed.', 'danger'));
+  input.value = '';
+  input.focus();
+}
+
+// ── fix 9: Lock/Unlock stage+team ──
+function lockCheckinStageTeam(event) {
+  if (event) event.preventDefault();
+  const stage = document.getElementById('checkin-stage').value;
+  const team = document.getElementById('checkin-team').value;
+  if (!stage || !team) {
+    showToast('Please select both stage and team before locking.', 'warning');
+    return;
+  }
+  document.getElementById('locked-stage').value = stage;
+  document.getElementById('locked-team').value = team;
+  document.getElementById('submit-locked-stage').value = stage;
+  document.getElementById('submit-locked-team').value = team;
+  document.getElementById('checkin-stage').disabled = true;
+  document.getElementById('checkin-team').disabled = true;
+  const lockBtn = document.getElementById('checkin-lock-btn');
+  const unlockBtn = document.getElementById('checkin-unlock-btn');
+  if (lockBtn) { lockBtn.style.display = 'none'; }
+  if (unlockBtn) { unlockBtn.style.display = ''; }
+  document.getElementById('checkin-scan-input').focus();
+}
+
+function unlockCheckinStageTeam() {
+  document.getElementById('checkin-stage').disabled = false;
+  document.getElementById('checkin-team').disabled = false;
+  document.getElementById('locked-stage').value = '';
+  document.getElementById('locked-team').value = '';
+  document.getElementById('submit-locked-stage').value = '';
+  document.getElementById('submit-locked-team').value = '';
+  const lockBtn = document.getElementById('checkin-lock-btn');
+  const unlockBtn = document.getElementById('checkin-unlock-btn');
+  if (lockBtn) { lockBtn.style.display = ''; }
+  if (unlockBtn) { unlockBtn.style.display = 'none'; }
+  document.getElementById('checkin-stage').focus();
+}
+
+// fix 13: auto-restore lock from session if items were already scanned before reload
+{% if locked_stage and locked_team %}
+document.addEventListener('DOMContentLoaded', function() {
+  const stageEl = document.getElementById('checkin-stage');
+  const teamEl = document.getElementById('checkin-team');
+  if (stageEl) stageEl.value = '{{ locked_stage | e }}';
+  if (teamEl) teamEl.value = '{{ locked_team | e }}';
+  lockCheckinStageTeam(null);
+});
+{% endif %}
+</script>
+
+<script>
+function confirmCheckinHasRows() {
+  const body = document.getElementById('checkin-body');
+  if (!body || body.querySelectorAll('tr').length === 0) {
+    showToast('Please scan at least one unit before confirming check-in.', 'warning');
+    return false;
+  }
+  return true;
+}
+function confirmCheckoutHasRows() {
+  const body = document.getElementById('checkout-body');
+  if (!body || body.querySelectorAll('tr').length === 0) {
+    showToast('Please scan at least one unit before confirming check-out.', 'warning');
+    return false;
+  }
+  return true;
+}
+</script>
+
+{% if is_supervisor %}
+<script>
+// ── Quick Stage Update modal ──
+function openQuickStageModal(instanceId, serial, currentStage) {
+  document.getElementById('quickStageSerial').textContent = serial;
+  document.getElementById('quickStageForm').action = '/stock/instance/' + instanceId + '/view_edit';
+  const sel = document.querySelector('#quickStageForm select[name="process_stage"]');
+  if (sel && currentStage) sel.value = currentStage;
+  const modal = document.getElementById('quickStageModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeQuickStageModal() {
+  document.getElementById('quickStageModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+document.getElementById('quickStageModal').addEventListener('click', function(e) {
+  if (e.target === this) closeQuickStageModal();
+});
+
+// ── Reassign modal ──
+function openReassignModal(instanceId, serial, currentUser, currentUserId) {
+  document.getElementById('reassignSerial').textContent = serial;
+  document.getElementById('currentAssignee').textContent = currentUser;
+  document.getElementById('reassignForm').action = '/stock/instance/' + instanceId + '/reassign';
+  // Pre-select current assignee in dropdown (so supervisor sees who has it)
+  const sel = document.querySelector('#reassignForm select[name="new_user_id"]');
+  if (sel && currentUserId) {
+    sel.value = currentUserId;
+  }
+  const modal = document.getElementById('reassignModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeReassignModal() {
+  document.getElementById('reassignModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// Close on backdrop click
+document.getElementById('reassignModal').addEventListener('click', function(e) {
+  if (e.target === this) closeReassignModal();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeReassignModal();
+});
+</script>
+{% endif %}
+{% endblock %}

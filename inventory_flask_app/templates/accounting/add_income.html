@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if income else 'Add' }} Income{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ 'Edit' if income else 'Add' }} Income</h1>
+    <p class="page-subtitle">Record miscellaneous revenue</p>
+  </div>
+</div>
+
+<div class="card animate-fade-up" style="max-width: 560px;">
+  <div class="card-body">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="mb-3">
+        <label class="form-label">Description <span class="text-danger">*</span></label>
+        <input type="text" name="description" class="form-control"
+               value="{{ income.description if income else '' }}"
+               placeholder="e.g. Service fee from client" required>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Amount ({{ currency }}) <span class="text-danger">*</span></label>
+          <input type="number" name="amount" class="form-control" step="0.01" min="0"
+                 value="{{ income.amount if income else '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Date <span class="text-danger">*</span></label>
+          <input type="date" name="income_date" class="form-control"
+                 value="{{ income.income_date.isoformat() if income else today }}" required>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Reference</label>
+        <input type="text" name="reference" class="form-control"
+               value="{{ income.reference or '' if income else '' }}"
+               placeholder="e.g. receipt number">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">{{ income.notes or '' if income else '' }}</textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> {{ 'Update' if income else 'Save' }} Income
+        </button>
+        <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('accounting_bp.income') }}'" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Reports</h1>
+    <div class="page-subtitle">Analytics and productivity insights</div>
+  </div>
+</div>
+
+{% macro report_card(url, icon, icon_color, title, subtitle) %}
+<a href="{{ url }}" class="card" style="text-decoration:none;color:inherit;transition:var(--transition-fast);"
+   onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+  <div class="card-body" style="padding:1.25rem;display:flex;align-items:center;gap:0.875rem;">
+    <div style="width:40px;height:40px;background:{{ icon_color }}1a;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="bi {{ icon }}" style="font-size:1.2rem;color:{{ icon_color }};"></i>
+    </div>
+    <div>
+      <div style="font-size:0.9rem;font-weight:600;">{{ title }}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">{{ subtitle }}</div>
+    </div>
+  </div>
+</a>
+{% endmacro %}
+
+<!-- Sales & Revenue -->
+<div class="animate-fade-up mb-4">
+  <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;padding-left:0.25rem;">
+    Sales &amp; Revenue
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+    {{ report_card(url_for('reports_bp.revenue_report'), 'bi-currency-dollar', '#10b981', 'Revenue', 'Daily revenue breakdown') }}
+    {{ report_card(url_for('reports_bp.sales_by_model'), 'bi-bar-chart-line', '#3b82f6', 'Sales by Model', 'Top-selling product lines') }}
+    {{ report_card(url_for('reports_bp.sales_by_customer'), 'bi-people', '#8b5cf6', 'Sales by Customer', 'Customer spending totals') }}
+  </div>
+</div>
+
+<!-- Operations -->
+<div class="animate-fade-up mb-4">
+  <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;padding-left:0.25rem;">
+    Operations
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+    {{ report_card(url_for('reports_bp.tech_productivity'), 'bi-person-badge', 'var(--primary)', 'Tech Productivity', 'Stage processing counts') }}
+    {{ report_card(url_for('reports_bp.stage_times'), 'bi-stopwatch', '#0891b2', 'Stage Times', 'Avg time per processing stage') }}
+    {{ report_card(url_for('reports_bp.slow_technicians'), 'bi-hourglass-bottom', '#f59e0b', 'Slow Technicians', 'Units stuck in processing') }}
+    {{ report_card(url_for('reports_bp.idle_units'), 'bi-clock-history', '#f59e0b', 'Idle Units', 'Units with no recent activity') }}
+    {{ report_card(url_for('reports_bp.aged_inventory'), 'bi-calendar-x', '#ef4444', 'Aged Inventory', 'Units in stock too long') }}
+  </div>
+</div>
+
+<!-- Procurement & Parts -->
+<div class="animate-fade-up mb-4">
+  <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;padding-left:0.25rem;">
+    Procurement &amp; Parts
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+    {{ report_card(url_for('reports_bp.purchase_orders_report'), 'bi-file-earmark-text', '#0891b2', 'Purchase Orders', 'PO status and receiving summary') }}
+    {{ report_card(url_for('reports_bp.parts_usage_report'), 'bi-tools', '#8b5cf6', 'Parts Usage', 'Parts consumed by technicians') }}
+    {{ report_card(url_for('reports_bp.parts_sales_report'), 'bi-bag-check', '#10b981', 'Parts Sales', 'Parts sale transactions and revenue') }}
+    {{ report_card(url_for('reports_bp.returns_report'), 'bi-arrow-return-left', '#ef4444', 'Returns', 'Return log with reasons') }}
+  </div>
+</div>
+
+{% endblock %}

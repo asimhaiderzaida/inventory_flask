@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Label — {{ part.name }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    /* ── Print: exact sticker size ── */
+    @page {
+      size: 2in 1in;
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .label {
+      width: 2in;
+      height: 1in;
+      padding: 0.07in 0.09in 0.04in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      background: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .lname {
+      font-size: 9.5pt;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #000;
+      line-height: 1.2;
+    }
+
+    .lnum {
+      font-size: 7pt;
+      color: #444;
+      font-family: 'Courier New', monospace;
+      line-height: 1.2;
+      margin-top: 1pt;
+    }
+
+    #labelBarcode {
+      display: block;
+      max-width: 100%;
+      flex-shrink: 0;
+    }
+
+    /* ── Screen: preview mode ── */
+    @media screen {
+      html, body {
+        background: #f1f5f9;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      }
+
+      .screen-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .label {
+        border: 1px dashed #94a3b8;
+        border-radius: 3px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+        /* Scale up for screen readability */
+        transform: scale(2.5);
+        transform-origin: center center;
+        margin: 1.5in 0;
+      }
+
+      .btn-print {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: #3b82f6; color: #fff; border: none;
+        padding: 0.55rem 1.25rem; border-radius: 8px;
+        font-size: 0.9rem; font-weight: 600; cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-print:hover { background: #2563eb; color: #fff; }
+
+      .btn-back {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: transparent; color: #64748b;
+        border: 1px solid #cbd5e1;
+        padding: 0.55rem 1.1rem; border-radius: 8px;
+        font-size: 0.9rem; font-weight: 500; cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-back:hover { background: #f8fafc; color: #1e293b; }
+
+      .label-meta {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        text-align: center;
+        line-height: 1.6;
+      }
+    }
+
+    /* ── Print: hide controls ── */
+    @media print {
+      html, body {
+        width: 2in; height: 1in;
+        background: #fff;
+      }
+      .screen-controls, .label-meta { display: none; }
+      .label { transform: none; margin: 0; border: none; box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="screen-controls">
+    <button class="btn-print" onclick="window.print()">
+      &#x1F5A8; Print Label
+    </button>
+    <a class="btn-back" href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}">
+      &#8592; Back to Part
+    </a>
+  </div>
+
+  <div class="label">
+    <div class="lname">{{ part.name }}</div>
+    <div class="lnum">{{ part.part_number }}</div>
+    <svg id="labelBarcode"></svg>
+  </div>
+
+  <div class="label-meta">
+    {{ part.name }} &nbsp;·&nbsp; {{ part.part_number }}
+    {% if part.barcode %}&nbsp;·&nbsp; <code>{{ part.barcode }}</code>{% endif %}
+  </div>
+
+  <script>
+    JsBarcode('#labelBarcode', {{ part.barcode | tojson }}, {
+      format: 'CODE128',
+      width: 1.4,
+      height: 28,
+      displayValue: true,
+      fontSize: 7,
+      margin: 1,
+      lineColor: '#000',
+      background: '#fff',
+    });
+
+    // Auto-print after barcode renders
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 350);
+    });
+  </script>
+</body>
+</html>

@@ -1,43 +1,234 @@
 {% extends "base.html" %}
+{% block title %}Return Management{% endblock %}
+{% block page_title %}Return Management{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Return Management</h2>
-    <div class="d-flex gap-2">
-      <a href="{{ url_for('returns_bp.lookup_return') }}" class="btn btn-outline-primary">🔍 Lookup Return</a>
-      <a href="#" class="btn btn-primary">+ Create New Return</a>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Return Management</h1>
+    <div class="page-subtitle">Track unit and parts returns</div>
+  </div>
+  <div class="page-actions">
+    <div class="dropdown">
+      <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-plus-circle"></i> New Return
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{{ url_for('returns_bp.lookup_return') }}">
+          <i class="bi bi-pc-display me-2"></i>Unit Return
+        </a></li>
+        <li><a class="dropdown-item" href="{{ url_for('returns_bp.part_lookup') }}">
+          <i class="bi bi-tools me-2"></i>Part Return
+        </a></li>
+      </ul>
+    </div>
+    <a href="{{ url_for('returns_bp.export_returns', tab=tab, q=q_search, date_from=date_from, date_to=date_to, condition=f_condition, refund_status=f_refund_status) }}"
+       class="btn btn-ghost" title="Export CSV">
+      <i class="bi bi-file-earmark-excel"></i> Export
+    </a>
+  </div>
+</div>
+
+{# ── Stats bar ─────────────────────────────────────────────── #}
+<div class="animate-fade-up" style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:120px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Total Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;">{{ returns|length }}</div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:120px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Total Refunded</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;color:var(--color-danger);">
+      ${{ '%.2f'|format(total_refund_amount) }}
     </div>
   </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:120px;{% if pending_refunds > 0 %}border-color:#fca5a5;{% endif %}">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:{% if pending_refunds > 0 %}var(--color-danger){% else %}var(--text-muted){% endif %};margin-bottom:0.2rem;">Pending Refunds</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;color:{% if pending_refunds > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};">
+      {{ pending_refunds }}
+    </div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:120px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Unit Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;">{{ returns|selectattr('return_type','equalto','unit')|list|length }}</div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:120px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Part Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;">{{ returns|selectattr('return_type','equalto','part')|list|length }}</div>
+  </div>
+</div>
 
+{# ── Tabs ──────────────────────────────────────────────────── #}
+<div class="animate-fade-up" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;border-bottom:2px solid var(--border);padding-bottom:0;">
+  {% for t_key, t_label in [('all','All Returns'),('unit','Units'),('part','Parts')] %}
+  <a href="{{ url_for('returns_bp.view_returns', tab=t_key, q=q_search, date_from=date_from, date_to=date_to, condition=f_condition, refund_status=f_refund_status) }}"
+     style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;font-size:0.84rem;font-weight:600;text-decoration:none;
+            border-bottom:2px solid transparent;margin-bottom:-2px;
+            {% if tab == t_key %}color:var(--primary);border-bottom-color:var(--primary);{% else %}color:var(--text-secondary);{% endif %}">
+    {{ t_label }}
+  </a>
+  {% endfor %}
+</div>
+
+{# ── Filter bar ───────────────────────────────────────────── #}
+<div class="animate-fade-up" style="margin-bottom:0.75rem;">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input type="text" name="q" value="{{ q_search }}" class="form-control form-control-sm"
+           style="max-width:220px;" placeholder="Search serial, part, reason…">
+    <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="max-width:150px;" title="From date">
+    <input type="date" name="date_to"   value="{{ date_to }}"   class="form-control form-control-sm" style="max-width:150px;" title="To date">
+    <select name="condition" class="form-select form-select-sm" style="max-width:130px;">
+      <option value="">All Conditions</option>
+      {% for c in ['Good','Damaged','Defective','Broken'] %}
+      <option value="{{ c }}" {% if f_condition == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <select name="refund_status" class="form-select form-select-sm" style="max-width:140px;">
+      <option value="">All Refund Status</option>
+      {% for s, l in [('pending','Pending'),('issued','Issued'),('denied','No Refund')] %}
+      <option value="{{ s }}" {% if f_refund_status == s %}selected{% endif %}>{{ l }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Filter</button>
+    {% if q_search or date_from or date_to or f_condition or f_refund_status %}
+    <a href="{{ url_for('returns_bp.view_returns', tab=tab) }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{# ── Table ────────────────────────────────────────────────── #}
+<div class="animate-fade-up">
   {% if returns %}
-    <div class="table-responsive">
-      <table class="table table-striped">
+  <div class="table-card">
+    <div style="overflow-x:clip;overflow-y:visible;">
+      <table class="table table-sm align-middle mb-0">
         <thead>
           <tr>
-            <th>Serial</th>
+            <th style="width:60px;">Type</th>
+            <th>Serial / Part #</th>
+            <th>Item / Name</th>
+            <th>Customer</th>
             <th>Reason</th>
             <th>Condition</th>
             <th>Action</th>
-            <th>Date</th>
-            <th>Notes</th>
+            <th>Refund</th>
+            <th style="width:90px;">Status</th>
+            <th>Credit Note</th>
+            <th style="width:100px;">Date</th>
           </tr>
         </thead>
         <tbody>
           {% for r in returns %}
-            <tr>
-              <td>{{ r.instance.serial if r.instance else 'N/A' }}</td>
-              <td>{{ r.reason }}</td>
-              <td>{{ r.condition }}</td>
-              <td>{{ r.action }}</td>
-              <td>{{ r.return_date.strftime('%Y-%m-%d') }}</td>
-              <td>{{ r.notes }}</td>
-            </tr>
+          <tr>
+            {# Type badge #}
+            <td>
+              {% if r.return_type == 'unit' %}
+              <span style="font-size:0.72rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:20px;background:#EFF6FF;color:#1D4ED8;">Unit</span>
+              {% else %}
+              <span style="font-size:0.72rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:20px;background:#F5F3FF;color:#5B21B6;">Part</span>
+              {% endif %}
+            </td>
+
+            {# Identifier #}
+            <td style="font-family:monospace;font-size:0.82rem;">
+              {% if r.return_type == 'unit' %}
+                {% if r.instance %}
+                  <a href="{{ url_for('stock_bp.unit_detail', instance_id=r.instance_id) }}" style="text-decoration:none;">{{ r.instance.serial or r.instance.asset or '—' }}</a>
+                {% else %}—{% endif %}
+              {% else %}
+                {% if r.part %}
+                  <a href="{{ url_for('parts_bp.part_detail', part_id=r.part.id) }}" style="text-decoration:none;">{{ r.part.part_number }}</a>
+                {% else %}—{% endif %}
+              {% endif %}
+            </td>
+
+            {# Item / Name #}
+            <td style="font-size:0.84rem;">
+              {% if r.return_type == 'unit' %}
+                {{ (r.instance.product.model if r.instance and r.instance.product else None) | nonan }}
+              {% else %}
+                {% if r.part %}{{ r.part.name }}{% if r.part_quantity %} &times; {{ r.part_quantity }}{% endif %}{% else %}—{% endif %}
+              {% endif %}
+            </td>
+
+            {# Customer #}
+            <td style="font-size:0.84rem;">
+              {% if r.invoice and r.invoice.customer %}
+                <a href="{{ url_for('customers_bp.customer_profile', customer_id=r.invoice.customer.id) }}" style="text-decoration:none;">{{ r.invoice.customer.name }}</a>
+              {% elif r.part_sale and r.part_sale.customer %}
+                <a href="{{ url_for('customers_bp.customer_profile', customer_id=r.part_sale.customer.id) }}" style="text-decoration:none;">{{ r.part_sale.customer.name }}</a>
+              {% elif r.part_sale and r.part_sale.customer_name %}
+                {{ r.part_sale.customer_name }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td style="font-size:0.84rem;max-width:160px;">{{ r.reason or '—' }}</td>
+
+            {# Condition #}
+            <td>
+              <span class="status-pill
+                {% if r.condition == 'Good' %}status-processed
+                {% elif r.condition in ('Damaged','Defective') %}status-idle
+                {% elif r.condition == 'Broken' %}status-disputed
+                {% endif %}">
+                {{ r.condition or '—' }}
+              </span>
+            </td>
+
+            <td style="font-size:0.84rem;">{{ r.action or '—' }}</td>
+
+            {# Refund amount #}
+            <td style="font-size:0.84rem;">
+              {% if r.refund_amount %}
+                <span style="font-weight:600;color:var(--color-danger);">-${{ '%.2f'|format(r.refund_amount) }}</span>
+                {% if r.refund_method and r.refund_method != 'none' %}
+                  <span style="font-size:0.72rem;color:var(--text-muted);display:block;">{{ r.refund_method|replace('_',' ')|title }}</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+
+            {# Refund status #}
+            <td>
+              {% if r.refund_status == 'issued' %}
+              <span class="status-pill status-processed">Issued</span>
+              {% elif r.refund_status == 'pending' %}
+              <span class="status-pill status-under_process">Pending</span>
+              {% elif r.refund_status == 'denied' %}
+              <span class="status-pill status-idle">None</span>
+              {% else %}
+              <span style="color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+
+            {# Credit note #}
+            <td style="font-family:monospace;font-size:0.8rem;">
+              {% if r.credit_note_number %}
+              <span style="color:var(--primary);">{{ r.credit_note_number }}</span>
+              {% else %}—{% endif %}
+            </td>
+
+            <td style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">
+              {{ r.return_date.strftime('%Y-%m-%d') if r.return_date else '—' }}
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    <div class="table-footer">
+      <div style="font-size:0.82rem;color:var(--text-secondary);">
+        {{ returns|length }} return{{ 's' if returns|length != 1 }}
+      </div>
+    </div>
+  </div>
   {% else %}
-    <p>No returns recorded yet.</p>
+  <div class="empty-state">
+    <i class="bi bi-arrow-return-left"></i>
+    <p>No returns found{% if q_search or f_condition or f_refund_status or date_from or date_to %} matching filters{% endif %}.</p>
+    {% if q_search or f_condition or f_refund_status or date_from or date_to %}
+    <a href="{{ url_for('returns_bp.view_returns', tab=tab) }}" class="btn btn-ghost btn-sm">Clear filters</a>
+    {% endif %}
+  </div>
   {% endif %}
 </div>
 {% endblock %}

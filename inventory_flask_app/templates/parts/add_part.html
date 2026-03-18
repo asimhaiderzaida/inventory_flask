@@ -1,48 +1,153 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Add Part{% endblock %}
+{% block page_title %}Add Part{% endblock %}
+
 {% block content %}
-<div class="container mt-4" style="max-width: 600px;">
-  <div class="card shadow-sm border-0 rounded-4">
-    <div class="card-header bg-primary text-white rounded-top-4">
-      <h4 class="mb-0">➕ Add New Part</h4>
-    </div>
-    <div class="card-body">
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Add New Part</h1>
+    <div class="page-subtitle">Add a part to inventory</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:580px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
       <form method="post">
-        <div class="form-group mb-3">
-          <label>Part Number</label>
-          <input type="text" name="part_number" class="form-control form-control-lg" placeholder="e.g. HDD-001" required>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+
+          <div class="col-md-6">
+            <label class="form-label">Part Number <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" name="part_number" class="form-control" placeholder="e.g. HDD-001" required autofocus>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Hard Drive" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Type</label>
+            <input type="text" name="part_type" class="form-control" placeholder="e.g. Storage">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vendor</label>
+            <input type="text" name="vendor" class="form-control" placeholder="e.g. Seagate">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Min Stock</label>
+            <input type="number" name="min_stock" class="form-control" value="1" min="0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Price</label>
+            <input type="number" name="price" class="form-control" step="0.01" value="0.00" min="0">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="2" placeholder="Optional description…"></textarea>
+          </div>
+
+          <!-- Barcode -->
+          <div class="col-12">
+            <div style="border:1px solid var(--border);border-radius:var(--radius-md);padding:1rem;background:var(--surface-2);">
+              <label class="form-label" style="margin-bottom:0.6rem;">
+                <i class="bi bi-upc-scan me-1" style="color:var(--primary);"></i>
+                Barcode
+                <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(auto-generated, editable)</span>
+              </label>
+              <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+                <input type="text" name="barcode" id="barcode-input" class="form-control"
+                       style="font-family:monospace;font-size:0.9rem;" placeholder="Auto-generated on load…">
+                <button type="button" class="btn btn-ghost btn-sm" id="regen-btn"
+                        style="white-space:nowrap;flex-shrink:0;" title="Generate a new barcode">
+                  <i class="bi bi-arrow-clockwise"></i> Regenerate
+                </button>
+              </div>
+              <div id="barcode-preview-wrap" style="text-align:center;display:none;padding:0.5rem 0;">
+                <svg id="barcode-svg" style="max-width:100%;"></svg>
+              </div>
+              <div id="barcode-error" style="display:none;font-size:0.78rem;color:var(--color-danger);margin-top:0.25rem;">
+                <i class="bi bi-exclamation-triangle"></i> Invalid barcode value — use letters, numbers, hyphens only.
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="d-flex gap-2">
+              <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('parts_bp.parts_list') }}'" class="btn btn-ghost flex-fill">Cancel</a>
+              <button type="submit" class="btn btn-primary flex-fill">
+                <i class="bi bi-check2-circle"></i> Add Part
+              </button>
+            </div>
+          </div>
+
         </div>
-        <div class="form-group mb-3">
-          <label>Name</label>
-          <input type="text" name="name" class="form-control form-control-lg" placeholder="e.g. Hard Drive" required>
-        </div>
-        <div class="form-group mb-3">
-          <label>Type</label>
-          <input type="text" name="part_type" class="form-control form-control-lg" placeholder="e.g. Storage">
-        </div>
-        <div class="form-group mb-3">
-          <label>Vendor</label>
-          <input type="text" name="vendor" class="form-control form-control-lg" placeholder="e.g. Seagate">
-        </div>
-        <div class="form-group mb-3">
-          <label>Min Stock</label>
-          <input type="number" name="min_stock" class="form-control form-control-lg" value="1" min="0">
-        </div>
-        <div class="form-group mb-3">
-          <label>Price</label>
-          <input type="number" name="price" class="form-control form-control-lg" step="0.01" value="0.0" min="0">
-        </div>
-        <div class="form-group mb-3">
-          <label>Description</label>
-          <textarea name="description" class="form-control form-control-lg" rows="3" placeholder="Add optional description here..."></textarea>
-        </div>
-        <button type="submit" class="btn btn-success btn-lg w-100 mt-2">
-          <i class="bi bi-check-circle me-1"></i> Add Part
-        </button>
-        <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-outline-secondary btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i> Cancel
-        </a>
       </form>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script>
+function generateBarcodeValue() {
+  // PRT- + 10-digit unix seconds + 4 random digits  →  e.g. PRT-17415830001234
+  var ts   = Math.floor(Date.now() / 1000);
+  var rand = Math.floor(Math.random() * 9000 + 1000);
+  return 'PRT-' + ts + rand;
+}
+
+function renderBarcode(value) {
+  var wrap = document.getElementById('barcode-preview-wrap');
+  var err  = document.getElementById('barcode-error');
+  if (!value || value.trim().length < 3) {
+    wrap.style.display = 'none';
+    err.style.display  = 'none';
+    return;
+  }
+  try {
+    JsBarcode('#barcode-svg', value.trim(), {
+      format:       'CODE128',
+      width:        2,
+      height:       55,
+      displayValue: true,
+      fontSize:     12,
+      margin:       8,
+      lineColor:    '#1e293b'
+    });
+    wrap.style.display = 'block';
+    err.style.display  = 'none';
+  } catch (e) {
+    wrap.style.display = 'none';
+    err.style.display  = 'block';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var input = document.getElementById('barcode-input');
+
+  // Auto-generate on page load
+  var val = generateBarcodeValue();
+  input.value = val;
+  renderBarcode(val);
+
+  // Live preview as user types
+  input.addEventListener('input', function () {
+    renderBarcode(this.value.trim());
+  });
+
+  // Regenerate button
+  document.getElementById('regen-btn').addEventListener('click', function () {
+    var newVal = generateBarcodeValue();
+    input.value = newVal;
+    renderBarcode(newVal);
+    input.focus();
+  });
+});
+</script>
 {% endblock %}

@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}Parts Bin Management{% endblock %}
+{% block page_title %}Parts Bin Management{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Parts Bin Management</h1>
+    <div class="page-subtitle">
+      {{ total }} stock record{{ 's' if total != 1 }}
+      {% if unassigned_count %}
+      &nbsp;·&nbsp;
+      <span style="color:var(--color-warning);font-weight:600;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        {{ unassigned_count }} unassigned
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <a href="{{ url_for('parts_bp.stock_in') }}" class="btn btn-ghost">
+      <i class="bi bi-box-arrow-in-down"></i> Stock In
+    </a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="animate-fade-up" style="margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+  <a href="{{ url_for('parts_bp.bin_management') }}"
+     class="btn btn-sm {% if not unassigned_only %}btn-primary{% else %}btn-ghost{% endif %}">
+    All Stock
+  </a>
+  <a href="{{ url_for('parts_bp.bin_management', unassigned=1) }}"
+     class="btn btn-sm {% if unassigned_only %}btn-primary{% else %}btn-ghost{% endif %}">
+    <i class="bi bi-exclamation-circle"></i> Unassigned Only
+    {% if unassigned_count %}
+    <span style="background:rgba(245,158,11,0.2);color:var(--color-warning);border-radius:20px;
+                 padding:0 0.45rem;font-size:0.72rem;margin-left:0.2rem;">{{ unassigned_count }}</span>
+    {% endif %}
+  </a>
+  <input type="text" id="bmSearch" class="form-control form-control-sm"
+         placeholder="Filter by part name, number, location, bin…"
+         style="max-width:340px;">
+</div>
+
+{% if stocks %}
+<div class="animate-fade-up">
+  <div class="table-card">
+    <div style="overflow-x:auto;">
+      <table class="table" id="bmTable">
+        <thead>
+          <tr>
+            <th>Part Name</th>
+            <th style="white-space:nowrap;">Part No.</th>
+            <th>Location</th>
+            <th>Current Bin</th>
+            <th style="text-align:center;white-space:nowrap;">Stock Qty</th>
+            <th style="width:1px;white-space:nowrap;text-align:center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ps in stocks %}
+          <tr data-search="{{ ps.part.name | lower }} {{ ps.part.part_number | lower }} {{ ps.location.name | lower }} {{ ps.bin.name | lower if ps.bin else 'no bin unassigned' }}">
+            <td>
+              <a href="{{ url_for('parts_bp.part_detail', part_id=ps.part_id) }}"
+                 style="font-weight:500;color:var(--text-primary);text-decoration:none;">
+                {{ ps.part.name }}
+              </a>
+            </td>
+            <td><code style="font-size:0.82rem;color:var(--text-secondary);">{{ ps.part.part_number }}</code></td>
+            <td style="font-size:0.85rem;">{{ ps.location.name }}</td>
+            <td>
+              {% if ps.bin %}
+                <code style="font-size:0.82rem;background:var(--surface-2);
+                             padding:0.1rem 0.4rem;border-radius:4px;border:1px solid var(--border);">
+                  {{ ps.bin.name }}
+                </code>
+              {% else %}
+                <span style="color:var(--text-muted);font-size:0.83rem;">— No bin</span>
+                <span style="background:rgba(245,158,11,0.15);color:var(--color-warning);
+                             font-size:0.68rem;font-weight:700;border-radius:20px;
+                             padding:0.1rem 0.45rem;margin-left:0.35rem;">UNASSIGNED</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;font-weight:700;">{{ ps.quantity }}</td>
+            <td style="text-align:center;white-space:nowrap;">
+              <button class="btn btn-ghost btn-sm bm-assign-btn"
+                      data-part-id="{{ ps.part_id }}"
+                      data-part-name="{{ ps.part.name | e }}"
+                      data-location-id="{{ ps.location_id }}"
+                      data-location-name="{{ ps.location.name | e }}"
+                      data-bin-id="{{ ps.bin_id or '' }}"
+                      data-bin-name="{{ ps.bin.name | e if ps.bin else '' }}"
+                      data-qty="{{ ps.quantity }}"
+                      title="{{ 'Change Bin' if ps.bin else 'Assign Bin' }}">
+                <i class="bi bi-grid-3x3-gap" style="color:var(--primary);"></i>
+                {{ 'Change Bin' if ps.bin else 'Assign Bin' }}
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="bmFooter">{{ total }} record{{ 's' if total != 1 }}</span>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="empty-state animate-fade-up">
+  <i class="bi bi-grid-3x3-gap"></i>
+  <p>
+    {% if unassigned_only %}No unassigned parts stock.{% else %}No parts stock found.{% endif %}
+  </p>
+  {% if unassigned_only %}
+  <a href="{{ url_for('parts_bp.bin_management') }}" class="btn btn-ghost btn-sm">Show all</a>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- ══ ASSIGN / CHANGE BIN MODAL ══════════════════════════════════════════ -->
+<div class="modal fade" id="bmBinModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-grid-3x3-gap me-2" style="color:var(--primary);"></i>
+          <span id="bmModalTitle">Assign Bin</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+        <div class="mb-3" style="font-size:0.85rem;color:var(--text-muted);">
+          Part: <strong id="bmModalPartName"></strong><br>
+          Location: <strong id="bmModalLocation"></strong>
+          &nbsp;·&nbsp; Current bin: <span id="bmModalCurrentBin" style="font-family:monospace;"></span>
+          &nbsp;·&nbsp; Qty: <strong id="bmModalAvail"></strong>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:0.84rem;">
+            New Bin <span style="color:var(--text-muted);font-size:0.75rem;">(leave blank to remove bin assignment)</span>
+          </label>
+          <select id="bmModalToBin" class="form-select">
+            <option value="">— no specific bin —</option>
+          </select>
+          <div id="bmModalNoBins" style="display:none;font-size:0.78rem;color:var(--text-muted);margin-top:0.35rem;">
+            <i class="bi bi-info-circle"></i> No parts bins at this location.
+            <a href="{{ url_for('stock_bp.manage_locations') }}" style="color:var(--primary);">Create one →</a>
+          </div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label" style="font-size:0.84rem;">Quantity</label>
+          <input type="number" id="bmModalQty" class="form-control" min="1" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="bmModalSubmit">
+          <i class="bi bi-check-circle"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  var CSRF = document.querySelector('meta[name="csrf-token"]').content;
+  var _bm = {};
+
+  /* ── Client-side filter ── */
+  var searchEl  = document.getElementById('bmSearch');
+  var footerEl  = document.getElementById('bmFooter');
+  if (searchEl) {
+    searchEl.addEventListener('input', function() {
+      var q = this.value.toLowerCase();
+      var rows = document.querySelectorAll('#bmTable tbody tr');
+      var visible = 0;
+      rows.forEach(function(tr) {
+        var match = !q || tr.dataset.search.includes(q);
+        tr.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      if (footerEl) footerEl.textContent = visible + ' record' + (visible !== 1 ? 's' : '') + (q ? ' matching "' + q + '"' : '');
+    });
+  }
+
+  /* ── Row button listeners ── */
+  function attachBmListeners() {
+    document.querySelectorAll('.bm-assign-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _bm.partId     = parseInt(this.dataset.partId);
+        _bm.locationId = parseInt(this.dataset.locationId);
+        _bm.binId      = this.dataset.binId ? parseInt(this.dataset.binId) : null;
+
+        document.getElementById('bmModalTitle').textContent    = this.dataset.binName ? 'Change Bin' : 'Assign Bin';
+        document.getElementById('bmModalPartName').textContent = this.dataset.partName;
+        document.getElementById('bmModalLocation').textContent = this.dataset.locationName;
+        document.getElementById('bmModalCurrentBin').textContent = this.dataset.binName || '— No bin';
+        document.getElementById('bmModalAvail').textContent    = this.dataset.qty;
+        document.getElementById('bmModalQty').value            = this.dataset.qty;
+        document.getElementById('bmModalQty').max              = this.dataset.qty;
+
+        var sel = document.getElementById('bmModalToBin');
+        sel.innerHTML = '<option value="">— no specific bin —</option>';
+        document.getElementById('bmModalNoBins').style.display = 'none';
+
+        fetch('/parts/api/bins?location_id=' + this.dataset.locationId, {
+          headers: { 'X-CSRFToken': CSRF }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(bins) {
+          if (!bins.length) {
+            document.getElementById('bmModalNoBins').style.display = '';
+            return;
+          }
+          bins.forEach(function(b) {
+            var opt = document.createElement('option');
+            opt.value = b.id;
+            opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+            sel.appendChild(opt);
+          });
+        });
+
+        new bootstrap.Modal(document.getElementById('bmBinModal')).show();
+      });
+    });
+  }
+  attachBmListeners();
+
+  /* ── Submit ── */
+  document.getElementById('bmModalSubmit').addEventListener('click', function() {
+    var toBin = document.getElementById('bmModalToBin').value;
+    var qty   = parseInt(document.getElementById('bmModalQty').value, 10);
+    if (!qty) { showToast('Enter a quantity.', 'warning'); return; }
+    var toBinInt = toBin ? parseInt(toBin) : null;
+    if (toBinInt === _bm.binId) { showToast('New bin is the same as the current bin.', 'warning'); return; }
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+    fetch('/parts/api/move_to_bin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({
+        part_id: _bm.partId,
+        from_location_id: _bm.locationId,
+        from_bin_id: _bm.binId,
+        to_location_id: _bm.locationId,
+        to_bin_id: toBinInt,
+        quantity: qty,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('bmBinModal')).hide();
+        showToast(data.message, 'success');
+        setTimeout(function() { location.reload(); }, 700);
+      } else {
+        showToast(data.message || 'Move failed.', 'danger');
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+    })
+    .catch(function() {
+      showToast('Network error.', 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+    });
+  });
+}());
+</script>
+{% endblock %}

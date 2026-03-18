@@ -1,47 +1,1007 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Parts Inventory{% endblock %}
+{% block page_title %}Parts Inventory{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <form method="get" class="d-flex align-items-center gap-2 mb-3">
-    <input type="text" name="q" class="form-control" placeholder="Search parts..." value="{{ request.args.get('q', '') }}">
-    <button type="submit" class="btn btn-outline-primary">Search</button>
-  </form>
-  <h2>Parts Inventory</h2>
-  <a href="{{ url_for('parts_bp.stock_in') }}" class="btn btn-success mb-3">
-    <i class="bi bi-box-arrow-in-down"></i> Stock In
-  </a>
-  <a href="{{ url_for('parts_bp.add_part') }}" class="btn btn-primary mb-3">Add Part</a>
-  <div style="overflow-x:auto;">
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Part Number</th>
-          <th>Name</th>
-          <th>Type</th>
-          <th class="d-none d-md-table-cell">Vendor</th>
-          <th>Min Stock</th>
-          <th>Price</th>
-          <th class="d-none d-md-table-cell">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for part in parts %}
-        <tr>
-          <td>{{ part.part_number }}</td>
-          <td>{{ part.name }}</td>
-          <td>{{ part.part_type }}</td>
-          <td class="d-none d-md-table-cell">{{ part.vendor }}</td>
-          <td>{{ part.min_stock }}</td>
-          <td>{{ part.price }}</td>
-          <td class="d-none d-md-table-cell">{{ part.description }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <div class="mt-3">
-      <h6>Summary Totals</h6>
-      <p>Total Parts: {{ parts|length }}</p>
-      <p>Total Inventory Value: {{ parts | sum(attribute='price') }}</p>
+<style>
+  /* ── Status badge ── */
+  .stock-status {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+    padding: 0.1rem 0.45rem; border-radius: 20px; white-space: nowrap;
+  }
+  .stock-status.in_stock    { background: rgba(16,185,129,0.12); color: var(--color-success); }
+  .stock-status.low_stock   { background: rgba(245,158,11,0.14); color: var(--color-warning); }
+  .stock-status.out_of_stock { background: rgba(239,68,68,0.12); color: var(--color-danger); }
+
+  /* ── Icon action buttons ── */
+  .part-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    border: none; background: transparent; cursor: pointer;
+    color: var(--text-muted); font-size: 0.85rem;
+    transition: background 0.12s, color 0.12s;
+    padding: 0; text-decoration: none;
+  }
+  .part-icon-btn:hover { background: var(--surface-3); color: var(--text-primary); }
+  .part-icon-btn.btn-danger-icon:hover { background: rgba(239,68,68,0.12); color: var(--color-danger); }
+  .part-icon-btn.btn-success-icon:hover { background: rgba(16,185,129,0.12); color: var(--color-success); }
+  .part-icon-btn:disabled, .part-icon-btn.disabled {
+    opacity: 0.35; cursor: not-allowed; pointer-events: none;
+  }
+
+  /* ── Search bar ── */
+  .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 440px; }
+  .search-wrap .search-icon {
+    position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 0.9rem; pointer-events: none;
+  }
+  .search-wrap #partsSearch { padding-left: 2.25rem; padding-right: 2rem; }
+  .search-wrap .search-clear {
+    position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 1rem; padding: 0.2rem; line-height: 1; display: none;
+  }
+  .search-wrap .search-clear:hover { color: var(--color-danger); }
+
+  /* ── Dropdown clipping fix ── */
+  /* TWO ancestors clip the dropdown:
+     1. .table-card has overflow:hidden in base.html
+     2. The inner div has overflow-x:auto (creates a scroll container)
+     Both must not clip. overflow-x:clip cuts content but does NOT create a
+     scroll container, so absolutely-positioned children (the dropdown) escape. */
+  #tableCard { overflow: visible !important; border-radius: var(--radius-lg); }
+  #tableCard > div { overflow-x: clip !important; overflow-y: visible !important; }
+
+  /* ── Skeleton loading ── */
+  .skel-row td { padding: 0.6rem 0.75rem; }
+  .skel-bar { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size: 400% 100%; animation: skel-shimmer 1.4s ease infinite; }
+  @keyframes skel-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+</style>
+
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Parts Inventory</h1>
+    <div class="page-subtitle" id="listSubtitle">
+      {{ parts|length }} part{{ 's' if parts|length != 1 else '' }}
+      {% if low_stock_ids %}
+      &nbsp;·&nbsp;
+      <span style="color:var(--color-danger);font-weight:600;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        {{ low_stock_ids|length }} low stock
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <button type="button" class="btn btn-ghost" id="print-labels-btn"
+            style="display:none;" onclick="bulkPrintLabels()">
+      <i class="bi bi-printer"></i> Print Labels
+      (<span id="selected-count">0</span>)
+    </button>
+    <a href="{{ url_for('parts_bp.parts_scan') }}" class="btn btn-ghost">
+      <i class="bi bi-upc-scan"></i> Scanner
+    </a>
+    <a href="{{ url_for('parts_bp.bin_management') }}" class="btn btn-ghost">
+      <i class="bi bi-grid-3x3-gap"></i> Manage Bins
+    </a>
+    <a href="{{ url_for('parts_bp.stock_in') }}" class="btn btn-ghost">
+      <i class="bi bi-box-arrow-in-down"></i> Stock In
+    </a>
+    <a href="{{ url_for('parts_bp.sell') }}" class="btn btn-primary">
+      <i class="bi bi-cart3"></i> Sell Parts
+    </a>
+    <a href="{{ url_for('parts_bp.add_part') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Add Part
+    </a>
+  </div>
+</div>
+
+<!-- Low-stock alert banner -->
+{% if low_stock_ids %}
+<div class="animate-fade-up" style="margin-bottom:1.25rem;" id="lowStockBanner">
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid var(--color-danger);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;display:flex;align-items:center;gap:0.75rem;">
+    <i class="bi bi-exclamation-triangle-fill" style="color:var(--color-danger);font-size:1.1rem;flex-shrink:0;"></i>
+    <span style="font-size:0.875rem;font-weight:500;color:#991b1b;">
+      {{ low_stock_ids|length }} part{{ 's' if low_stock_ids|length != 1 }} below minimum stock.
+      <a href="#" onclick="setStatusFilter('low_stock');return false;" style="color:#991b1b;font-weight:700;">Show low-stock only →</a>
+    </span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Search + filter bar -->
+<div class="animate-fade-up" style="margin-bottom:1.25rem;">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <div class="search-wrap">
+      <i class="bi bi-search search-icon"></i>
+      <input type="text" id="partsSearch" class="form-control"
+             placeholder="Search name, part#, barcode, description, vendor…"
+             value="{{ search }}" autocomplete="off">
+      <button class="search-clear" id="searchClear" title="Clear">
+        <i class="bi bi-x-circle-fill"></i>
+      </button>
+    </div>
+    <select id="typeFilter" class="form-select" style="width:auto;min-width:150px;max-width:220px;">
+      <option value="">All Types</option>
+    </select>
+    <select id="statusFilter" class="form-select" style="width:auto;min-width:150px;">
+      <option value="">All Status</option>
+      <option value="in_stock">In Stock</option>
+      <option value="low_stock">Low Stock</option>
+      <option value="out_of_stock">Out of Stock</option>
+    </select>
+  </div>
+  <div id="filterCount" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;display:none;"></div>
+</div>
+
+<!-- Table -->
+<div class="animate-fade-up">
+  <div class="table-card" id="tableCard">
+    <div style="overflow-x:clip;overflow-y:visible;">
+      <table class="table" style="table-layout:auto;width:100%;">
+        <thead>
+          <tr>
+            <th style="width:32px;text-align:center;padding-left:0.75rem;">
+              <input type="checkbox" id="select-all" class="form-check-input" title="Select all">
+            </th>
+            <th>Name</th>
+            <th style="white-space:nowrap;">Part No.</th>
+            <th class="d-none d-md-table-cell">Type</th>
+            <th class="d-none d-md-table-cell">Vendor</th>
+            <th class="d-none d-lg-table-cell" style="white-space:nowrap;">Barcode</th>
+            <th style="text-align:center;white-space:nowrap;">Stock</th>
+            <th class="d-none d-lg-table-cell" style="text-align:center;white-space:nowrap;">Min</th>
+            <th style="text-align:right;white-space:nowrap;">Price</th>
+            <th class="d-none d-lg-table-cell" style="text-align:right;white-space:nowrap;">Value</th>
+            <th style="text-align:center;white-space:nowrap;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="partsTableBody">
+          {% for part in parts %}
+          {% set total = part._current_stock %}
+          {% if total == 0 %}{% set st = 'out_of_stock' %}
+          {% elif part.id in low_stock_ids %}{% set st = 'low_stock' %}
+          {% else %}{% set st = 'in_stock' %}{% endif %}
+          <tr data-part-id="{{ part.id }}" data-status="{{ st }}"
+              data-type="{{ part.part_type or '' }}"
+              {% if st == 'low_stock' %} style="background:rgba(245,158,11,0.04);"
+              {% elif st == 'out_of_stock' %} style="background:rgba(239,68,68,0.04);"{% endif %}>
+            <td style="text-align:center;padding-left:0.75rem;">
+              <input type="checkbox" class="form-check-input row-checkbox"
+                     data-part-id="{{ part.id }}"
+                     data-barcode="{{ part.barcode or '' }}"
+                     data-part-name="{{ part.name | e }}"
+                     data-part-number="{{ part.part_number | e }}">
+            </td>
+            <td>
+              <a href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}"
+                 style="font-weight:500;color:var(--text-primary);text-decoration:none;">
+                {{ part.name }}
+              </a>
+            </td>
+            <td style="white-space:nowrap;">
+              <code style="font-size:0.82rem;color:var(--text-secondary);">{{ part.part_number }}</code>
+            </td>
+            <td class="d-none d-md-table-cell" style="color:var(--text-muted);font-size:0.85rem;">
+              {{ part.part_type or '—' }}
+            </td>
+            <td class="d-none d-md-table-cell" style="font-size:0.85rem;">
+              {% if part.vendor_rel %}{{ part.vendor_rel.name }}
+              {% else %}{{ part.vendor or '—' }}{% endif %}
+            </td>
+            <td class="d-none d-lg-table-cell">
+              {% if part.barcode %}
+              <code style="font-size:0.75rem;color:var(--text-muted);">{{ part.barcode }}</code>
+              {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+            </td>
+            <td style="text-align:center;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;">
+                <span class="stock-status {{ st }}">
+                  {% if st == 'out_of_stock' %}<i class="bi bi-x-circle-fill"></i> OUT
+                  {% elif st == 'low_stock' %}<i class="bi bi-exclamation-triangle-fill"></i> LOW
+                  {% else %}<i class="bi bi-check-circle-fill"></i> OK{% endif %}
+                </span>
+                <span style="font-weight:700;font-size:0.9rem;" data-stock-cell="{{ part.id }}">{{ total }}</span>
+              </div>
+            </td>
+            <td class="d-none d-lg-table-cell" style="text-align:center;color:var(--text-muted);font-size:0.85rem;">
+              {{ part.min_stock }}
+            </td>
+            <td style="text-align:right;font-size:0.84rem;white-space:nowrap;">
+              {% if part.price %}{{ '{:,.2f}'.format(part.price) }}{% else %}—{% endif %}
+            </td>
+            <td class="d-none d-lg-table-cell" style="text-align:right;font-size:0.84rem;white-space:nowrap;">
+              {% if part.price and total %}{{ '{:,.2f}'.format(total * part.price) }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:center;white-space:nowrap;">
+              <div class="dropdown">
+                <button class="btn btn-ghost btn-sm" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        style="padding:0.25rem 0.45rem;">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="font-size:0.85rem;min-width:170px;">
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}">
+                      <i class="bi bi-eye me-2 text-primary"></i>View Details
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('parts_bp.edit_part', part_id=part.id) }}">
+                      <i class="bi bi-pencil me-2"></i>Edit
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <button class="dropdown-item inline-stock-in-btn"
+                            data-part-id="{{ part.id }}" data-part-name="{{ part.name | e }}">
+                      <i class="bi bi-box-arrow-in-down me-2" style="color:var(--color-success);"></i>Stock In
+                    </button>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('parts_bp.stock_out') }}?part_id={{ part.id }}">
+                      <i class="bi bi-box-arrow-up me-2"></i>Stock Out
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('parts_bp.consume') }}?part_id={{ part.id }}">
+                      <i class="bi bi-tools me-2"></i>Use in Repair
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <button class="dropdown-item assign-bin-btn"
+                            data-part-id="{{ part.id }}" data-part-name="{{ part.name | e }}">
+                      <i class="bi bi-grid-3x3-gap me-2" style="color:var(--primary);"></i>Assign to Bin
+                    </button>
+                  </li>
+                  <li>
+                    <button class="dropdown-item assign-bin-btn"
+                            data-part-id="{{ part.id }}" data-part-name="{{ part.name | e }}">
+                      <i class="bi bi-arrow-left-right me-2" style="color:var(--primary);"></i>Move Stock
+                    </button>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="{{ url_for('parts_bp.part_history', part_id=part.id) }}">
+                      <i class="bi bi-clock-history me-2"></i>History
+                    </a>
+                  </li>
+                  <li>
+                    <button class="dropdown-item barcode-btn"
+                            data-barcode="{{ part.barcode or part.part_number | e }}"
+                            data-part-name="{{ part.name | e }}"
+                            data-part-number="{{ part.part_number | e }}"
+                            data-part-id="{{ part.id }}"
+                            data-url-label="{{ url_for('parts_bp.part_label', part_id=part.id) }}">
+                      <i class="bi bi-printer me-2" style="color:var(--primary);"></i>Print Label
+                    </button>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    {% if total > 0 %}
+                    <button class="dropdown-item text-muted" disabled
+                            title="Cannot delete — has stock">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                    {% else %}
+                    <button class="dropdown-item text-danger"
+                            onclick="openDeleteModal({{ part.id }}, '{{ part.name | e }}', '{{ url_for('parts_bp.delete_part', part_id=part.id) }}')">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                    {% endif %}
+                  </li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer" id="tableFooter">
+      <span id="footerSummary">
+        {{ parts|length }} part{{ 's' if parts|length != 1 }}
+        &nbsp;·&nbsp; Total qty: <span id="footer-total-qty">{{ total_quantity }}</span>
+        {% if total_value %}
+        &nbsp;·&nbsp; Value: {{ '{:,.2f}'.format(total_value) }}
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <i class="bi bi-cpu"></i>
+    <p id="emptyMsg">No parts found.</p>
+  </div>
+</div>
+
+
+<!-- ══ ASSIGN TO BIN MODAL ════════════════════════════════════════════════ -->
+<div class="modal fade" id="assignBinModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-grid-3x3-gap me-2" style="color:var(--primary);"></i>
+          Assign to Bin — <span id="abmPartName" style="font-style:italic;"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+
+        <!-- Current stock -->
+        <div style="font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                    color:var(--text-muted);margin-bottom:0.5rem;">Current Stock</div>
+        <div id="abmStockWrap" style="margin-bottom:1.25rem;">
+          <div id="abmStockLoading" style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0;">
+            <span class="spinner-border spinner-border-sm me-2"></span>Loading stock…
+          </div>
+          <div id="abmStockTable" style="display:none;"></div>
+        </div>
+
+        <!-- Move form -->
+        <div style="font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                    color:var(--text-muted);margin-bottom:0.5rem;">Move / Assign</div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;">From Location</label>
+            <select id="abmFromLocation" class="form-select form-select-sm">
+              <option value="">— select —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;">From Bin <span style="color:var(--text-muted);font-size:0.73rem;">(optional)</span></label>
+            <select id="abmFromBin" class="form-select form-select-sm">
+              <option value="">— no specific bin —</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;">To Location</label>
+            <select id="abmToLocation" class="form-select form-select-sm">
+              <option value="">— select —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:0.82rem;">To Bin <span style="color:var(--text-muted);font-size:0.73rem;">(optional)</span></label>
+            <select id="abmToBin" class="form-select form-select-sm">
+              <option value="">— no specific bin —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:0.82rem;">Quantity</label>
+            <input type="number" id="abmQty" class="form-control form-control-sm" min="1" value="1">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="abmSubmit">
+          <i class="bi bi-check-circle"></i> Save
+        </button>
+      </div>
     </div>
   </div>
 </div>
+
+
+<!-- ══ BARCODE LABEL MODAL ════════════════════════════════════════════════ -->
+<div class="modal fade" id="barcodeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:0.75rem 1rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+               id="barcodeModalName"></div>
+          <div style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;"
+               id="barcodeModalNumber"></div>
+        </div>
+        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="text-align:center;padding:1.25rem 1.5rem;">
+        <svg id="barcodeModalSvg" style="max-width:100%;display:block;margin:0 auto;"></svg>
+        <div style="font-family:monospace;font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;word-break:break-all;"
+             id="barcodeModalValue"></div>
+      </div>
+      <div class="modal-footer" style="padding:0.75rem 1rem;">
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="barcodeModalPrintBtn">
+          <i class="bi bi-printer"></i> Print (popup)
+        </button>
+        <a href="#" class="btn btn-primary btn-sm" id="barcodeModalLabelBtn" target="_blank">
+          <i class="bi bi-file-earmark-text"></i> Label Page
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ INLINE STOCK IN MODAL ══════════════════════════════════════════════ -->
+<div class="modal fade" id="inlineStockInModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('parts_bp.stock_in') }}" id="inlineStockInForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="part_id" id="isiPartId">
+        <input type="hidden" name="bin_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-box-arrow-in-down me-2 text-success"></i>
+            Stock In — <span id="isiPartName" style="font-style:italic;"></span>
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <select name="location_id" class="form-select" required>
+              <option value="">— select location —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Note <span class="text-muted" style="font-size:0.78rem;">(optional)</span></label>
+            <input type="text" name="note" class="form-control" placeholder="Delivery note, PO ref…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Add to Stock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ DELETE CONFIRM MODAL ═══════════════════════════════════════════════ -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="color:var(--color-danger);">
+          <i class="bi bi-trash me-2"></i>Delete Part
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:0;">Delete <strong id="deletePartName"></strong>?
+          This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <form method="POST" id="deleteForm" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script>
+(function() {
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CONSTANTS & INITIAL DATA
+════════════════════════════════════════════════════════════════════════════ */
+var CSRF = document.querySelector('meta[name="csrf-token"]').content;
+var _searchTimer = null;
+var _totalParts  = {{ parts|length }};
+
+var typeFilter   = document.getElementById('typeFilter');
+var statusFilter = document.getElementById('statusFilter');
+
+// Populate type dropdown from initial DOM rows (all parts loaded on page)
+(function() {
+  var seen = {};
+  var types = [];
+  document.querySelectorAll('tr[data-type]').forEach(function(tr) {
+    var t = tr.dataset.type;
+    if (t && !seen[t]) { seen[t] = true; types.push(t); }
+  });
+  types.sort();
+  types.forEach(function(t) {
+    var opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    typeFilter.appendChild(opt);
+  });
+}());
+
+// Expose for low-stock banner link
+window.setStatusFilter = function(val) {
+  statusFilter.value = val;
+  triggerSearch();
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SEARCH & FILTER DROPDOWNS
+════════════════════════════════════════════════════════════════════════════ */
+var searchInput = document.getElementById('partsSearch');
+var clearBtn    = document.getElementById('searchClear');
+var filterCount = document.getElementById('filterCount');
+
+searchInput.addEventListener('input', function() {
+  clearBtn.style.display = this.value ? '' : 'none';
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(triggerSearch, 300);
+});
+
+clearBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  clearBtn.style.display = 'none';
+  triggerSearch();
+  searchInput.focus();
+});
+
+typeFilter.addEventListener('change', triggerSearch);
+statusFilter.addEventListener('change', triggerSearch);
+
+if (searchInput.value) clearBtn.style.display = '';
+
+function triggerSearch() {
+  doSearch(searchInput.value.trim());
+}
+
+function doSearch(q) {
+  var url = '/parts/api/search?q=' + encodeURIComponent(q)
+          + '&type='   + encodeURIComponent(typeFilter.value)
+          + '&status=' + encodeURIComponent(statusFilter.value);
+  showSkeleton();
+  fetch(url, { headers: { 'X-CSRFToken': CSRF } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderResults(data); })
+    .catch(function() { /* leave skeleton */ });
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RENDER RESULTS
+════════════════════════════════════════════════════════════════════════════ */
+function renderResults(data) {
+  var tbody = document.getElementById('partsTableBody');
+  var empty = document.getElementById('emptyState');
+  var card  = document.getElementById('tableCard');
+
+  // Update footer
+  document.getElementById('footerSummary').innerHTML =
+    data.total + ' part' + (data.total !== 1 ? 's' : '')
+    + ' &nbsp;·&nbsp; Total qty: ' + data.total_qty
+    + (data.total_value ? ' &nbsp;·&nbsp; Value: ' + fmtNum(data.total_value) : '');
+
+  // Update result count chip under filter bar
+  var isFiltered = searchInput.value || typeFilter.value || statusFilter.value;
+  if (isFiltered) {
+    filterCount.textContent = 'Showing ' + data.total + ' of ' + _totalParts + ' parts';
+    filterCount.style.display = '';
+  } else {
+    filterCount.style.display = 'none';
+  }
+
+  if (!data.parts.length) {
+    tbody.innerHTML = '';
+    card.style.display  = 'none';
+    empty.style.display = '';
+    document.getElementById('emptyMsg').textContent =
+      searchInput.value ? 'No parts match "' + searchInput.value + '".' : 'No parts found.';
+    return;
+  }
+
+  card.style.display  = '';
+  empty.style.display = 'none';
+
+  var html = '';
+  data.parts.forEach(function(p) {
+    var rowBg = p.status === 'low_stock'    ? 'background:rgba(245,158,11,0.04);'
+              : p.status === 'out_of_stock' ? 'background:rgba(239,68,68,0.04);' : '';
+
+    var badgeHtml = statusBadge(p.status);
+    var canDelete = p.total_stock === 0;
+
+    var deleteItem = canDelete
+      ? '<li><button class="dropdown-item text-danger" onclick="openDeleteModal(' + p.id + ',\'' + esc(p.name) + '\',\'' + esc(p.url_delete) + '\')"><i class="bi bi-trash me-2"></i>Delete</button></li>'
+      : '<li><button class="dropdown-item text-muted" disabled title="Cannot delete — has stock"><i class="bi bi-trash me-2"></i>Delete</button></li>';
+
+    var actionsHtml = '<div class="dropdown">'
+      + '<button class="btn btn-ghost btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding:0.25rem 0.45rem;">'
+      + '<i class="bi bi-three-dots-vertical"></i></button>'
+      + '<ul class="dropdown-menu dropdown-menu-end" style="font-size:0.85rem;min-width:170px;">'
+      + '<li><a class="dropdown-item" href="' + esc(p.url_detail) + '"><i class="bi bi-eye me-2 text-primary"></i>View Details</a></li>'
+      + '<li><a class="dropdown-item" href="' + esc(p.url_edit) + '"><i class="bi bi-pencil me-2"></i>Edit</a></li>'
+      + '<li><hr class="dropdown-divider"></li>'
+      + '<li><button class="dropdown-item inline-stock-in-btn" data-part-id="' + p.id + '" data-part-name="' + esc(p.name) + '"><i class="bi bi-box-arrow-in-down me-2" style="color:var(--color-success);"></i>Stock In</button></li>'
+      + '<li><a class="dropdown-item" href="' + esc(p.url_stock_out) + '"><i class="bi bi-box-arrow-up me-2"></i>Stock Out</a></li>'
+      + '<li><a class="dropdown-item" href="' + esc(p.url_consume) + '"><i class="bi bi-tools me-2"></i>Use in Repair</a></li>'
+      + '<li><hr class="dropdown-divider"></li>'
+      + '<li><button class="dropdown-item assign-bin-btn" data-part-id="' + p.id + '" data-part-name="' + esc(p.name) + '"><i class="bi bi-grid-3x3-gap me-2" style="color:var(--primary);"></i>Assign to Bin</button></li>'
+      + '<li><button class="dropdown-item assign-bin-btn" data-part-id="' + p.id + '" data-part-name="' + esc(p.name) + '"><i class="bi bi-arrow-left-right me-2" style="color:var(--primary);"></i>Move Stock</button></li>'
+      + '<li><a class="dropdown-item" href="' + esc(p.url_history) + '"><i class="bi bi-clock-history me-2"></i>History</a></li>'
+      + '<li><button class="dropdown-item barcode-btn" data-barcode="' + esc(p.barcode || p.part_number) + '" data-part-name="' + esc(p.name) + '" data-part-number="' + esc(p.part_number) + '" data-part-id="' + p.id + '" data-url-label="' + esc(p.url_label) + '"><i class="bi bi-printer me-2" style="color:var(--primary);"></i>Print Label</button></li>'
+      + '<li><hr class="dropdown-divider"></li>'
+      + deleteItem
+      + '</ul></div>';
+
+    html += '<tr data-part-id="' + p.id + '" data-status="' + p.status + '" data-type="' + esc(p.part_type) + '" style="' + rowBg + '">'
+      + '<td style="text-align:center;padding-left:0.75rem;"><input type="checkbox" class="form-check-input row-checkbox" data-part-id="' + p.id + '" data-barcode="' + esc(p.barcode) + '" data-part-name="' + esc(p.name) + '" data-part-number="' + esc(p.part_number) + '"></td>'
+      + '<td><a href="' + esc(p.url_detail) + '" style="font-weight:500;color:var(--text-primary);text-decoration:none;">' + esc(p.name) + '</a></td>'
+      + '<td style="white-space:nowrap;"><code style="font-size:0.82rem;color:var(--text-secondary);">' + esc(p.part_number) + '</code></td>'
+      + '<td class="d-none d-md-table-cell" style="color:var(--text-muted);font-size:0.85rem;">' + esc(p.part_type || '—') + '</td>'
+      + '<td class="d-none d-md-table-cell" style="font-size:0.85rem;">' + esc(p.vendor || '—') + '</td>'
+      + '<td class="d-none d-lg-table-cell">' + (p.barcode ? '<code style="font-size:0.75rem;color:var(--text-muted);">' + esc(p.barcode) + '</code>' : '<span style="color:var(--text-muted);">—</span>') + '</td>'
+      + '<td style="text-align:center;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;">' + badgeHtml + '<span style="font-weight:700;font-size:0.9rem;">' + p.total_stock + '</span></div></td>'
+      + '<td class="d-none d-lg-table-cell" style="text-align:center;color:var(--text-muted);font-size:0.85rem;">' + p.min_stock + '</td>'
+      + '<td style="text-align:right;font-size:0.84rem;white-space:nowrap;">' + (p.price != null ? fmtNum(p.price) : '—') + '</td>'
+      + '<td class="d-none d-lg-table-cell" style="text-align:right;font-size:0.84rem;white-space:nowrap;">' + (p.value ? fmtNum(p.value) : '—') + '</td>'
+      + '<td style="text-align:center;white-space:nowrap;">' + actionsHtml + '</td>'
+      + '</tr>';
+  });
+
+  tbody.innerHTML = html;
+  attachRowListeners();
+  reinitTooltips();
+  updateSelectionUI();
+}
+
+function statusBadge(st) {
+  if (st === 'out_of_stock') return '<span class="stock-status out_of_stock"><i class="bi bi-x-circle-fill"></i> OUT</span>';
+  if (st === 'low_stock')    return '<span class="stock-status low_stock"><i class="bi bi-exclamation-triangle-fill"></i> LOW</span>';
+  return '<span class="stock-status in_stock"><i class="bi bi-check-circle-fill"></i> OK</span>';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SKELETON WHILE LOADING
+════════════════════════════════════════════════════════════════════════════ */
+function showSkeleton() {
+  var rows = '';
+  for (var i = 0; i < 6; i++) {
+    rows += '<tr class="skel-row"><td></td>'
+      + '<td><div class="skel-bar" style="width:' + (60 + Math.random()*30|0) + '%;"></div></td>'
+      + '<td><div class="skel-bar" style="width:80px;"></div></td>'
+      + '<td class="d-none d-md-table-cell"><div class="skel-bar" style="width:60px;"></div></td>'
+      + '<td class="d-none d-md-table-cell"><div class="skel-bar" style="width:80px;"></div></td>'
+      + '<td class="d-none d-lg-table-cell"><div class="skel-bar" style="width:90px;"></div></td>'
+      + '<td><div class="skel-bar" style="width:40px;margin:auto;"></div></td>'
+      + '<td class="d-none d-lg-table-cell"></td><td></td>'
+      + '<td class="d-none d-lg-table-cell"></td><td></td></tr>';
+  }
+  document.getElementById('partsTableBody').innerHTML = rows;
+  document.getElementById('tableCard').style.display  = '';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   INLINE STOCK IN MODAL
+════════════════════════════════════════════════════════════════════════════ */
+function attachRowListeners() {
+  document.querySelectorAll('.inline-stock-in-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.getElementById('isiPartId').value = this.dataset.partId;
+      document.getElementById('isiPartName').textContent = this.dataset.partName;
+      new bootstrap.Modal(document.getElementById('inlineStockInModal')).show();
+    });
+  });
+  document.querySelectorAll('.barcode-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showBarcodeModal(this.dataset.barcode, this.dataset.partName, this.dataset.partNumber, this.dataset.partId || null, this.dataset.urlLabel || null);
+    });
+  });
+  document.querySelectorAll('.assign-bin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openAssignBinModal(this.dataset.partId, this.dataset.partName);
+    });
+  });
+  document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', updateSelectionUI);
+  });
+}
+attachRowListeners(); // initial page load
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DELETE MODAL
+════════════════════════════════════════════════════════════════════════════ */
+window.openDeleteModal = function(id, name, url) {
+  document.getElementById('deletePartName').textContent = name;
+  document.getElementById('deleteForm').action = url;
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BARCODE MODAL
+════════════════════════════════════════════════════════════════════════════ */
+var currentPrintData = null;
+
+function showBarcodeModal(barcode, name, number, partId, urlLabel) {
+  currentPrintData = { barcode: barcode, name: name, number: number, partId: partId };
+  document.getElementById('barcodeModalName').textContent   = name;
+  document.getElementById('barcodeModalNumber').textContent = number;
+  document.getElementById('barcodeModalValue').textContent  = barcode;
+  // Wire label page link — prefer explicit urlLabel, fall back to partId
+  var labelUrl = urlLabel || (partId ? '/parts/' + partId + '/label' : null);
+  if (labelUrl) {
+    document.getElementById('barcodeModalLabelBtn').href = labelUrl;
+    document.getElementById('barcodeModalLabelBtn').style.display = '';
+  } else {
+    document.getElementById('barcodeModalLabelBtn').style.display = 'none';
+  }
+  var modalEl = document.getElementById('barcodeModal');
+  var modal   = new bootstrap.Modal(modalEl);
+  modal.show();
+  modalEl.addEventListener('shown.bs.modal', function() {
+    JsBarcode('#barcodeModalSvg', barcode, {
+      format: 'CODE128', width: 2, height: 70,
+      displayValue: true, fontSize: 13, margin: 10, lineColor: '#1e293b'
+    });
+  }, { once: true });
+}
+
+document.getElementById('barcodeModalPrintBtn').addEventListener('click', function() {
+  if (currentPrintData) printSingleLabel(currentPrintData.barcode, currentPrintData.name, currentPrintData.number);
+});
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LABEL PRINTING
+════════════════════════════════════════════════════════════════════════════ */
+function printSingleLabel(barcode, name, number) {
+  var win = window.open('', '_blank', 'width=420,height=260');
+  win.document.write(buildLabelPage([{ barcode: barcode, name: name, number: number }]));
+  win.document.close();
+}
+
+window.bulkPrintLabels = function() {
+  var checked = document.querySelectorAll('.row-checkbox:checked');
+  if (!checked.length) return;
+  var ids = [];
+  checked.forEach(function(cb) {
+    if (cb.dataset.barcode) ids.push(cb.dataset.partId);
+  });
+  if (!ids.length) { showToast('None of the selected parts have barcodes.', 'warning'); return; }
+  window.open('/parts/labels?ids=' + ids.join(','), '_blank');
+};
+
+function buildLabelPage(parts) {
+  var labelsHtml = parts.map(function(p) {
+    return '<div class="label">'
+      + '<div class="lname">' + escHtml(p.name) + '</div>'
+      + '<div class="lnum">'  + escHtml(p.number) + '</div>'
+      + '<svg class="lbc" data-barcode="' + escHtml(p.barcode) + '"></svg>'
+      + '</div>';
+  }).join('');
+  return '<!DOCTYPE html><html><head><title>Part Labels</title>'
+    + '<style>@page{size:2in 1in;margin:0}body{margin:0;padding:0;font-family:Arial,sans-serif;}'
+    + '.label{display:inline-block;width:2in;height:1in;padding:0.1in;box-sizing:border-box;page-break-inside:avoid;overflow:hidden;vertical-align:top;}'
+    + '.lname{font-size:9pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+    + '.lnum{font-size:7pt;color:#555;font-family:monospace;margin-bottom:1pt;}'
+    + 'svg{max-width:100%;display:block;}</style></head><body>'
+    + labelsHtml
+    + '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>'
+    + '<script>window.onload=function(){'
+    + 'document.querySelectorAll(".lbc").forEach(function(s){JsBarcode(s,s.dataset.barcode,{format:"CODE128",width:1.5,height:30,displayValue:true,fontSize:7,margin:2});});'
+    + 'setTimeout(function(){window.print();},400);};<\/script>'
+    + '</body></html>';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CHECKBOX / BULK SELECT
+════════════════════════════════════════════════════════════════════════════ */
+var selectAllCb = document.getElementById('select-all');
+var printBtn    = document.getElementById('print-labels-btn');
+var countSpan   = document.getElementById('selected-count');
+
+function updateSelectionUI() {
+  var checked = document.querySelectorAll('.row-checkbox:checked').length;
+  var total   = document.querySelectorAll('.row-checkbox').length;
+  countSpan.textContent           = checked;
+  printBtn.style.display          = checked > 0 ? '' : 'none';
+  selectAllCb.checked             = checked === total && total > 0;
+  selectAllCb.indeterminate       = checked > 0 && checked < total;
+}
+selectAllCb.addEventListener('change', function() {
+  document.querySelectorAll('.row-checkbox').forEach(function(cb) { cb.checked = selectAllCb.checked; });
+  updateSelectionUI();
+});
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TOOLTIPS
+════════════════════════════════════════════════════════════════════════════ */
+function reinitTooltips() {
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+    var existing = bootstrap.Tooltip.getInstance(el);
+    if (existing) existing.dispose();
+    new bootstrap.Tooltip(el, { trigger: 'hover' });
+  });
+}
+reinitTooltips();
+
+/* ════════════════════════════════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtNum(n) {
+  return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ASSIGN TO BIN MODAL
+════════════════════════════════════════════════════════════════════════════ */
+var _abmPartId = null;
+
+window.openAssignBinModal = function(partId, partName) {
+  _abmPartId = partId;
+  document.getElementById('abmPartName').textContent = partName;
+  // Reset form
+  document.getElementById('abmFromLocation').value = '';
+  document.getElementById('abmFromBin').innerHTML = '<option value="">— no specific bin —</option>';
+  document.getElementById('abmToLocation').value = '';
+  document.getElementById('abmToBin').innerHTML = '<option value="">— no specific bin —</option>';
+  document.getElementById('abmQty').value = 1;
+  // Show loading state
+  document.getElementById('abmStockLoading').style.display = '';
+  document.getElementById('abmStockTable').style.display = 'none';
+  new bootstrap.Modal(document.getElementById('assignBinModal')).show();
+  // Fetch stock
+  fetch('/parts/' + partId + '/stock_json', { headers: { 'X-CSRFToken': CSRF } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('abmStockLoading').style.display = 'none';
+      renderAbmStockTable(data.stocks);
+      // Pre-select from-location if only one
+      if (data.stocks.length === 1) {
+        document.getElementById('abmFromLocation').value = data.stocks[0].location_id;
+        document.getElementById('abmToLocation').value = data.stocks[0].location_id;
+        abmLoadBins('from', data.stocks[0].location_id, data.stocks[0].bin_id);
+        abmLoadBins('to', data.stocks[0].location_id, null);
+        document.getElementById('abmQty').value = data.stocks[0].quantity;
+      }
+    })
+    .catch(function() {
+      document.getElementById('abmStockLoading').innerHTML = '<span style="color:var(--color-danger);">Failed to load stock data.</span>';
+    });
+};
+
+function renderAbmStockTable(stocks) {
+  if (!stocks.length) {
+    document.getElementById('abmStockTable').innerHTML =
+      '<div style="color:var(--text-muted);font-size:0.85rem;font-style:italic;">No stock in any location.</div>';
+    document.getElementById('abmStockTable').style.display = '';
+    return;
+  }
+  var rows = stocks.map(function(s) {
+    var binCell = s.bin_name
+      ? '<code style="font-size:0.78rem;">' + esc(s.bin_name) + '</code>'
+      : '<span style="color:var(--text-muted);">— No bin</span>';
+    return '<tr>'
+      + '<td style="font-size:0.83rem;font-weight:500;">' + esc(s.location_name) + '</td>'
+      + '<td>' + binCell + '</td>'
+      + '<td style="text-align:center;font-weight:700;">' + s.quantity + '</td>'
+      + '<td><button type="button" class="btn btn-ghost btn-sm abm-prefill-btn" '
+      + 'data-loc="' + s.location_id + '" data-bin="' + (s.bin_id || '') + '" data-qty="' + s.quantity + '">'
+      + '<i class="bi bi-arrow-right-circle"></i></button></td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('abmStockTable').innerHTML =
+    '<table class="table table-sm mb-0" style="font-size:0.83rem;">'
+    + '<thead><tr><th>Location</th><th>Current Bin</th><th style="text-align:center;">Qty</th><th style="width:1px;"></th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
+  document.getElementById('abmStockTable').style.display = '';
+  // Prefill button per row
+  document.querySelectorAll('.abm-prefill-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var locId = this.dataset.loc;
+      var binId = this.dataset.bin || null;
+      document.getElementById('abmFromLocation').value = locId;
+      document.getElementById('abmToLocation').value = locId;
+      document.getElementById('abmQty').value = this.dataset.qty;
+      abmLoadBins('from', locId, binId ? parseInt(binId) : null);
+      abmLoadBins('to', locId, null);
+    });
+  });
+}
+
+function abmLoadBins(side, locationId, preSelectId) {
+  var sel = document.getElementById(side === 'from' ? 'abmFromBin' : 'abmToBin');
+  sel.innerHTML = '<option value="">— no specific bin —</option>';
+  if (!locationId) return;
+  fetch('/parts/api/bins?location_id=' + locationId, { headers: { 'X-CSRFToken': CSRF } })
+    .then(function(r) { return r.json(); })
+    .then(function(bins) {
+      bins.forEach(function(b) {
+        var opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+        sel.appendChild(opt);
+      });
+      if (preSelectId) { sel.value = preSelectId; }
+    });
+}
+
+document.getElementById('abmFromLocation').addEventListener('change', function() {
+  abmLoadBins('from', this.value, null);
+});
+document.getElementById('abmToLocation').addEventListener('change', function() {
+  abmLoadBins('to', this.value, null);
+});
+
+document.getElementById('abmSubmit').addEventListener('click', function() {
+  if (!_abmPartId) return;
+  var fromLoc = document.getElementById('abmFromLocation').value;
+  var fromBin = document.getElementById('abmFromBin').value;
+  var toLoc   = document.getElementById('abmToLocation').value;
+  var toBin   = document.getElementById('abmToBin').value;
+  var qty     = parseInt(document.getElementById('abmQty').value, 10);
+  if (!fromLoc || !toLoc || !qty) {
+    showToast('Fill in From Location, To Location, and Quantity.', 'warning');
+    return;
+  }
+  var btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+  fetch('/parts/api/move_to_bin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({
+      part_id: parseInt(_abmPartId),
+      from_location_id: parseInt(fromLoc),
+      from_bin_id: fromBin ? parseInt(fromBin) : null,
+      to_location_id: parseInt(toLoc),
+      to_bin_id: toBin ? parseInt(toBin) : null,
+      quantity: qty,
+    }),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('assignBinModal')).hide();
+      showToast(data.message, 'success');
+    } else {
+      showToast(data.message || 'Move failed.', 'danger');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+  })
+  .catch(function() {
+    showToast('Network error.', 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════════════════════════ */
+// If page loaded with a search param, run AJAX search immediately
+if (searchInput.value) {
+  doSearch(searchInput.value.trim());
+}
+
+}());
+</script>
+{% endblock %}
 {% endblock %}

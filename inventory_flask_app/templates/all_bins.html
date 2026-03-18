@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}All Bins{% endblock %}
+{% block page_title %}All Bins{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">All Bins</h1>
+    <div class="page-subtitle">
+      {% set total_bins = 0 %}{% for loc in locations %}{% set total_bins = total_bins + bins_by_loc.get(loc.id, [])|length %}{% endfor %}
+      {{ total_bins }} bin{{ 's' if total_bins != 1 else '' }} across {{ locations|length }} location{{ 's' if locations|length != 1 else '' }}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.bin_lookup') }}" class="btn btn-ghost">
+      <i class="bi bi-upc-scan"></i> Bin Lookup
+    </a>
+    <a href="{{ url_for('stock_bp.manage_locations') }}" class="btn btn-ghost">
+      <i class="bi bi-geo-alt"></i> Locations
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up">
+  {% if locations %}
+    {% for location in locations %}
+      {% set loc_bins = bins_by_loc.get(location.id, []) %}
+      <div style="margin-bottom:2rem;">
+        <!-- Location header -->
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);">
+          <i class="bi bi-geo-alt-fill" style="color:var(--primary);font-size:1rem;"></i>
+          <span style="font-weight:700;font-size:1rem;">{{ location.name }}</span>
+          <span style="font-size:0.78rem;color:var(--text-muted);">{{ loc_bins|length }} bin{{ 's' if loc_bins|length != 1 else '' }}</span>
+          <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}"
+             class="btn btn-ghost btn-sm" style="margin-left:auto;">
+            <i class="bi bi-pencil"></i> Manage Bins
+          </a>
+        </div>
+
+        {% if loc_bins %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;">
+          {% for b in loc_bins %}
+          {% set count = counts.get(b.id, 0) %}
+          {% set sc = status_counts.get(b.id, {}) %}
+          <a href="{{ url_for('stock_bp.bin_detail', bin_id=b.id) }}"
+             style="display:block;text-decoration:none;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;transition:var(--transition-fast);"
+             onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--surface-2)'"
+             onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface-1)'">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;margin-bottom:0.6rem;">
+              <span style="font-family:monospace;font-weight:700;font-size:1rem;color:var(--text-primary);">{{ b.name }}</span>
+              <span style="font-weight:700;font-size:1.1rem;color:{% if count > 0 %}var(--primary){% else %}var(--text-muted){% endif %};">{{ count }}</span>
+            </div>
+            {% if b.description %}
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ b.description }}</div>
+            {% endif %}
+            {% if count > 0 %}
+            <div style="display:flex;gap:0.2rem;margin-top:0.4rem;">
+              {% if sc.get('unprocessed', 0) %}
+              <span class="status-pill status-unprocessed" style="font-size:0.67rem;padding:0.15em 0.45em;">{{ sc.unprocessed }}</span>
+              {% endif %}
+              {% if sc.get('under_process', 0) %}
+              <span class="status-pill status-under_process" style="font-size:0.67rem;padding:0.15em 0.45em;">{{ sc.under_process }}</span>
+              {% endif %}
+              {% if sc.get('processed', 0) %}
+              <span class="status-pill status-processed" style="font-size:0.67rem;padding:0.15em 0.45em;">{{ sc.processed }}</span>
+              {% endif %}
+            </div>
+            {% else %}
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;">Empty</div>
+            {% endif %}
+          </a>
+          {% endfor %}
+          <!-- Add Bin card -->
+          <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}"
+             style="display:flex;align-items:center;justify-content:center;gap:0.4rem;text-decoration:none;background:transparent;border:1px dashed var(--border);border-radius:var(--radius-lg);padding:1rem;color:var(--text-muted);font-size:0.82rem;transition:var(--transition-fast);"
+             onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
+             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+            <i class="bi bi-plus-circle"></i> Add Bin
+          </a>
+        </div>
+        {% else %}
+        <div style="padding:0.75rem 0;font-size:0.85rem;color:var(--text-muted);">
+          No bins defined for this location.
+          <a href="{{ url_for('stock_bp.manage_bins', location_id=location.id) }}" style="color:var(--primary);">Add bins</a>
+        </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-grid-3x3-gap"></i>
+    <p>No locations defined yet. Create locations first, then add bins.</p>
+    <a href="{{ url_for('stock_bp.add_location') }}" class="btn btn-primary btn-sm">Add Location</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

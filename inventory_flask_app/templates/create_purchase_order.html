@@ -1,97 +1,437 @@
 {% extends "base.html" %}
 {% block title %}Create Purchase Order{% endblock %}
+{% block page_title %}Create Purchase Order{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed #E5E7EB; border-radius: 12px;
+    padding: 2.5rem; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: #F9FAFB;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: #3B82F6; background: #EFF6FF;
+  }
+  .upload-zone.has-file {
+    border-color: #10B981; background: #F0FDF4;
+  }
+  .upload-zone .upload-icon { display: block; margin-bottom: 0.5rem; }
+  .upload-zone .upload-filename {
+    display: none; font-weight: 600; font-size: 0.9rem;
+    color: #059669; margin-top: 0.5rem;
+  }
+  .upload-zone.has-file .upload-filename { display: block; }
+  .upload-zone.has-file .upload-hint     { display: none; }
+
+  /* ── Vendor search ── */
+  .vendor-search-wrapper { position: relative; }
+  .vendor-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 9999;
+    max-height: 280px; overflow-y: auto;
+  }
+  .vendor-result-item { padding: 0.6rem 1rem; cursor: pointer; transition: background 0.1s; }
+  .vendor-result-item:hover { background: var(--surface-2); }
+
+  /* ── Vendor pill ── */
+  .vendor-pill {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .vendor-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #10B981; color: #fff; font-size: 0.82rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  /* ── Format table ── */
+  .format-table th { background: #F0FDF4; color: #065F46; font-size: 0.78rem; font-weight: 700; }
+  .format-table td { font-size: 0.82rem; }
+  .format-table tr:hover td { background: #F9FAFB; }
+
+  /* ── Section label ── */
+  .s-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--primary);
+    color: #fff; font-size: 0.7rem; font-weight: 800; margin-right: 0.5rem; flex-shrink: 0;
+  }
+  .s-head {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 700;
+    display: flex; align-items: center; margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 90vh;">
-  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 530px; width: 100%; background: #f6f7fa;">
-    <div class="mb-4 text-center">
-      <h2 class="fw-bold mb-1 text-primary" style="letter-spacing:0.01em;">
-        <i class="bi bi-clipboard-plus me-2"></i>Create Purchase Order
-      </h2>
-      <div class="text-muted" style="font-size:0.98rem;">Add a new PO and upload Excel with serials & specs</div>
-    </div>
-    <form method="POST" enctype="multipart/form-data" id="createPOForm">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="mb-3 mb-3">
-        <label class="form-label fw-bold">PO Number:</label>
-        <input type="text" name="po_number" class="form-control form-control-lg rounded-pill px-3" required>
-      </div>
-      <div class="mb-3 mb-3">
-        <label class="form-label fw-bold">Vendor:</label>
-        <div class="input-group">
-          <select name="vendor_id" class="form-select form-select-lg rounded-pill px-3" required>
-            <option value="">-- Select Vendor --</option>
-            {% for vendor in vendors %}
-              <option value="{{ vendor.id }}">{{ vendor.name }}</option>
-            {% endfor %}
-          </select>
-          <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-outline-success ms-2 rounded-pill" target="_blank">
-            <i class="bi bi-plus-circle"></i> Add Vendor
-          </a>
-        </div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label fw-bold">Default Location for Uploaded Units:</label>
-        <select name="location_id" class="form-select form-select-lg rounded-pill px-3" required>
-          <option value="">-- Select Location --</option>
-          {% for location in locations %}
-            <option value="{{ location.id }}">{{ location.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="mb-3 mb-3">
-        <label class="form-label fw-bold">Upload Excel File with Serials + Specs:</label>
-        <input type="file" name="file" class="form-control form-control-lg rounded-pill px-3" accept=".xlsx, .xls" required>
-        <small class="text-muted">Excel must include at least <code>serial_number</code> and <code>model_number</code> columns.</small>
-      </div>
-      <div class="d-grid gap-2 mt-3">
-        <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i>Back to Dashboard
-        </a>
-        <div id="poLoadingSpinner" class="spinner-border text-success d-none mx-auto" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-check2-circle me-1"></i>Create PO
-        </button>
-      </div>
-    </form>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Create Purchase Order</h1>
+    <div class="page-subtitle">Upload an Excel file to create a new PO and register expected units</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()"
+       onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.stock_intake') }}'"
+       class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
   </div>
 </div>
 
-<style>
-  .po-box {
-    background-color: #ffffff;
-    padding: 40px 30px;
-    border-radius: 12px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-    width: 100%;
-    max-width: 600px;
-  }
+<form method="POST" enctype="multipart/form-data" id="createPOForm" class="animate-fade-up">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-  h2 {
-    font-weight: bold;
-  }
+  <div class="row g-4">
 
-  .form-label {
-    font-size: 1rem;
-    color: #333;
-  }
+    {# ══════════════ LEFT COLUMN ══════════════ #}
+    <div class="col-lg-7">
 
-  .btn-success {
-    font-weight: bold;
-    padding: 10px 25px;
-  }
-</style>
+      {# ── PO Details card ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.75rem;">
+          <div class="s-head"><span class="s-num">1</span> Purchase Order Details</div>
+
+          {# PO Number #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">PO Number <span class="text-danger">*</span></label>
+            <input type="text" name="po_number" id="poNumberInput" class="form-control"
+                   placeholder="e.g. PO-2026-001" required autocomplete="off">
+          </div>
+
+          {# Vendor — searchable #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Vendor <span class="text-danger">*</span></label>
+
+            {# Pill shown after selection #}
+            <div id="vendorPillWrap" style="display:none;margin-bottom:0.5rem;">
+              <div class="vendor-pill">
+                <div class="vendor-avatar" id="vendorAvatarInitials">?</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                       id="vendorPillName">—</div>
+                  <div style="font-size:0.78rem;color:var(--text-muted);" id="vendorPillSub">—</div>
+                </div>
+                <a href="#" style="font-size:0.78rem;color:var(--primary);text-decoration:none;white-space:nowrap;"
+                   onclick="clearVendorSelection(); return false;">Change</a>
+              </div>
+            </div>
+
+            {# Search input #}
+            <div id="vendorSelectWrap">
+              <div class="d-flex gap-2 align-items-start">
+                <div class="vendor-search-wrapper" style="flex:1;position:relative;">
+                  <input type="text" id="vendorSearch" class="form-control"
+                         placeholder="Search vendor by name…" autocomplete="off">
+                  <div id="vendorResults" class="vendor-dropdown" style="display:none;"></div>
+                  <input type="hidden" id="vendorIdInput" name="vendor_id">
+                </div>
+                <a href="{{ url_for('vendors_bp.add_vendor') }}" class="btn btn-ghost"
+                   target="_blank" style="white-space:nowrap;">
+                  <i class="bi bi-plus-lg"></i> Add
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {# Default Location #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              Default Location
+              <span style="font-weight:400;color:var(--text-muted);">(optional)</span>
+            </label>
+            <select name="location_id" class="form-select">
+              <option value="">— No default location —</option>
+              {% for location in locations %}
+              <option value="{{ location.id }}">{{ location.name }}</option>
+              {% endfor %}
+            </select>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">
+              Applied to all items unless overridden per row in the Excel file.
+            </div>
+          </div>
+
+          {# Notes #}
+          <div class="mb-1">
+            <label class="form-label fw-semibold">
+              Notes <span style="font-weight:400;color:var(--text-muted);">(optional)</span>
+            </label>
+            <textarea name="notes" class="form-control" rows="2"
+                      placeholder="Any notes about this PO…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      {# ── Excel Upload card ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.75rem;">
+          <div class="s-head"><span class="s-num">2</span> Excel File <span class="text-danger ms-1">*</span></div>
+
+          <div class="upload-zone" id="uploadZone">
+            <i class="bi bi-file-earmark-excel upload-icon" style="font-size:3rem;color:#10B981;"></i>
+            <p class="mb-1 upload-hint" style="font-weight:600;">Drag &amp; drop your Excel file here</p>
+            <p class="text-muted small upload-hint mb-0">or click to browse (.xlsx, .xls)</p>
+            <p class="upload-filename mb-0" id="uploadFilename">
+              <i class="bi bi-check-circle-fill me-1"></i><span id="uploadFilenameText"></span>
+            </p>
+            <input type="file" name="file" accept=".xlsx,.xls" id="excelInput" style="display:none;">
+          </div>
+        </div>
+      </div>
+
+      {# ── Action buttons ── #}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" id="poSubmitBtn" style="padding:0.7rem 2rem;font-weight:700;">
+          <i class="bi bi-check2-circle me-1"></i>
+          <span id="poSubmitText">Create PO →</span>
+        </button>
+        <a href="javascript:history.back()"
+           onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.stock_intake') }}'"
+           class="btn btn-ghost" style="padding:0.7rem 1.5rem;">
+          Cancel
+        </a>
+      </div>
+
+    </div>{# end col-lg-7 #}
+
+    {# ══════════════ RIGHT COLUMN ══════════════ #}
+    <div class="col-lg-5">
+
+      {# ── Required Excel Format card ── #}
+      <div class="card mb-4">
+        <div class="card-header" style="background:#F0FDF4;border-color:#BBF7D0;">
+          <span style="font-weight:700;color:#065F46;font-size:0.9rem;">
+            <i class="bi bi-table me-2"></i>Required Excel Format
+          </span>
+        </div>
+        <div class="card-body" style="padding:1rem 1.25rem;">
+          <table class="table table-sm table-borderless format-table mb-0">
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th>Required</th>
+                <th>Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>serial</code></td><td><span style="color:#059669;font-weight:700;">✅ Yes</span></td><td class="text-muted">ABC123</td></tr>
+              <tr><td><code>asset</code></td><td class="text-muted">Optional</td><td class="text-muted">ASSET-001</td></tr>
+              <tr><td><code>item_name</code></td><td class="text-muted">Optional</td><td class="text-muted">Dell Laptop</td></tr>
+              <tr><td><code>make</code></td><td class="text-muted">Optional</td><td class="text-muted">Dell</td></tr>
+              <tr><td><code>model</code></td><td class="text-muted">Optional</td><td class="text-muted">Latitude 5320</td></tr>
+              <tr><td><code>cpu</code></td><td class="text-muted">Optional</td><td class="text-muted">Intel i7</td></tr>
+              <tr><td><code>ram</code></td><td class="text-muted">Optional</td><td class="text-muted">16GB</td></tr>
+              <tr><td><code>grade</code></td><td class="text-muted">Optional</td><td class="text-muted">A</td></tr>
+              <tr><td><code>display</code></td><td class="text-muted">Optional</td><td class="text-muted">13.3"</td></tr>
+              <tr><td><code>gpu1</code></td><td class="text-muted">Optional</td><td class="text-muted">Intel UHD</td></tr>
+              <tr><td><code>gpu2</code></td><td class="text-muted">Optional</td><td class="text-muted">RTX 3060</td></tr>
+              <tr><td><code>disk1size</code></td><td class="text-muted">Optional</td><td class="text-muted">512GB</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {# ── Download Template ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.25rem;">
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+            Download a pre-formatted Excel template with all column headers ready.
+          </p>
+          <a href="{{ url_for('stock_bp.po_template_download') }}"
+             class="btn w-100" style="background:#10B981;color:#fff;font-weight:600;border:none;">
+            <i class="bi bi-download me-2"></i>Download Excel Template
+          </a>
+        </div>
+      </div>
+
+      {# ── Tips card ── #}
+      <div class="card">
+        <div class="card-body" style="padding:1.25rem;">
+          <p style="font-weight:700;font-size:0.88rem;margin-bottom:0.75rem;">
+            <i class="bi bi-lightbulb me-1" style="color:#F59E0B;"></i> Tips for importing
+          </p>
+          <ul style="font-size:0.83rem;color:var(--text-secondary);margin:0;padding-left:1.1rem;line-height:1.9;">
+            <li>Serial number is the only required column</li>
+            <li>Column names are case-insensitive</li>
+            <li>Aliases accepted: <code>serial_number</code>, <code>asset_tag</code></li>
+            <li>Location can be set per-row or use the default above</li>
+            <li>Duplicate serials in one file are ignored</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>{# end col-lg-5 #}
+  </div>{# end row #}
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('createPOForm');
-    const spinner = document.getElementById('poLoadingSpinner');
-    if (form && spinner) {
-      form.addEventListener('submit', function () {
-        spinner.classList.remove('d-none');
-      });
-    }
+/* ── HTML escape ── */
+function escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ═══════════════════════════════════════
+   VENDOR SEARCH
+   ═══════════════════════════════════════ */
+var _addVendorUrl = {{ url_for('vendors_bp.add_vendor') | tojson }};
+var _vendorCache  = {};
+var _vendorTimer  = null;
+
+function clearVendorSelection() {
+  document.getElementById('vendorIdInput').value = '';
+  document.getElementById('vendorPillWrap').style.display = 'none';
+  document.getElementById('vendorSelectWrap').style.display = '';
+  document.getElementById('vendorSearch').value = '';
+  document.getElementById('vendorResults').style.display = 'none';
+  setTimeout(function() { document.getElementById('vendorSearch').focus(); }, 50);
+}
+
+function selectVendor(v) {
+  _vendorCache[v.id] = v;
+  document.getElementById('vendorIdInput').value = v.id;
+  document.getElementById('vendorResults').style.display = 'none';
+  document.getElementById('vendorSearch').value = '';
+  var name     = v.name || '';
+  var initials = name.trim().split(/\s+/).map(function(w) { return w[0]; }).join('').toUpperCase().slice(0, 2);
+  var sub      = [v.phone, v.email].filter(Boolean).join(' · ') || 'No contact info';
+  document.getElementById('vendorAvatarInitials').textContent = initials || '?';
+  document.getElementById('vendorPillName').textContent = name;
+  document.getElementById('vendorPillSub').textContent = sub;
+  document.getElementById('vendorPillWrap').style.display = '';
+  document.getElementById('vendorSelectWrap').style.display = 'none';
+}
+
+function _renderVendorResults(results) {
+  var dropdown = document.getElementById('vendorResults');
+  var addBtn = '<div class="vendor-result-item" style="border-top:1px solid #E5E7EB;"'
+    + ' onclick="window.location.href=' + escH(JSON.stringify(_addVendorUrl)) + '">'
+    + '<i class="bi bi-plus-circle me-2" style="color:var(--primary);"></i>'
+    + '<span style="color:var(--primary);font-weight:600;">Add New Vendor</span>'
+    + '</div>';
+  results.forEach(function(v) { _vendorCache[v.id] = v; });
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div style="padding:0.75rem 1rem;color:var(--text-muted);font-size:0.85rem;">No vendors found</div>' + addBtn;
+  } else {
+    dropdown.innerHTML = results.map(function(v) {
+      var sub = [v.phone, v.email].filter(Boolean).join(' · ');
+      return '<div class="vendor-result-item" onclick="selectVendor(_vendorCache[' + v.id + '])">'
+        + '<div style="font-weight:600;font-size:0.88rem;">' + escH(v.name) + '</div>'
+        + (sub ? '<div style="font-size:0.76rem;color:var(--text-muted);">' + escH(sub) + '</div>' : '')
+        + '</div>';
+    }).join('') + addBtn;
+  }
+  dropdown.style.display = 'block';
+}
+
+function initVendorSearch() {
+  var inp = document.getElementById('vendorSearch');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(_vendorTimer);
+    if (q.length < 2) { document.getElementById('vendorResults').style.display = 'none'; return; }
+    _vendorTimer = setTimeout(function() {
+      fetch('/vendors/api/search?q=' + encodeURIComponent(q))
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(_renderVendorResults)
+        .catch(function(err) {
+          console.error('Vendor search error:', err);
+          document.getElementById('vendorResults').style.display = 'none';
+        });
+    }, 300);
   });
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('vendorResults').style.display = 'none';
+  });
+  document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.vendor-search-wrapper');
+    if (wrap && !wrap.contains(e.target)) document.getElementById('vendorResults').style.display = 'none';
+  });
+}
+
+/* ═══════════════════════════════════════
+   DRAG & DROP UPLOAD
+   ═══════════════════════════════════════ */
+function initUploadZone() {
+  var zone  = document.getElementById('uploadZone');
+  var input = document.getElementById('excelInput');
+  if (!zone || !input) return;
+
+  /* Click zone → open file picker */
+  zone.addEventListener('click', function() { input.click(); });
+
+  /* File selected via picker */
+  input.addEventListener('change', function() {
+    if (this.files && this.files[0]) _setFile(this.files[0].name);
+  });
+
+  /* Drag events */
+  zone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    zone.classList.add('dragover');
+  });
+  zone.addEventListener('dragleave', function(e) {
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove('dragover');
+  });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    var files = e.dataTransfer.files;
+    if (!files.length) return;
+    var f = files[0];
+    if (!/\.(xlsx|xls)$/i.test(f.name)) {
+      if (typeof showToast === 'function') showToast('Please upload an Excel file (.xlsx or .xls)', 'warning');
+      return;
+    }
+    /* Transfer to the real file input */
+    var dt = new DataTransfer();
+    dt.items.add(f);
+    input.files = dt.files;
+    _setFile(f.name);
+  });
+}
+
+function _setFile(filename) {
+  var zone = document.getElementById('uploadZone');
+  zone.classList.remove('dragover');
+  zone.classList.add('has-file');
+  document.getElementById('uploadFilenameText').textContent = filename;
+}
+
+/* ═══════════════════════════════════════
+   FORM SUBMIT
+   ═══════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', function() {
+  initVendorSearch();
+  initUploadZone();
+
+  document.getElementById('createPOForm').addEventListener('submit', function(e) {
+    /* Client-side vendor check */
+    if (!document.getElementById('vendorIdInput').value) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Please select a vendor.', 'warning');
+      document.getElementById('vendorSearch').focus();
+      return;
+    }
+    /* Client-side file check */
+    var fi = document.getElementById('excelInput');
+    if (!fi.files || !fi.files.length) {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('Please attach an Excel file.', 'warning');
+      return;
+    }
+    var btn  = document.getElementById('poSubmitBtn');
+    var text = document.getElementById('poSubmitText');
+    btn.disabled = true;
+    text.textContent = 'Creating…';
+  });
+});
 </script>
 {% endblock %}

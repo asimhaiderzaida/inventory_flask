@@ -3,6 +3,8 @@
 <head>
   <title>Batch Print Labels</title>
   <meta charset="utf-8">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     @media print {
       body {
@@ -82,8 +84,8 @@
 </head>
 <body>
 <div class="print-all-btns d-print-none">
-  <button onclick="window.print()" class="btn btn-primary btn-lg w-100 mt-2">🖨️ Print All Labels</button>
-  <a href="{{ request.referrer or url_for('main_dashboard') }}" class="btn btn-secondary btn-lg w-100 mt-2">Back</a>
+  <button onclick="window.print()" class="btn btn-primary btn-lg w-100 mt-2"><i class="bi bi-printer"></i> Print All Labels</button>
+  <a href="javascript:history.back()" class="btn btn-secondary btn-lg w-100 mt-2">Back</a>
 </div>
 
 {% for label in batch_labels %}
@@ -91,21 +93,21 @@
   <div class="label-qr">
     <img src="data:image/png;base64,{{ label.qr_b64 }}" alt="QR Code" width="80" height="80">
     <div class="label-serial">
-      SN: <code>{{ label.instance.serial_number }}</code><br>
-      AT: <b>{{ label.instance.asset_tag }}</b>
+      SN: <code>{{ label.instance.serial }}</code><br>
+      AT: <b>{{ label.instance.asset }}</b>
     </div>
   </div>
   <div class="label-main">
-    <div class="label-field">{{ label.instance.product.item_name or '' }}</div>
+    <div class="label-field">{{ label.instance.product.item_name | nonan }}</div>
     <div class="label-model">
-      {{ label.instance.product.model_number or '' }}
+      {{ label.instance.product.model | nonan }}
     </div>
     <div class="label-field">
-      {{ label.instance.product.processor or '' }} | {{ label.instance.product.ram or '' }} | {{ label.instance.product.storage or '' }}
+      {{ label.instance.product.cpu | nonan }} | {{ label.instance.product.ram | nonan }} | {{ label.instance.product.disk1size | nonan }}
     </div>
     <div class="label-specs">
-      GPU: {{ label.instance.product.video_card or '' }} | Screen: {{ label.instance.product.screen_size or '' }}<br>
-      Grade: {{ label.instance.product.grade or '' }}
+      GPU: {{ label.instance.product.gpu1 | nonan }} | Screen: {{ label.instance.product.display | nonan }}<br>
+      Grade: {{ label.instance.product.grade | nonan }}
     </div>
     <div class="label-small">
       Printed: {{ label.printed_time.strftime('%d-%b-%Y %H:%M') }}

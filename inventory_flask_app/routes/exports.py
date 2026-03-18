@@ -8,15 +8,24 @@ import csv
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
 
+# Additional imports for aged inventory export
+from flask import Response
+from datetime import timedelta
+from inventory_flask_app.models import ProductInstance
+from flask_login import current_user
+import io
+
 exports_bp = Blueprint('exports_bp', __name__)
 
-@csrf.exempt
 @exports_bp.route('/export-products', methods=['GET'])
 @login_required
 def export_products():
     from inventory_flask_app.models import ProductInstance
     from flask_login import current_user
-    instances = ProductInstance.query.join(Product).filter(Product.tenant_id == current_user.tenant_id).all()
+    instances = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.is_sold == False
+    ).all()
 
     from inventory_flask_app.models import TenantSettings
     tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
@@ -33,7 +42,7 @@ def export_products():
     visible_columns = {
         "Asset": ("asset", settings.get("show_column_asset") == "true", settings.get("label_asset", "Asset")),
         "Serial": ("serial", settings.get("show_column_serial") == "true", settings.get("label_serial", "Serial")),
-        "Item Name": ("product.item_name", settings.get("show_column_Item Name") == "true", settings.get("label_item_name", "Item Name")),
+        "Item Name": ("product.item_name", settings.get("show_column_item_name") == "true", settings.get("label_item_name", "Item Name")),
         "Make": ("product.make", settings.get("show_column_make") == "true", settings.get("label_make", "Make")),
         "Model": ("product.model", settings.get("show_column_model") == "true", settings.get("label_model", "Model")),
         "CPU": ("product.cpu", settings.get("show_column_cpu") == "true", settings.get("label_cpu", "CPU")),
@@ -42,7 +51,7 @@ def export_products():
         "Display": ("product.display", settings.get("show_column_display") == "true", settings.get("label_display", "Display")),
         "GPU 1": ("product.gpu1", settings.get("show_column_gpu1") == "true", settings.get("label_gpu1", "GPU 1")),
         "GPU 2": ("product.gpu2", settings.get("show_column_gpu2") == "true", settings.get("label_gpu2", "GPU 2")),
-        "Grade": ("product.grade", settings.get("show_column_Grade") == "true", settings.get("label_grade", "Grade")),
+        "Grade": ("product.grade", settings.get("show_column_grade") == "true", settings.get("label_grade", "Grade")),
         "Location": ("location.name", settings.get("show_column_location") == "true", settings.get("label_location", "Location")),
     }
 
@@ -73,7 +82,6 @@ def export_products():
         download_name='product_inventory_export.xlsx'
     )
 
-@csrf.exempt
 @exports_bp.route('/customer_orders/export')
 @login_required
 def export_customer_orders():
@@ -82,7 +90,7 @@ def export_customer_orders():
     visible_columns = [
         ("Asset", "asset", "label_asset", "show_column_asset"),
         ("Serial", "serial", "label_serial", "show_column_serial"),
-        ("Item Name", "item_name", "label_item_name", "show_column_Item Name"),
+        ("Item Name", "item_name", "label_item_name", "show_column_item_name"),
         ("Make", "make", "label_make", "show_column_make"),
         ("Model", "model", "label_model", "show_column_model"),
         ("CPU", "cpu", "label_cpu", "show_column_cpu"),
@@ -91,7 +99,7 @@ def export_customer_orders():
         ("Display", "display", "label_display", "show_column_display"),
         ("GPU 1", "gpu1", "label_gpu1", "show_column_gpu1"),
         ("GPU 2", "gpu2", "label_gpu2", "show_column_gpu2"),
-        ("Grade", "grade", "label_grade", "show_column_Grade"),
+        ("Grade", "grade", "label_grade", "show_column_grade"),
         ("Location", "location", "label_location", "show_column_location"),
         ("Status", "status", "label_status", "show_column_status"),
         ("Stage", "process_stage", "label_stage", "show_column_process_stage"),
@@ -189,7 +197,6 @@ def export_customer_orders():
     output.seek(0)
     return send_file(output, download_name='customer_orders.xlsx', as_attachment=True)
 
-@csrf.exempt
 @exports_bp.route('/inventory/export', methods=['GET', 'POST'])
 @login_required
 def inventory_export():
@@ -202,24 +209,33 @@ def inventory_export():
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
         serial_raw = request.form.get('serial')
+        serial_numbers_raw = request.form.get('serial_numbers')
+        asset_tags_raw = request.form.get('asset_tags')
         action = request.form.get('action')
         
         query = Product.query.filter_by(tenant_id=current_user.tenant_id)
 
+        combined = []
         if serial_raw:
-            serials = [s.strip() for s in serial_raw.replace('\n', ',').split(',') if s.strip()]
+            combined.extend([s.strip() for s in serial_raw.replace('\n', ',').split(',') if s.strip()])
+        if serial_numbers_raw:
+            combined.extend([s.strip() for s in serial_numbers_raw.replace('\n', ',').split(',') if s.strip()])
+        if asset_tags_raw:
+            combined.extend([s.strip() for s in asset_tags_raw.replace('\n', ',').split(',') if s.strip()])
+        if combined:
             from sqlalchemy import or_
             query = query.filter(
                 or_(
-                    Product.serial.in_(serials),
-                    Product.asset.in_(serials)
+                    Product.serial.in_(combined),
+                    Product.asset.in_(combined)
                 )
             )
         else:
             if model:
                 query = query.filter(Product.model.ilike(f"%{model}%"))
             if processor:
-                query = query.filter(Product.processor.ilike(f"%{processor}%"))
+                # 'processor' is stored as 'cpu' in Product model
+                query = query.filter(Product.cpu.ilike(f"%{processor}%"))
             if gpu1:
                 query = query.filter(Product.gpu1.ilike(f"%{gpu1}%"))
             if start_date and end_date:
@@ -252,7 +268,16 @@ def inventory_export():
         } for p in products]
 
         if action == 'preview':
-            return render_template('export_preview.html', products=data)
+            filters = {
+                'model': model or '',
+                'processor': processor or '',
+                'gpu1': gpu1 or '',
+                'start_date': start_date or '',
+                'end_date': end_date or '',
+                'serial_numbers': serial_numbers_raw or '',
+                'asset_tags': asset_tags_raw or '',
+            }
+            return render_template('export_preview.html', products=data, filters=filters)
 
         if action == 'download':
             output = BytesIO()
@@ -263,3 +288,89 @@ def inventory_export():
             return send_file(output, as_attachment=True, download_name='inventory_export.xlsx')
 
     return render_template('inventory_export.html')
+
+@exports_bp.route('/orders/export_excel/<order_number>')
+@login_required
+def export_order_excel(order_number):
+    from inventory_flask_app.models import Order, SaleTransaction, ProductInstance, Product
+    from flask_login import current_user
+
+    order = Order.query.filter_by(order_number=order_number, tenant_id=current_user.tenant_id).first()
+    if not order:
+        flash("Order not found.", "danger")
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    transactions = SaleTransaction.query.filter_by(order_id=order.id).all()
+    data = []
+    for tx in transactions:
+        instance = db.session.get(ProductInstance, tx.product_instance_id)
+        product = instance.product if instance and instance.product else None
+        data.append({
+            "Asset": instance.asset if instance else '',
+            "Serial": instance.serial if instance else '',
+            "Item Name": product.item_name if product else '',
+            "Model": product.model if product else '',
+            "CPU": product.cpu if product else '',
+            "RAM": product.ram if product else '',
+            "Disk": product.disk1size if product else '',
+            "Display": product.display if product else '',
+            "GPU1": product.gpu1 if product else '',
+            "Grade": product.grade if product else '',
+            "Status": instance.status if instance else '',
+            "Price": tx.price_at_sale,
+            "Date Sold": tx.date_sold.strftime('%Y-%m-%d') if tx.date_sold else ''
+        })
+
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Order Details')
+    output.seek(0)
+
+    return send_file(output, download_name=f'order_{order_number}_export.xlsx', as_attachment=True)
+
+
+# Export aged inventory as CSV
+@exports_bp.route('/export/aged_inventory')
+@login_required
+def export_aged_inventory():
+    threshold_days = 60  # default fallback
+    try:
+        from inventory_flask_app.models import TenantSettings
+        tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+        settings = {s.key: s.value for s in tenant_settings}
+        threshold_days = int(settings.get("inventory_age_threshold", 60))
+    except:
+        pass
+
+    cutoff_date = datetime.utcnow() - timedelta(days=threshold_days)
+
+    instances = ProductInstance.query.join(Product).filter(
+        ProductInstance.created_at <= cutoff_date,
+        Product.tenant_id == current_user.tenant_id
+    ).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Serial", "Asset", "Model", "CPU", "RAM", "Grade",
+        "Status", "Vendor", "Location", "Created"
+    ])
+
+    for i in instances:
+        writer.writerow([
+            i.serial,
+            i.asset,
+            i.product.model if i.product else "",
+            i.product.cpu if i.product else "",
+            i.product.ram if i.product else "",
+            i.product.grade if i.product else "",
+            i.status,
+            i.product.vendor.name if i.product and i.product.vendor else "",
+            i.location.name if i.location else "",
+            i.created_at.strftime("%Y-%m-%d") if i.created_at else ""
+        ])
+
+    response = Response(output.getvalue(), mimetype='text/csv')
+    response.headers['Content-Disposition'] = 'attachment; filename=aged_inventory.csv'
+    return response

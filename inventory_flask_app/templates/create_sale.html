@@ -1,67 +1,102 @@
 {% extends "base.html" %}
+{% block title %}Create Sale{% endblock %}
+{% block page_title %}Create Sale{% endblock %}
 
-{% block head %}
-<style>
-.create-sale-card {
-  background: #f3f4f8;
-  border-radius: 1.2rem;
-  box-shadow: 0 2px 16px #0057b710;
-  border: none;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 1.2rem 0.6rem;
-}
-.create-sale-heading {
-  font-size: 1.62rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-@media (max-width: 600px) {
-  .create-sale-card { padding: 1.2rem 0.3rem; }
-  .create-sale-heading { font-size: 1.15rem; }
-}
-@media (min-width: 1200px) {
-  .create-sale-card {
-    max-width: 100%;
-  }
-}
-body {
-  background-color: #f5f7fa;
-}
-
-.table-responsive {
-  overflow-x: auto;
-}
-
-table.table td,
-table.table th {
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-@media (max-width: 992px) {
-  .table-responsive table {
-    font-size: 0.88rem;
-  }
-}
-</style>
+{% block extra_head %}
 <audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+<style>
+  /* ── Step indicator ── */
+  .sale-steps { display:flex; align-items:center; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .step { padding:0.4rem 1rem; border-radius:999px; font-size:0.82rem;
+          background:#F1F5F9; color:#64748B; font-weight:600; white-space:nowrap;
+          transition:background 0.2s, color 0.2s; }
+  .step.active { background:var(--primary); color:#fff; }
+  .step.completed { background:var(--color-success); color:#fff; }
+  .step-divider { color:#CBD5E1; font-size:1rem; }
 
-<script>
-  function playBeep() {
-    const beep = document.getElementById("beep-sound");
-    if (beep) beep.play();
+  /* ── Payment cards ── */
+  .payment-card {
+    border:2px solid var(--border); border-radius:12px; padding:1.25rem 1rem;
+    cursor:pointer; text-align:center; flex:1; min-width:100px;
+    transition:border-color 0.15s, background 0.15s;
+    user-select:none;
   }
+  .payment-card:hover { border-color:#93C5FD; }
+  .payment-card.selected { border-color:var(--primary); background:#EFF6FF; }
+  .payment-card .pm-icon { font-size:1.75rem; display:block; margin-bottom:0.4rem; line-height:1; color:var(--text-secondary); }
+  .payment-card.selected .pm-icon { color:var(--primary); }
+  .payment-card .pm-label { font-size:0.75rem; font-weight:600; color:#374151; }
 
-  document.getElementById('scanSerialInput').addEventListener('change', function () {
-    if (this.value.trim()) {
-      playBeep();
-    }
-  });
-</script>
+  /* ── Price input ── */
+  .unit-price-input {
+    font-size:1rem; font-weight:600; border:2px solid var(--border);
+    border-radius:8px; padding:0.4rem 0.6rem; width:110px;
+    transition:border-color 0.15s; text-align:right;
+  }
+  .unit-price-input:focus { border-color:var(--primary); outline:none; box-shadow:none; }
+
+  /* ── Scan input ── */
+  .scan-input-large {
+    font-size:1.05rem; padding:0.7rem 1rem;
+    border:2px solid var(--border) !important;
+    transition:border-color 0.15s !important;
+  }
+  .scan-input-large:focus { border-color:var(--primary) !important; outline:none; box-shadow:none !important; }
+
+  /* ── Empty units ── */
+  .empty-units {
+    border:2px dashed var(--border); border-radius:12px; padding:2.5rem 1rem;
+    text-align:center; color:var(--text-muted);
+  }
+  .empty-units i { font-size:2rem; display:block; margin-bottom:0.5rem; }
+
+  /* ── Order summary (right col) ── */
+  .order-summary { position:sticky; top:80px; }
+  .order-total-amount { font-size:1.5rem; font-weight:800; color:var(--primary);
+                         font-variant-numeric:tabular-nums; }
+  .summary-row { display:flex; justify-content:space-between; align-items:center;
+                  font-size:0.875rem; padding:0.3rem 0; }
+  .summary-row.total-row { font-size:1rem; font-weight:700; padding-top:0.65rem;
+                             border-top:2px solid var(--border); margin-top:0.25rem; }
+
+  /* ── Section headers ── */
+  .s-num { display:inline-flex; align-items:center; justify-content:center;
+            width:22px; height:22px; border-radius:50%; background:var(--primary);
+            color:#fff; font-size:0.7rem; font-weight:800; margin-right:0.5rem; flex-shrink:0; }
+  .s-head { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em;
+             color:var(--text-muted); font-weight:700; display:flex; align-items:center;
+             margin-bottom:1rem; }
+
+  /* ── Customer pill ── */
+  .customer-pill { display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem;
+                    background:var(--surface-2); border:1px solid var(--border); border-radius:12px; }
+  .cust-avatar { width:40px; height:40px; border-radius:50%; background:var(--primary);
+                  color:#fff; font-size:0.85rem; font-weight:700;
+                  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  /* ── Unit table ── */
+  .unit-table-wrap { overflow-x:auto; }
+
+  /* ── Summary unit list ── */
+  .summary-unit-row { display:flex; justify-content:space-between; align-items:flex-start;
+                        font-size:0.8rem; padding:0.3rem 0; border-bottom:1px solid var(--border); gap:0.5rem; }
+  .summary-unit-row:last-child { border-bottom:none; }
+
+  /* ── Customer search dropdown ── */
+  .customer-search-wrapper { position:relative; }
+  .customer-dropdown {
+    position:absolute; top:calc(100% + 4px); left:0; right:0;
+    background:#fff; border:1px solid #E5E7EB; border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:9999;
+    max-height:300px; overflow-y:auto;
+  }
+  .customer-result-item { padding:0.6rem 1rem; cursor:pointer; transition:background 0.1s; }
+  .customer-result-item:hover { background:var(--surface-2); }
+</style>
 {% endblock %}
-{% block content %}
 
+{% block content %}
+{# ── Pre-populated products from instance selection ── #}
 {% if selected_instances %}
 <script>
 var products = [
@@ -85,370 +120,754 @@ var products = [
   {% endfor %}
 ];
 </script>
-{% elif available_instances %}
-<script>
-var products = [];
-const availableSerials = {{ available_instances | tojson | safe }};
-const availableSerialsData = {{ available_serials_data | tojson | safe }};
-</script>
 {% else %}
-<script>
-var products = [];
-const availableSerialsData = {{ available_serials_data | tojson | safe }};
-</script>
+<script>var products = [];</script>
 {% endif %}
 
-<div class="container" style="max-width: 880px;">
-  <div class="create-sale-card mt-5">
-    <div class="mb-4 text-center">
-      <h2 class="create-sale-heading mb-1">
-        <i class="bi bi-receipt text-primary me-2"></i>Create Sale Invoice
-      </h2>
-      <div class="text-muted" style="font-size:1.07rem;">Complete the fields below to generate an invoice</div>
-    </div>
-    <form id="saleForm" class="form">
-      <div class="mb-3">
-        <label for="customerSelect" class="form-label">Select Customer:</label>
-        <div class="row g-3 align-items-end">
-          <div class="col-md-8">
-            <select id="customerSelect" class="form-select form-control-sm rounded-pill px-3" style="max-width: 400px;" name="customer_id" required>
-              <option value="">-- Select Customer --</option>
-              {% for customer in customers %}
-                  <option value="{{ customer.id }}"
-                      {% if selected_customer_id and customer.id|string == selected_customer_id|string %}selected{% endif %}
-                  >{{ customer.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-4">
-            <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-primary rounded-pill fw-semibold btn-sm px-4 w-100" style="min-width: 160px;">➕ Add Customer</a>
-          </div>
-        </div>
-      </div>
+{# ── Currency / VAT config ── #}
+<script>
+  var SALE_CURRENCY = {{ (settings.currency or 'AED') | tojson }};
+  var SALE_VAT_RATE = {{ (settings.vat_rate or '5') | float }};
+</script>
 
-      <div id="scan-add-row" class="mb-3">
-        <div class="row g-3 align-items-end mt-3">
-          <div class="col-md-8">
-            <label for="scanSerialInput" class="form-label">Scan or Type Serial Number:</label>
-            <input type="text" id="scanSerialInput" class="form-control form-control-sm rounded-pill px-3" style="max-width: 400px;" placeholder="Enter or scan serial number">
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <button type="button" class="btn btn-primary btn-sm fw-semibold px-4 w-100" style="min-width: 160px;" onclick="addProduct()">➕ Add Product</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- MOVED TABLE BLOCK HERE, new markup below -->
-      <div class="table-responsive mt-4" style="overflow-x: auto;">
-        <table class="table table-hover table-sm align-middle table-bordered table-striped shadow-sm rounded" id="productTable" style="display: none; min-width: 960px;">
-            <thead>
-                <tr>
-                    <th>Serial</th>
-                    <th>Asset</th>
-                    <th>Item Name</th>
-                    <th>Make</th>
-                    <th>Model</th>
-                    <th class="d-none d-md-table-cell">CPU</th>
-                    <th class="d-none d-md-table-cell">RAM</th>
-                    <th class="d-none d-md-table-cell">Disk</th>
-                    <th class="d-none d-md-table-cell">Display</th>
-                    <th class="d-none d-md-table-cell">GPU 1</th>
-                    <th class="d-none d-md-table-cell">GPU 2</th>
-                    <th class="d-none d-md-table-cell">Grade</th>
-                    <th class="d-none d-md-table-cell">Price (USD)</th>
-                    <th>Remove</th>
-                </tr>
-            </thead>
-            <tbody id="productList"></tbody>
-        </table>
-      </div>
-      <!-- END MOVED TABLE BLOCK -->
-
-      <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-3">
-        <button type="submit" id="submitInvoiceBtn" class="btn btn-success btn-sm px-4 fw-semibold" style="display: none;">✅ Confirm & Create Invoice</button>
-        <button type="button" id="previewInvoiceBtn" class="btn btn-outline-primary btn-sm px-4 fw-semibold" style="display: none;">👁️ Preview Invoice</button>
-      </div>
-      <div id="saleLoadingSpinner" class="text-center mt-3" style="display:none;">
-        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-      </div>
-      <script>
-      // Inject availableSerials into autocomplete or dropdown later if needed
-      if (typeof availableSerials !== 'undefined' && Array.isArray(availableSerials)) {
-          console.log('Available unsold instances for selection:', availableSerials);
-      }
-      </script>
-  </form>
+{# ── Page header ── #}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Create Sale Invoice</h1>
+    <div class="page-subtitle">Scan units, set prices, and generate an invoice</div>
+  </div>
 </div>
 
-<!-- Invoice Preview Modal -->
-<div class="modal fade" id="invoicePreviewModal" tabindex="-1" aria-labelledby="invoicePreviewModalLabel" aria-hidden="true">
+{# ── Step indicator ── #}
+<div class="sale-steps animate-fade-up">
+  <div class="step active" id="step-customer">① Customer</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-units">② Add Units</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-payment">③ Payment</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-confirm">④ Confirm</div>
+</div>
+
+{# ── Main form ── #}
+<form id="saleForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" id="payment_method_input" name="payment_method" value="cash">
+
+  <div class="row g-4 animate-fade-up">
+
+    {# ━━━━━━━━━━━━━━━━━━━ LEFT COLUMN ━━━━━━━━━━━━━━━━━━━ #}
+    <div class="col-lg-8">
+
+      {# ── SECTION A: Customer ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.5rem;">
+          <div class="s-head"><span class="s-num">1</span> Select Customer</div>
+
+          {# Customer pill (shown after selection) #}
+          <div id="customerPillWrap" style="display:none;margin-bottom:1rem;">
+            <div class="customer-pill">
+              <div class="cust-avatar" id="customerAvatarInitials">?</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                     id="customerPillName">—</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);" id="customerPillSub">—</div>
+              </div>
+              <a href="#" style="font-size:0.78rem;color:var(--primary);text-decoration:none;white-space:nowrap;"
+                 onclick="clearCustomerSelection(); return false;">Change</a>
+            </div>
+          </div>
+
+          {# Customer search (hidden after selection) #}
+          <div id="customerSelectWrap">
+            <div class="d-flex gap-2 align-items-start">
+              <div class="customer-search-wrapper" style="flex:1;position:relative;">
+                <input type="text" id="customerSearch" class="form-control"
+                       placeholder="Search by name or phone number…" autocomplete="off">
+                <div id="customerResults" class="customer-dropdown" style="display:none;"></div>
+                <input type="hidden" id="customerIdInput" name="customer_id">
+              </div>
+              <a href="{{ url_for('customers_bp.add_customer') }}" class="btn btn-ghost" style="white-space:nowrap;">
+                <i class="bi bi-person-plus"></i> New
+              </a>
+            </div>
+          </div>
+
+          {# Pre-select customer from URL param #}
+          {% if selected_customer_id %}
+          {% for customer in customers %}{% if customer.id|string == selected_customer_id|string %}
+          <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            selectCustomer({ id: {{ customer.id }}, name: {{ customer.name|tojson }},
+              phone: {{ (customer.phone or '')|tojson }}, email: {{ (customer.email or '')|tojson }},
+              company: {{ (customer.company or '')|tojson }} });
+          });
+          </script>
+          {% endif %}{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── SECTION B: Add Units ── #}
+      <div class="card mb-4">
+        <div class="card-body" style="padding:1.5rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div class="s-head" style="margin-bottom:0;">
+              <span class="s-num">2</span> Add Units
+              <span id="unitCountBadge" style="display:none;margin-left:0.5rem;background:var(--primary);
+                    color:#fff;padding:0.1rem 0.5rem;border-radius:999px;font-size:0.72rem;font-weight:700;">0</span>
+            </div>
+            <div style="display:flex;gap:1rem;align-items:center;">
+              <button type="button" class="btn btn-link btn-sm p-0"
+                      style="font-size:0.78rem;color:var(--text-muted);text-decoration:none;"
+                      onclick="loadScannedUnits()">
+                <i class="bi bi-arrow-repeat"></i> Load (<span id="scannedCount">0</span>)
+              </button>
+              <button type="button" class="btn btn-link btn-sm p-0"
+                      style="font-size:0.78rem;color:var(--color-danger);text-decoration:none;"
+                      onclick="clearScannedSession()">
+                <i class="bi bi-x-circle"></i> Clear
+              </button>
+            </div>
+          </div>
+
+          {# Scan input #}
+          <div id="scan-add-row" class="mb-3">
+            <div class="input-group">
+              <input type="text" id="scanSerialInput"
+                     class="scan-input-large form-control"
+                     placeholder="Scan or enter serial number…" autofocus>
+              <button type="button" class="btn btn-primary"
+                      onclick="addProduct()"
+                      style="border-radius:0 10px 10px 0;padding:0 1.25rem;">
+                <i class="bi bi-plus-lg"></i> Add
+              </button>
+            </div>
+          </div>
+
+          {# Empty state #}
+          <div id="emptyUnitsState" class="empty-units">
+            <i class="bi bi-upc-scan"></i>
+            <p style="margin:0;font-size:0.88rem;">Scan a serial above to add units to the sale</p>
+          </div>
+
+          {# Unit table #}
+          <div class="unit-table-wrap">
+            <table class="table table-sm align-middle mb-0" id="productTable" style="display:none;min-width:480px;">
+              <thead>
+                <tr>
+                  <th style="font-size:0.75rem;">Serial</th>
+                  <th style="font-size:0.75rem;" class="d-none d-sm-table-cell">Asset</th>
+                  <th style="font-size:0.75rem;">Model</th>
+                  <th style="font-size:0.75rem;" class="d-none d-md-table-cell">CPU</th>
+                  <th style="font-size:0.75rem;" class="d-none d-md-table-cell">RAM</th>
+                  <th style="font-size:0.75rem;" class="d-none d-md-table-cell">Grade</th>
+                  <th style="font-size:0.75rem;text-align:right;">Price</th>
+                  <th style="width:36px;"></th>
+                </tr>
+              </thead>
+              <tbody id="productList"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {# ── SECTION C: Payment ── #}
+      <div class="card">
+        <div class="card-body" style="padding:1.5rem;">
+          <div class="s-head"><span class="s-num">3</span> Payment Method</div>
+
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <div class="payment-card selected" data-method="cash" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-cash-stack"></i></span>
+              <span class="pm-label">Cash</span>
+            </div>
+            <div class="payment-card" data-method="card" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-credit-card"></i></span>
+              <span class="pm-label">Card</span>
+            </div>
+            <div class="payment-card" data-method="transfer" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-bank"></i></span>
+              <span class="pm-label">Transfer</span>
+            </div>
+            <div class="payment-card" data-method="credit" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-clock-history"></i></span>
+              <span class="pm-label">Credit</span>
+            </div>
+            <div class="payment-card" data-method="crypto" onclick="selectPaymentCard(this)">
+              <span class="pm-icon"><i class="bi bi-currency-bitcoin"></i></span>
+              <span class="pm-label">Crypto</span>
+            </div>
+          </div>
+
+          {# Credit due date (shown only when Credit selected) #}
+          <div id="creditDueDateRow" style="display:none;margin-top:1rem;max-width:260px;">
+            <label class="form-label" style="font-size:0.84rem;font-weight:600;">
+              Due Date <span style="color:var(--text-muted);font-weight:400;font-size:0.78rem;">(optional)</span>
+            </label>
+            <input type="date" name="credit_due_date" id="creditDueDateInput" class="form-control">
+          </div>
+        </div>
+      </div>
+
+    </div>{# end col-lg-8 #}
+
+    {# ━━━━━━━━━━━━━━━━━━━ RIGHT COLUMN: Order Summary ━━━━━━━━━━━━━━━━━━━ #}
+    <div class="col-lg-4">
+      <div class="order-summary">
+        <div class="card">
+          <div class="card-body" style="padding:1.5rem;">
+
+            {# Header #}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+              <span style="font-weight:700;font-size:0.9rem;">Order Summary</span>
+              <span id="unitCountLabel" style="font-size:0.75rem;color:var(--text-muted);">0 items</span>
+            </div>
+
+            {# Unit list (live updates) #}
+            <div id="summaryUnitList" style="min-height:60px;margin-bottom:1rem;max-height:220px;overflow-y:auto;"></div>
+
+            <hr style="margin:0.75rem 0;border-color:var(--border);">
+
+            {# VAT toggle #}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+              <label for="vatToggle" style="font-size:0.82rem;font-weight:600;cursor:pointer;margin:0;">
+                VAT (<span id="vatRateLabel">{{ settings.vat_rate or '5' }}</span>%)
+              </label>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="vatToggle"
+                       style="width:36px;height:20px;" checked>
+              </div>
+            </div>
+
+            {# Breakdown rows #}
+            <div class="summary-row">
+              <span style="color:var(--text-muted);">Subtotal</span>
+              <span id="breakdownSubtotal" style="font-variant-numeric:tabular-nums;">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+            <div id="vatLine" class="summary-row">
+              <span style="color:var(--text-muted);">VAT (<span id="vatPct">{{ settings.vat_rate or '5' }}</span>%)</span>
+              <span id="breakdownVat" style="color:var(--text-muted);font-variant-numeric:tabular-nums;">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+            <div class="summary-row total-row">
+              <span>Total</span>
+              <span id="breakdownTotal" class="order-total-amount">{{ settings.currency or 'AED' }} 0.00</span>
+            </div>
+
+            {# Actions #}
+            <div style="margin-top:1.25rem;">
+              <button type="submit" id="confirmSaleBtn" class="btn btn-primary w-100"
+                      style="font-size:0.975rem;font-weight:700;padding:0.8rem 1rem;">
+                <i class="bi bi-check-circle me-1"></i>
+                <span id="confirmBtnLabel">Confirm Sale — {{ settings.currency or 'AED' }} 0.00</span>
+              </button>
+              <button type="button" id="previewInvoiceBtn" class="btn btn-ghost w-100 mt-2"
+                      style="font-size:0.875rem;">
+                <i class="bi bi-eye me-1"></i> Preview Invoice
+              </button>
+              <div class="text-center mt-2">
+                <a href="{{ url_for('sales_bp.sold_units_view') }}"
+                   style="font-size:0.78rem;color:var(--text-muted);text-decoration:none;">
+                  Cancel
+                </a>
+              </div>
+            </div>
+
+            {# Loading spinner #}
+            <div id="saleLoadingSpinner" class="text-center mt-3" style="display:none;">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading…</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>{# end row #}
+</form>
+
+{# ── Invoice Preview Modal ── #}
+<div class="modal fade" id="invoicePreviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header align-items-center">
-        <h5 class="modal-title me-3" id="invoicePreviewModalLabel">Invoice Preview</h5>
-        <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="printPreviewInvoice()">🖨️ Print</button>
-        <button type="button" class="btn btn-outline-success btn-sm me-2" id="downloadPdfBtn" style="display:none;">⬇️ Download PDF</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
-          ✖ Close Preview
-        </button>
+      <div class="modal-header">
+        <h5 class="modal-title">Invoice Preview</h5>
+        <div class="d-flex gap-2 ms-auto">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="printPreviewInvoice()">
+            <i class="bi bi-printer"></i> Print
+          </button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
       </div>
-      <div class="modal-body" id="preview-container">
-        <!-- Invoice HTML will be inserted here -->
-      </div>
+      <div class="modal-body" id="preview-container"></div>
     </div>
   </div>
 </div>
-            
-<script>
-function addProduct() {
-    const rawInput = document.getElementById('scanSerialInput').value.trim();
-    const serial = rawInput.toUpperCase();
-    if (!serial) {
-        alert('Please scan or enter a serial number.');
-        return;
-    }
 
-    if (products.some(p => (p.serial && p.serial.toUpperCase() === serial))) {
-        alert('⚠️ This serial is already added to the sale.');
-        document.getElementById('scanSerialInput').value = '';
-        return;
-    }
-
-    fetch(`/get_product_by_serial/${serial}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
-
-            // Prevent adding already sold products
-            if (data.is_sold) {
-                alert('This product has already been sold.');
-                return;
-            }
-
-            // Use 'serial' field from data for both 'serial'
-            const product = {
-                product_instance_id: data.product_instance_id,
-                serial: data.serial,
-                asset: data.asset, // Ensure asset field is present
-                name: data.item_name,
-                make: data.make,
-                model: data.model,
-                cpu: data.cpu,
-                ram: data.ram,
-                disk1size: data.disk1size,
-                display: data.display,
-                gpu1: data.gpu1,
-                gpu2: data.gpu2,
-                grade: data.grade,
-                price_at_sale: 0
-            };
-
-            products.push(product);
-            updateProductTable();
-            document.getElementById('scanSerialInput').value = '';
-        })
-        .catch(err => {
-            console.error('Fetch error:', err);
-            alert('Product not found or server error.');
-        });
-}
-
-// Listen for Enter key on the serial input to trigger addProduct
-document.getElementById('scanSerialInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        addProduct();
-    }
-});
-
-function updateProductTable() {
-    const table = document.getElementById('productTable');
-    const tbody = document.getElementById('productList');
-    tbody.innerHTML = '';
-
-    let total = 0;
-    products.forEach((product, index) => {
-        total += parseFloat(product.price_at_sale) || 0;
-        const row = document.createElement('tr');
-        // Ensure asset is shown in the correct column (second column)
-        row.innerHTML = `
-            <td>${product.serial || product.serial_number || ''}</td>
-            <td>${product.asset || product.asset_tag || ''}</td>
-            <td>${product.name}</td>
-            <td>${product.make || ''}</td>
-            <td>${product.model || ''}</td>
-            <td class="d-none d-md-table-cell">${product.cpu || ''}</td>
-            <td class="d-none d-md-table-cell">${product.ram || ''}</td>
-            <td class="d-none d-md-table-cell">${product.disk1size || ''}</td>
-            <td class="d-none d-md-table-cell">${product.display || ''}</td>
-            <td class="d-none d-md-table-cell">${product.gpu1 || ''}</td>
-            <td class="d-none d-md-table-cell">${product.gpu2 || ''}</td>
-            <td class="d-none d-md-table-cell">${product.grade || ''}</td>
-            <td class="d-none d-md-table-cell">
-              <input type="number" value="${product.price_at_sale}" min="0" onchange="updatePrice(${index}, this.value)" class="form-control" style="min-width: 100px; max-width: 150px;">
-            </td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">Remove</button></td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    // Add total row if products exist
-    if (products.length > 0) {
-        const totalRow = document.createElement('tr');
-        totalRow.innerHTML = `
-            <td colspan="12" style="text-align:right;"><strong>Total:</strong></td>
-            <td colspan="2"><strong>$${total.toFixed(2)}</strong></td>
-        `;
-        tbody.appendChild(totalRow);
-        table.style.display = '';
-        document.getElementById('submitInvoiceBtn').style.display = '';
-        document.getElementById('previewInvoiceBtn').style.display = '';
-    } else {
-        table.style.display = 'none';
-        document.getElementById('submitInvoiceBtn').style.display = 'none';
-        document.getElementById('previewInvoiceBtn').style.display = 'none';
-    }
-}
-
-function updatePrice(index, value) {
-    products[index].price_at_sale = parseFloat(value) || 0;
-    updateProductTable();
-}
-
-function removeProduct(index) {
-    products.splice(index, 1);
-    updateProductTable();
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    updateProductTable();
-    var scanAddRow = document.getElementById('scan-add-row');
-    if (products.length > 0 && scanAddRow) scanAddRow.style.display = 'none';
-
-    const saleForm = document.getElementById('saleForm');
-    if (!saleForm) return;
-
-    saleForm.addEventListener('submit', function (e) {
-        e.preventDefault(); // Stop native submit!
-
-        const customerId = document.getElementById('customerSelect').value;
-
-        if (!customerId) {
-            alert('Please select a customer.');
-            return;
-        }
-        if (products.length === 0) {
-            alert('Please add at least one product.');
-            return;
-        }
-
-        document.getElementById('saleLoadingSpinner').style.display = 'block';
-
-        const saleFormData = new FormData();
-        saleFormData.append('customer_id', customerId);
-        // Ensure we are always using serial and asset as in invoice preview & backend
-        products.forEach((product) => {
-            // Use .serial for serials and .asset for assets, always present
-            saleFormData.append('serials', product.serial);
-            saleFormData.append('assets', product.asset);
-            saleFormData.append(`price_${product.serial}`, product.price_at_sale || 0);
-        });
-
-        fetch('/confirm_sale', {
-            method: 'POST',
-            body: saleFormData,
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.invoice_url) {
-                var modal = new bootstrap.Modal(document.getElementById('invoiceOptionsModal'));
-                modal.show();
-                document.getElementById('modalDownloadInvoiceBtn').onclick = function() {
-                    window.open(data.invoice_url, "_blank");
-                    modal.hide();
-                    document.getElementById('saleLoadingSpinner').style.display = 'none';
-                };
-                document.getElementById('modalDoneBtn').onclick = function() {
-                    modal.hide();
-                    document.getElementById('saleLoadingSpinner').style.display = 'none';
-                    window.location.href = "/create_sale_form";
-                };
-                document.getElementById('saleLoadingSpinner').style.display = 'none';
-            } else {
-                alert(data.error || "Failed to confirm sale.");
-                document.getElementById('saleLoadingSpinner').style.display = 'none';
-            }
-        })
-        .catch(err => {
-            console.error('Submit error:', err);
-            alert('Failed to confirm sale.');
-            document.getElementById('saleLoadingSpinner').style.display = 'none';
-        });
-    });
-});
-
-document.getElementById('previewInvoiceBtn').addEventListener('click', function () {
-    const customerId = document.getElementById('customerSelect').value;
-    if (!customerId) {
-        alert('Please select a customer.');
-        return;
-    }
-    if (products.length === 0) {
-        alert('Please add at least one product.');
-        return;
-    }
-    document.getElementById('saleLoadingSpinner').style.display = 'block';
-    fetch('/preview_invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: customerId, items: products })
-    })
-    .then(response => response.text())
-    .then(html => {
-        // Only update the preview-container (modal body), not the modal header
-        document.getElementById('preview-container').innerHTML = html;
-        var modal = new bootstrap.Modal(document.getElementById('invoicePreviewModal'));
-        modal.show();
-        document.getElementById('saleLoadingSpinner').style.display = 'none';
-    })
-    .catch(err => {
-        console.error('Preview error:', err);
-        alert('Failed to generate invoice preview.');
-        document.getElementById('saleLoadingSpinner').style.display = 'none';
-    });
-});
-
-function printPreviewInvoice() {
-    // Only print the modal body content
-    var printContents = document.getElementById('preview-container').innerHTML;
-    var originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContents;
-    window.print();
-    document.body.innerHTML = originalContents;
-    location.reload(); // To reload the original page after print
-}
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
+{# ── Sale Complete Modal ── #}
 <div class="modal fade" id="invoiceOptionsModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Sale Completed</h5>
+        <h5 class="modal-title">
+          <i class="bi bi-check-circle-fill me-2" style="color:var(--color-success);"></i>Sale Completed
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p>The sale was successfully completed. Would you like to download the invoice PDF?</p>
+        <p style="color:var(--text-secondary);">Sale recorded successfully. Would you like to view or download the invoice?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" id="modalDownloadInvoiceBtn" class="btn btn-primary">Download Invoice PDF</button>
-        <button type="button" id="modalDoneBtn" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+        <button type="button" id="modalViewInvoiceBtn" class="btn btn-primary">
+          <i class="bi bi-file-earmark-text"></i> View Invoice
+        </button>
+        <button type="button" id="modalDownloadInvoiceBtn" class="btn btn-ghost">
+          <i class="bi bi-download"></i> Download PDF
+        </button>
+        <button type="button" id="modalDoneBtn" class="btn btn-ghost" data-bs-dismiss="modal">Done</button>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
+<script>
+/* ── Beep ── */
+function playBeep() {
+  const beep = document.getElementById('beep-sound');
+  if (beep) beep.play().catch(() => {});
+}
+
+/* ── Step progression ── */
+var _stepLabels = { 'step-customer':'① Customer', 'step-units':'② Add Units', 'step-payment':'③ Payment', 'step-confirm':'④ Confirm' };
+function advanceStep(step) {
+  const steps = { customer:'step-customer', units:'step-units', payment:'step-payment' };
+  const next  = { customer:'step-units', units:'step-payment', payment:'step-confirm' };
+  const cur = document.getElementById(steps[step]);
+  const nxt = document.getElementById(next[step]);
+  if (cur && !cur.classList.contains('completed')) {
+    cur.classList.remove('active');
+    cur.classList.add('completed');
+    cur.textContent = '✓ ' + _stepLabels[cur.id].slice(2); /* strip number, add ✓ */
+  }
+  if (nxt && !nxt.classList.contains('completed') && !nxt.classList.contains('active')) {
+    nxt.classList.add('active');
+  }
+}
+
+/* ── Payment card selector ── */
+function selectPaymentCard(card) {
+  document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  const method = card.dataset.method;
+  document.getElementById('payment_method_input').value = method;
+  const creditRow = document.getElementById('creditDueDateRow');
+  if (creditRow) creditRow.style.display = method === 'credit' ? '' : 'none';
+  advanceStep('payment');
+}
+
+/* ── Payment method toggle (kept for backward-compat) ── */
+function initPaymentButtons() {}
+
+/* ── Right-column unit list ── */
+function updateSummaryList() {
+  const list       = document.getElementById('summaryUnitList');
+  const countLabel = document.getElementById('unitCountLabel');
+  const badge      = document.getElementById('unitCountBadge');
+  if (!list) return;
+  if (products.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:0.75rem 0;">No units added yet</div>';
+    if (countLabel) countLabel.textContent = '0 items';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  if (badge)      { badge.textContent = products.length; badge.style.display = ''; }
+  if (countLabel) countLabel.textContent = products.length + ' item' + (products.length !== 1 ? 's' : '');
+  list.innerHTML = products.map(function(p) {
+    var label = (p.model || p.name || p.serial || '—');
+    var price = (parseFloat(p.price_at_sale) || 0).toFixed(2);
+    return '<div class="summary-unit-row">' +
+      '<div style="min-width:0;flex:1;">' +
+        '<span style="font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + label + '</span>' +
+        '<span style="color:var(--text-muted);font-family:monospace;font-size:0.72rem;">' + (p.serial || '') + '</span>' +
+      '</div>' +
+      '<span style="font-weight:600;color:var(--primary);white-space:nowrap;">' + SALE_CURRENCY + ' ' + price + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+/* ── Update totals only (no full re-render) ── */
+function updateSaleTotals() {
+  var subtotal = 0;
+  products.forEach(function(p) { subtotal += parseFloat(p.price_at_sale) || 0; });
+
+  var vatToggle = document.getElementById('vatToggle');
+  var applyVat  = vatToggle ? vatToggle.checked : true;
+  var vatAmt    = applyVat ? subtotal * SALE_VAT_RATE / 100 : 0;
+  var total     = subtotal + vatAmt;
+
+  var elSub  = document.getElementById('breakdownSubtotal');
+  var elVat  = document.getElementById('breakdownVat');
+  var elTot  = document.getElementById('breakdownTotal');
+  var vatLine = document.getElementById('vatLine');
+  if (elSub)  elSub.textContent  = SALE_CURRENCY + ' ' + subtotal.toFixed(2);
+  if (elVat)  elVat.textContent  = SALE_CURRENCY + ' ' + vatAmt.toFixed(2);
+  if (elTot)  elTot.textContent  = SALE_CURRENCY + ' ' + total.toFixed(2);
+  if (vatLine) vatLine.style.display = applyVat ? '' : 'none';
+
+  var lbl = document.getElementById('confirmBtnLabel');
+  if (lbl) lbl.textContent = 'Confirm Sale — ' + SALE_CURRENCY + ' ' + total.toFixed(2);
+
+  updateSummaryList();
+}
+
+/* ── Full table render ── */
+function updateProductTable() {
+  const table      = document.getElementById('productTable');
+  const tbody      = document.getElementById('productList');
+  const emptyState = document.getElementById('emptyUnitsState');
+  /* vatBreakdownPanel / paymentMethodRow / saleActionsRow no longer exist
+     as controlled elements — guards prevent errors */
+  const vatPanel   = document.getElementById('vatBreakdownPanel');
+  const pmRow      = document.getElementById('paymentMethodRow');
+  const actRow     = document.getElementById('saleActionsRow');
+
+  tbody.innerHTML = '';
+
+  products.forEach(function(p, i) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="font-family:monospace;font-size:0.8rem;">' + (p.serial || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-sm-table-cell">' + (p.asset || '') + '</td>' +
+      '<td style="font-size:0.84rem;max-width:160px;">' +
+        '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.model || p.name || '') + '</div>' +
+      '</td>' +
+      '<td style="font-size:0.82rem;color:var(--text-secondary);" class="d-none d-md-table-cell">' + (p.cpu || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + (p.ram || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + (p.grade || '') + '</td>' +
+      '<td style="text-align:right;">' +
+        '<div style="display:flex;align-items:center;gap:0.3rem;justify-content:flex-end;">' +
+          '<span style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;">' + SALE_CURRENCY + '</span>' +
+          '<input type="number" value="' + (p.price_at_sale || 0) + '" min="0" step="0.01"' +
+          ' oninput="updatePrice(' + i + ', this.value)"' +
+          ' class="unit-price-input">' +
+        '</div>' +
+      '</td>' +
+      '<td><button type="button" class="btn btn-ghost btn-sm"' +
+          ' style="color:var(--color-danger);padding:0.25rem 0.4rem;"' +
+          ' onclick="removeProduct(' + i + ')"><i class="bi bi-x-lg"></i></button></td>';
+    tbody.appendChild(tr);
+  });
+
+  if (products.length > 0) {
+    table.style.display = '';
+    if (emptyState) emptyState.style.display = 'none';
+    if (vatPanel)   vatPanel.style.display = '';
+    if (pmRow)      pmRow.style.display    = '';
+    if (actRow)     actRow.style.display   = '';
+    updateSaleTotals();
+  } else {
+    table.style.display = 'none';
+    if (emptyState) emptyState.style.display = '';
+    if (vatPanel)   vatPanel.style.display = 'none';
+    if (pmRow)      pmRow.style.display    = 'none';
+    if (actRow)     actRow.style.display   = 'none';
+    updateSummaryList();
+  }
+  updateScannedCount();
+}
+
+/* ── Price update (no full re-render — preserves focus) ── */
+function updatePrice(i, v) {
+  products[i].price_at_sale = parseFloat(v) || 0;
+  updateSaleTotals();
+}
+
+function removeProduct(i) {
+  products.splice(i, 1);
+  updateProductTable();
+}
+
+function updateScannedCount() {
+  const b = document.getElementById('scannedCount');
+  if (b) b.textContent = products.length;
+}
+
+/* ── Add product via serial lookup ── */
+function addProduct() {
+  const serial = document.getElementById('scanSerialInput').value.trim().toUpperCase();
+  if (!serial) { showToast('Enter or scan a serial number.', 'warning'); return; }
+  if (products.some(function(p) { return (p.serial || '').toUpperCase() === serial; })) {
+    showToast('This serial is already added.', 'warning');
+    document.getElementById('scanSerialInput').value = '';
+    return;
+  }
+  fetch('/stock/api/lookup_unit?q=' + encodeURIComponent(serial))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { showToast(data.error, 'danger'); return; }
+      if (data.is_sold) { showToast('This unit has already been sold.', 'danger'); return; }
+      var product = {
+        product_instance_id: data.product_instance_id,
+        serial: data.serial, asset: data.asset,
+        name: data.item_name, make: data.make, model: data.model,
+        cpu: data.cpu, ram: data.ram, disk1size: data.disk1size,
+        display: data.display, gpu1: data.gpu1, gpu2: data.gpu2,
+        grade: data.grade, price_at_sale: 0
+      };
+      products.push(product);
+      sendScannedUnitToSession(product);
+      updateProductTable();
+      document.getElementById('scanSerialInput').value = '';
+      playBeep();
+      if (products.length === 1) advanceStep('units');
+    })
+    .catch(function() { showToast('Product not found or server error.', 'danger'); });
+}
+
+/* ── Session helpers ── */
+function sendScannedUnitToSession(p) {
+  fetch('/scan_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serial: p.serial, asset: p.asset })
+  }).catch(function() {});
+}
+
+function loadScannedUnits() {
+  fetch('/load_scanned_units')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!Array.isArray(data)) { showToast('No scanned data.', 'warning'); return; }
+      products = data.map(function(u) { return Object.assign({}, u, { price_at_sale: 0 }); });
+      updateProductTable();
+      showToast('Loaded ' + products.length + ' scanned units.', 'success');
+    })
+    .catch(function() { showToast('Failed to load scanned units.', 'danger'); });
+}
+
+function clearScannedSession() {
+  if (!confirm('Clear all scanned units?')) return;
+  var csrfToken = document.querySelector('meta[name="csrf-token"]')
+                  ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
+  fetch('/clear_scanned_units', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken }
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) { products = []; updateProductTable(); showToast('Cleared.', 'success'); }
+      else showToast('Failed to clear.', 'danger');
+    });
+}
+
+/* ── Print preview ── */
+function printPreviewInvoice() {
+  const c    = document.getElementById('preview-container').innerHTML;
+  const orig = document.body.innerHTML;
+  document.body.innerHTML = c;
+  window.print();
+  document.body.innerHTML = orig;
+  location.reload();
+}
+
+/* ── HTML escape ── */
+function escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Customer search ── */
+var _addCustUrl   = {{ url_for('customers_bp.add_customer') | tojson }};
+var _custCache    = {};
+var _custTimer    = null;
+
+function clearCustomerSelection() {
+  document.getElementById('customerIdInput').value = '';
+  document.getElementById('customerPillWrap').style.display = 'none';
+  document.getElementById('customerSelectWrap').style.display = '';
+  document.getElementById('customerSearch').value = '';
+  document.getElementById('customerResults').style.display = 'none';
+  setTimeout(function() { document.getElementById('customerSearch').focus(); }, 50);
+}
+
+function selectCustomer(c) {
+  _custCache[c.id] = c;
+  document.getElementById('customerIdInput').value = c.id;
+  document.getElementById('customerResults').style.display = 'none';
+  document.getElementById('customerSearch').value = '';
+  var name     = c.name || '';
+  var initials = name.trim().split(/\s+/).map(function(w) { return w[0]; }).join('').toUpperCase().slice(0,2);
+  var sub      = [c.phone, c.email].filter(Boolean).join(' · ') || 'No contact info';
+  document.getElementById('customerAvatarInitials').textContent = initials || '?';
+  document.getElementById('customerPillName').textContent = name;
+  document.getElementById('customerPillSub').textContent = sub;
+  document.getElementById('customerPillWrap').style.display = '';
+  document.getElementById('customerSelectWrap').style.display = 'none';
+  advanceStep('customer');
+}
+
+function _renderCustomerResults(results) {
+  var dropdown = document.getElementById('customerResults');
+  var addBtn = '<div class="customer-result-item" style="border-top:1px solid #E5E7EB;"'
+    + ' onclick="window.location.href=' + escH(JSON.stringify(_addCustUrl)) + '">'
+    + '<i class="bi bi-person-plus me-2" style="color:var(--primary);"></i>'
+    + '<span style="color:var(--primary);font-weight:600;">Add New Customer</span>'
+    + '</div>';
+  results.forEach(function(c) { _custCache[c.id] = c; });
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div style="padding:0.75rem 1rem;color:var(--text-muted);font-size:0.85rem;">No customers found</div>' + addBtn;
+  } else {
+    dropdown.innerHTML = results.map(function(c) {
+      var sub = [c.phone, c.company].filter(Boolean).join(' · ');
+      return '<div class="customer-result-item" onclick="selectCustomer(_custCache[' + c.id + '])">'
+        + '<div style="font-weight:600;font-size:0.88rem;">' + escH(c.name) + '</div>'
+        + (sub ? '<div style="font-size:0.76rem;color:var(--text-muted);">' + escH(sub) + '</div>' : '')
+        + '</div>';
+    }).join('') + addBtn;
+  }
+  dropdown.style.display = 'block';
+}
+
+function initCustomerSearch() {
+  var inp = document.getElementById('customerSearch');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(_custTimer);
+    if (q.length < 2) { document.getElementById('customerResults').style.display = 'none'; return; }
+    _custTimer = setTimeout(function() {
+      fetch('/customers/api/search?q=' + encodeURIComponent(q))
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(_renderCustomerResults)
+        .catch(function(err) {
+          console.error('Customer search error:', err);
+          document.getElementById('customerResults').style.display = 'none';
+        });
+    }, 300);
+  });
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('customerResults').style.display = 'none';
+  });
+  document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.customer-search-wrapper');
+    if (wrap && !wrap.contains(e.target)) document.getElementById('customerResults').style.display = 'none';
+  });
+}
+
+/* ── DOMContentLoaded ── */
+document.addEventListener('DOMContentLoaded', function() {
+  initPaymentButtons();
+  initCustomerSearch();
+
+  // VAT toggle
+  var vatToggle = document.getElementById('vatToggle');
+  if (vatToggle) vatToggle.addEventListener('change', function() { updateSaleTotals(); });
+
+  // Scan input — Enter key
+  const scanInput = document.getElementById('scanSerialInput');
+  if (scanInput) {
+    scanInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); addProduct(); }
+    });
+  }
+
+  // Initial render (handles pre-populated products from selected_instances)
+  updateProductTable();
+  if (products.length > 0) {
+    var scanRow = document.getElementById('scan-add-row');
+    if (scanRow) scanRow.style.display = 'none';
+    advanceStep('customer');
+    advanceStep('units');
+  }
+
+  // Form submit
+  var saleForm = document.getElementById('saleForm');
+  if (!saleForm) return;
+
+  saleForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var customerId = document.getElementById('customerIdInput').value;
+    if (!customerId) { showToast('Select a customer.', 'warning'); return; }
+    if (products.length === 0) { showToast('Add at least one product.', 'warning'); return; }
+
+    var paymentMethod = document.getElementById('payment_method_input').value || 'cash';
+    var vatApplied    = document.getElementById('vatToggle') ? document.getElementById('vatToggle').checked : true;
+
+    var btn = document.getElementById('confirmSaleBtn');
+    setButtonLoading(btn, true);
+    document.getElementById('saleLoadingSpinner').style.display = 'block';
+
+    var fd = new FormData();
+    fd.append('customer_id',    customerId);
+    fd.append('payment_method', paymentMethod);
+    fd.append('vat_applied',    vatApplied ? 'true' : 'false');
+    var creditDue = document.getElementById('creditDueDateInput');
+    if (creditDue && creditDue.value) fd.append('credit_due_date', creditDue.value);
+
+    products.forEach(function(p) {
+      fd.append('serials', p.serial);
+      fd.append('assets',  p.asset);
+      fd.append('price_' + p.serial, p.price_at_sale || 0);
+    });
+
+    fetch('/confirm_sale', { method: 'POST', body: fd })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        setButtonLoading(btn, false);
+        document.getElementById('saleLoadingSpinner').style.display = 'none';
+        if (data.success && data.invoice_url) {
+          var modal = new bootstrap.Modal(document.getElementById('invoiceOptionsModal'));
+          modal.show();
+          var viewUrl = data.invoice_url.replace('/download_invoice/', '/invoices/view/');
+          document.getElementById('modalViewInvoiceBtn').onclick = function() {
+            window.location.href = viewUrl;
+          };
+          document.getElementById('modalDownloadInvoiceBtn').onclick = function() {
+            window.open(data.invoice_url, '_blank');
+          };
+          document.getElementById('modalDoneBtn').onclick = function() {
+            modal.hide();
+            window.location.href = '/create_sale_form';
+          };
+        } else {
+          showToast(data.error || 'Failed to confirm sale.', 'danger');
+        }
+      })
+      .catch(function() {
+        setButtonLoading(btn, false);
+        document.getElementById('saleLoadingSpinner').style.display = 'none';
+        showToast('Failed to confirm sale. Please try again.', 'danger');
+      });
+  });
+
+  // Preview invoice
+  document.getElementById('previewInvoiceBtn').addEventListener('click', function() {
+    var customerId = document.getElementById('customerIdInput').value;
+    if (!customerId) { showToast('Select a customer.', 'warning'); return; }
+    if (products.length === 0) { showToast('Add at least one product.', 'warning'); return; }
+    document.getElementById('saleLoadingSpinner').style.display = 'block';
+    fetch('/preview_invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: customerId, items: products })
+    })
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      document.getElementById('preview-container').innerHTML = html;
+      new bootstrap.Modal(document.getElementById('invoicePreviewModal')).show();
+      document.getElementById('saleLoadingSpinner').style.display = 'none';
+    })
+    .catch(function() {
+      document.getElementById('saleLoadingSpinner').style.display = 'none';
+      showToast('Failed to generate preview.', 'danger');
+    });
+  });
+});
+</script>
 {% endblock %}

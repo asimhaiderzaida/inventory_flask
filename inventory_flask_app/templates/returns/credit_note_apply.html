@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Apply Credit Note{% endblock %}
+{% block page_title %}Apply Credit Note{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Apply Credit Note</h1>
+    <div class="page-subtitle">
+      <span style="font-family:monospace;font-weight:700;">{{ cn.credit_note_number }}</span>
+      &middot; ${{ '%.2f'|format(cn.amount) }}
+      {% if cn.customer %} &middot; {{ cn.customer.name }}{% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('returns_bp.credit_notes') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:580px;">
+  {# ── Credit note summary ──────────────────────────────────── #}
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Credit Note Details</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:0.4rem 1rem;font-size:0.88rem;margin:0;">
+        <dt style="color:var(--text-muted);font-weight:500;">CN Number</dt>
+        <dd style="margin:0;font-family:monospace;font-weight:700;color:var(--primary);">{{ cn.credit_note_number }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Customer</dt>
+        <dd style="margin:0;">{{ cn.customer.name if cn.customer else '—' }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Total Amount</dt>
+        <dd style="margin:0;font-weight:700;">${{ '%.2f'|format(cn.amount) }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Issued</dt>
+        <dd style="margin:0;">{{ cn.issued_at.strftime('%Y-%m-%d') if cn.issued_at else '—' }}</dd>
+        {% if cn.notes %}
+        <dt style="color:var(--text-muted);font-weight:500;">Notes</dt>
+        <dd style="margin:0;">{{ cn.notes }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  {# ── Apply form ───────────────────────────────────────────── #}
+  {% if open_ar_list %}
+  <div class="card">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Apply to Outstanding Invoice</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-4">
+          <label class="form-label">Select Invoice <span style="color:var(--color-danger);">*</span></label>
+          {% for ar in open_ar_list %}
+          <label class="d-flex align-items-start gap-2 p-3 mb-2 rounded"
+                 style="border:1px solid var(--border);cursor:pointer;background:var(--surface-1);">
+            <input type="radio" name="ar_id" value="{{ ar.id }}" class="form-check-input mt-1" required>
+            <div style="flex:1;">
+              <div style="font-size:0.88rem;font-weight:600;">
+                {% if ar.invoice %}
+                  Invoice #{{ ar.invoice.invoice_number }}
+                {% else %}
+                  AR #{{ ar.id }}
+                {% endif %}
+                <span class="status-pill
+                  {% if ar.status == 'overdue' %}status-disputed
+                  {% elif ar.status == 'partial' %}status-under_process
+                  {% else %}status-unprocessed{% endif %}"
+                  style="margin-left:0.5rem;">{{ ar.status|title }}</span>
+              </div>
+              <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">
+                Balance: <strong style="color:var(--color-danger);">${{ '%.2f'|format(ar.balance) }}</strong>
+                {% if ar.due_date %}
+                  &middot; Due {{ ar.due_date.strftime('%Y-%m-%d') }}
+                  {% if ar.is_overdue %}
+                  <span style="color:var(--color-danger);">({{ ar.days_overdue }}d overdue)</span>
+                  {% endif %}
+                {% endif %}
+              </div>
+              <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">
+                Will apply: <strong>${{ '%.2f'|format([cn.amount|float, ar.balance]|min) }}</strong>
+                of credit note
+              </div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-check2-circle"></i> Apply Credit Note
+        </button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div style="padding:1.25rem;background:var(--surface-2);border-radius:var(--radius-md);
+              border:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:0.88rem;">
+    <i class="bi bi-info-circle me-2"></i>
+    {% if cn.customer_id %}
+      No open invoices found for {{ cn.customer.name if cn.customer else 'this customer' }}.
+      All AR balances may already be settled.
+    {% else %}
+      This credit note has no customer attached. Please update the return record to assign a customer.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

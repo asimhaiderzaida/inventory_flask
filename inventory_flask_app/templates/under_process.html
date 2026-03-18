@@ -1,71 +1,81 @@
 {% extends "base.html" %}
+{% block title %}Under Process{% endblock %}
+{% block page_title %}Under Process{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-  <div class="card shadow border-0 rounded-4 p-4" style="background: #f6f7fa;">
-    <h2 class="mb-4 text-primary fw-bold" style="font-size: 1.6rem;">
-      <i class="bi bi-compass me-2"></i>Under Process Tracker
-    </h2>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Under Process Tracker</h1>
+    <div class="page-subtitle">Units currently in processing</div>
+  </div>
+</div>
 
-    <form method="GET" class="row g-3 mb-4">
-      <div class="col-12 col-md-4 mb-2 mb-md-0">
-        <label class="form-label">Filter by Stage</label>
-        <select name="stage" class="form-select form-control-lg rounded-pill px-3">
-          <option value="">-- All Stages --</option>
-          {% for stage in stages %}
-            <option value="{{ stage }}" {% if stage == selected_stage %}selected{% endif %}>{{ stage|capitalize }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-4 mb-2 mb-md-0">
-        <label class="form-label">Filter by Team</label>
-        <select name="team" class="form-select form-control-lg rounded-pill px-3">
-          <option value="">-- All Teams --</option>
-          {% for team in teams %}
-            <option value="{{ team }}" {% if team == selected_team %}selected{% endif %}>{{ team }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-4 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary rounded-pill fw-semibold px-4 btn-lg w-100">
-          <i class="bi bi-search me-1"></i>Filter
-        </button>
-      </div>
-    </form>
+<!-- Filters -->
+<div class="animate-fade-up" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <form method="GET" class="d-flex flex-wrap gap-3 align-items-end">
+    <div style="flex:1;min-width:180px;">
+      <label class="form-label">Stage</label>
+      <select name="stage" class="form-select">
+        <option value="">All Stages</option>
+        {% for stage in stages %}
+          <option value="{{ stage }}" {% if stage == selected_stage %}selected{% endif %}>{{ stage|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex:1;min-width:180px;">
+      <label class="form-label">Team</label>
+      <select name="team" class="form-select">
+        <option value="">All Teams</option>
+        {% for team in teams %}
+          <option value="{{ team }}" {% if team == selected_team %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-search"></i> Filter
+    </button>
+  </form>
+</div>
 
-    {% if instances %}
-    <div style="overflow-x:auto;">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle rounded-4 overflow-hidden" style="background: #fff;">
-          <thead class="table-light">
+<div class="animate-fade-up">
+  {% if instances %}
+    <div class="table-card">
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
             <tr>
-              <th class="text-nowrap">Serial</th>
-              <th class="text-nowrap">Asset</th>
-              <th class="text-nowrap">Product</th>
-              <th class="text-nowrap">Stage</th>
-              <th class="text-nowrap">Team</th>
-              <th class="text-nowrap">Last Updated</th>
+              <th>Serial</th>
+              <th>Asset</th>
+              <th>Product</th>
+              <th>Stage</th>
+              <th>Team</th>
+              <th>Last Updated</th>
             </tr>
           </thead>
           <tbody>
             {% for instance in instances %}
             <tr>
-              <td class="text-nowrap">{{ instance.serial }}</td>
-              <td class="text-nowrap">{{ instance.asset }}</td>
-              <td class="text-nowrap">
-                {{ instance.product.item_name }} ({{ instance.product.model }})
+              <td><span style="font-family:monospace;font-size:0.82rem;">{{ instance.serial }}</span></td>
+              <td>{{ instance.asset or '—' }}</td>
+              <td>
+                {% if instance.product %}
+                  {{ instance.product.item_name | nonan }} ({{ instance.product.model | nonan }})
+                {% else %}—{% endif %}
               </td>
-              <td class="text-nowrap">{{ instance.process_stage|capitalize }}</td>
-              <td class="text-nowrap">{{ instance.team_assigned }}</td>
-              <td class="text-nowrap">{{ instance.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td><span class="status-pill status-under_process">{{ instance.process_stage|capitalize if instance.process_stage else '—' }}</span></td>
+              <td>{{ instance.team_assigned or '—' }}</td>
+              <td style="font-size:0.82rem;color:var(--text-muted);">{{ instance.updated_at.strftime('%Y-%m-%d %H:%M') if instance.updated_at else '—' }}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
-    {% else %}
-      <p class="text-muted mb-0">No units currently under process.</p>
-    {% endif %}
-  </div>
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-compass"></i>
+      <p>No units currently under process{% if selected_stage or selected_team %} matching the selected filters{% endif %}.</p>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

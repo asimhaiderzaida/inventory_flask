@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Confirm Part Return{% endblock %}
+{% block page_title %}Confirm Part Return{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Confirm Part Return</h1>
+    <div class="page-subtitle">Review part details before proceeding</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('returns_bp.part_lookup') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:520px;">
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Part Info</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:0.4rem 1rem;font-size:0.88rem;margin:0;">
+        <dt style="color:var(--text-muted);font-weight:500;">Part #</dt>
+        <dd style="margin:0;font-family:monospace;">{{ part.part_number }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Name</dt>
+        <dd style="margin:0;">{{ part.name }}</dd>
+        {% if part.part_type %}
+        <dt style="color:var(--text-muted);font-weight:500;">Type</dt>
+        <dd style="margin:0;">{{ part.part_type }}</dd>
+        {% endif %}
+        {% if part.vendor %}
+        <dt style="color:var(--text-muted);font-weight:500;">Vendor</dt>
+        <dd style="margin:0;">{{ part.vendor }}</dd>
+        {% endif %}
+        {% if part.price %}
+        <dt style="color:var(--text-muted);font-weight:500;">Unit Price</dt>
+        <dd style="margin:0;">${{ "%.2f"|format(part.price) }}</dd>
+        {% endif %}
+        {% if part.barcode %}
+        <dt style="color:var(--text-muted);font-weight:500;">Barcode</dt>
+        <dd style="margin:0;font-family:monospace;">{{ part.barcode }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  {% if sale_item %}
+  <div class="card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Most Recent Sale</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:0.4rem 1rem;font-size:0.88rem;margin:0;">
+        {% if sale_item.transaction %}
+          {% if sale_item.transaction.customer %}
+          <dt style="color:var(--text-muted);font-weight:500;">Customer</dt>
+          <dd style="margin:0;">{{ sale_item.transaction.customer.name }}</dd>
+          {% elif sale_item.transaction.customer_name %}
+          <dt style="color:var(--text-muted);font-weight:500;">Customer</dt>
+          <dd style="margin:0;">{{ sale_item.transaction.customer_name }}</dd>
+          {% endif %}
+          <dt style="color:var(--text-muted);font-weight:500;">Invoice #</dt>
+          <dd style="margin:0;font-family:monospace;">{{ sale_item.transaction.invoice_number }}</dd>
+          <dt style="color:var(--text-muted);font-weight:500;">Sale Date</dt>
+          <dd style="margin:0;">{{ sale_item.transaction.sold_at.strftime('%Y-%m-%d') }}</dd>
+        {% endif %}
+        <dt style="color:var(--text-muted);font-weight:500;">Qty Sold</dt>
+        <dd style="margin:0;">{{ sale_item.quantity }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Unit Price</dt>
+        <dd style="margin:0;font-weight:600;">${{ "%.2f"|format(sale_item.unit_price) }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Subtotal</dt>
+        <dd style="margin:0;">${{ "%.2f"|format(sale_item.subtotal) }}</dd>
+      </dl>
+    </div>
+  </div>
+  {% else %}
+  <div style="padding:0.75rem 1rem;background:var(--surface-2);border-radius:var(--radius-md);
+              font-size:0.84rem;color:var(--text-muted);margin-bottom:1rem;border:1px solid var(--border);">
+    <i class="bi bi-info-circle"></i>
+    No recent sale record found for this part. You can still process a return.
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('returns_bp.part_lookup') }}" class="btn btn-ghost flex-fill">Cancel</a>
+    <a href="{{ url_for('returns_bp.create_part_return', part_id=part.id, sale_item_id=sale_item.id) if sale_item else url_for('returns_bp.create_part_return', part_id=part.id) }}"
+       class="btn btn-primary flex-fill">
+      <i class="bi bi-arrow-right-circle"></i> Proceed with Return
+    </a>
+  </div>
+</div>
+{% endblock %}

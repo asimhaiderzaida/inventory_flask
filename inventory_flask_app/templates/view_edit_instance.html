@@ -1,51 +1,368 @@
 {% extends "base.html" %}
+{% block title %}Unit Details{% endblock %}
+{% block page_title %}Unit Details{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">Edit Product Instance</h2>
-  <form method="POST" class="row row-cols-1 row-cols-md-2 g-4">
-    <div class="col">
-      <div class="card h-100">
-        <div class="card-header bg-light">
-          <strong>Product Details</strong>
-        </div>
-        <div class="card-body">
-          <p class="mb-2"><strong>Serial:</strong> {{ instance.serial_number }}</p>
-          <p class="mb-2"><strong>Asset Tag:</strong> {{ instance.asset_tag }}</p>
-          <p class="mb-2"><strong>Model:</strong> {{ instance.product.model if instance.product else '' }}</p>
-          <p class="mb-2"><strong>Name:</strong> {{ instance.product.item_name if instance.product else '' }}</p>
-          <p class="mb-2"><strong>RAM:</strong> {{ instance.product.ram if instance.product else '' }}</p>
-          <p class="mb-2"><strong>Processor:</strong> {{ instance.product.cpu if instance.product else '' }}</p>
-          <p class="mb-2"><strong>Storage:</strong> {{ instance.product.disk1size if instance.product else '' }}</p>
-          <p class="mb-2"><strong>Grade:</strong> {{ instance.product.grade if instance.product else '' }}</p>
-          <p class="mb-2"><strong>Video Card:</strong> {{ instance.product.gpu1 if instance.product else '' }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="mb-3">
-        <label for="status" class="form-label fw-semibold">Status</label>
-        <select id="status" name="status" class="form-select form-select-lg">
-          <option value="unprocessed" {% if instance.status == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
-          <option value="under_process" {% if instance.status == 'under_process' %}selected{% endif %}>Under Process</option>
-          <option value="processed" {% if instance.status == 'processed' %}selected{% endif %}>Processed</option>
-          <option value="sold" {% if instance.status == 'sold' %}selected{% endif %}>Sold</option>
-        </select>
-      </div>
-      <div class="mb-3">
-        <label for="process_stage" class="form-label fw-semibold">Process Stage</label>
-        <input type="text" id="process_stage" name="process_stage" class="form-control form-control-lg" value="{{ instance.process_stage or '' }}">
-      </div>
-      <div class="mb-3">
-        <label for="team_assigned" class="form-label fw-semibold">Team Assigned</label>
-        <input type="text" id="team_assigned" name="team_assigned" class="form-control form-control-lg" value="{{ instance.team_assigned or '' }}">
-      </div>
-      <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Save</button>
-      <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-secondary btn-lg w-100 mt-3">Cancel</a>
-    </div>
-  </form>
-  <form method="POST" action="{{ url_for('stock_bp.delete_instance', instance_id=instance.id) }}"
-        onsubmit="return confirm('Are you sure you want to delete this item?');" class="mt-4">
-    <button type="submit" class="btn btn-danger btn-lg w-100">Delete</button>
-  </form>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Unit Details</h1>
+    <div class="page-subtitle">{{ instance.product.model | nonan if instance.product else 'Unknown' }} &mdash; {{ instance.serial }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.unit_detail', instance_id=instance.id) }}" class="btn btn-ghost">
+      <i class="bi bi-clock-history"></i> View History
+    </a>
+    <a href="javascript:history.back()" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
 </div>
+
+<div class="row g-3 animate-fade-up">
+  <!-- Product details (read-only) -->
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">Product Details</h6>
+        {% set p = instance.product %}
+        {% set rows = [
+          ('Serial', instance.serial),
+          ('Asset Tag', instance.asset),
+          ('Model', p.model if p else '—'),
+          ('Item Name', p.item_name if p else '—'),
+          ('RAM', p.ram if p else '—'),
+          ('Processor', p.cpu if p else '—'),
+          ('Storage', p.disk1size if p else '—'),
+          ('Grade', p.grade if p else '—'),
+          ('Video Card', p.gpu1 if p else '—'),
+        ] %}
+        {% for label, value in rows %}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.45rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.8rem;color:var(--text-muted);">{{ label }}</span>
+          <span style="font-size:0.875rem;font-weight:500;color:var(--text-primary);text-align:right;">{{ value or '—' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit form -->
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">Edit Fields</h6>
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+              <option value="unprocessed"  {% if instance.status=='unprocessed' %}selected{% endif %}>Unprocessed</option>
+              <option value="under_process"{% if instance.status=='under_process' %}selected{% endif %}>Under Process</option>
+              <option value="processed"    {% if instance.status=='processed' %}selected{% endif %}>Processed</option>
+              <option value="disputed"     {% if instance.status=='disputed' %}selected{% endif %}>Disputed</option>
+              <option value="sold"         {% if instance.status=='sold' %}selected{% endif %}>Sold</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Process Stage</label>
+            {% if process_stages %}
+            <select name="process_stage" class="form-select">
+              <option value="">— No stage —</option>
+              {% for s in process_stages %}
+              <option value="{{ s.name }}" {% if instance.process_stage == s.name %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+              {% if instance.process_stage and instance.process_stage not in process_stages|map(attribute='name')|list %}
+              <option value="{{ instance.process_stage }}" selected>{{ instance.process_stage }} (custom)</option>
+              {% endif %}
+            </select>
+            {% else %}
+            <input type="text" name="process_stage" class="form-control" value="{{ instance.process_stage or '' }}">
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Team Assigned</label>
+            <input type="text" name="team_assigned" class="form-control" value="{{ instance.team_assigned or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <select name="location_id" class="form-select">
+              <option value="">— no change —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}" {% if instance.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Shelf / Bin</label>
+            <select name="shelf_bin" id="shelf-bin-edit" class="form-select">
+              <option value="">— no bin —</option>
+              {% if instance.bin %}
+              <option value="{{ instance.bin.name }}" selected>{{ instance.bin.name }}</option>
+              {% elif instance.shelf_bin %}
+              <option value="{{ instance.shelf_bin }}" selected>{{ instance.shelf_bin }} (legacy)</option>
+              {% endif %}
+            </select>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">
+              Select a location first to see available bins.
+              <a href="#" id="bin-manage-link" style="display:none;">Manage bins</a>
+            </div>
+          </div>
+
+          {% if custom_fields %}
+          <hr style="margin:1.25rem 0;border-color:var(--border);">
+          <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">Custom Fields</h6>
+          {% for cf in custom_fields %}
+          <div class="mb-3">
+            <label class="form-label">
+              {{ cf.field_label }}
+              {% if cf.is_required %}<span class="text-danger">*</span>{% endif %}
+            </label>
+            {% set cf_val = cf_values.get(cf.id, '') or '' %}
+            {% if cf.field_type == 'select' %}
+              {% set opts = cf.field_options | fromjson if cf.field_options else [] %}
+              <select name="cf_{{ cf.field_key }}" class="form-select"{% if cf.is_required %} required{% endif %}>
+                <option value="">— select —</option>
+                {% for opt in opts %}
+                <option value="{{ opt }}" {% if cf_val == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              </select>
+            {% elif cf.field_type == 'number' %}
+              <input type="number" step="any" name="cf_{{ cf.field_key }}" class="form-control"
+                     value="{{ cf_val }}"{% if cf.is_required %} required{% endif %}>
+            {% elif cf.field_type == 'date' %}
+              <input type="date" name="cf_{{ cf.field_key }}" class="form-control"
+                     value="{{ cf_val }}"{% if cf.is_required %} required{% endif %}>
+            {% else %}
+              <input type="text" name="cf_{{ cf.field_key }}" class="form-control"
+                     value="{{ cf_val }}"{% if cf.is_required %} required{% endif %}>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              <i class="bi bi-save"></i> Save Changes
+            </button>
+            <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.under_process') }}'" class="btn btn-ghost flex-fill">Cancel</a>
+          </div>
+        </form>
+
+        <hr style="margin:1.5rem 0;border-color:var(--border);">
+
+        {% if instance.status != 'disputed' %}
+        <button type="button" class="btn w-100 mb-2" style="background:rgba(245,158,11,0.08);color:#d97706;border:1px solid rgba(245,158,11,0.25);"
+                onclick="document.getElementById('disputeModal').style.display='flex'">
+          <i class="bi bi-exclamation-triangle"></i> Mark as Disputed
+        </button>
+        {% endif %}
+        {% if instance.status == 'disputed' and current_user.role in ('admin', 'supervisor') %}
+        <form method="POST" action="{{ url_for('stock_bp.resolve_dispute', instance_id=instance.id) }}" class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn w-100" style="background:rgba(16,185,129,0.08);color:#059669;border:1px solid rgba(16,185,129,0.25);"
+                  onclick="return confirm('Mark dispute as resolved? Unit will return to unprocessed.')">
+            <i class="bi bi-check-circle"></i> Resolve Dispute
+          </button>
+        </form>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('stock_bp.delete_instance', instance_id=instance.id) }}"
+              onsubmit="return confirm('Delete this instance? This cannot be undone.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn w-100" style="background:rgba(239,68,68,0.08);color:var(--color-danger);border:1px solid rgba(239,68,68,0.2);">
+            <i class="bi bi-trash"></i> Delete Instance
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Return History ──────────────────────────────────────── #}
+{% if instance_returns %}
+<div class="animate-fade-up" style="margin-top:1.5rem;">
+  <div class="table-card">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">
+        <i class="bi bi-arrow-return-left me-1"></i>Return History
+      </span>
+      <span style="font-size:0.78rem;color:var(--text-muted);">{{ instance_returns|length }} return{{ 's' if instance_returns|length != 1 }}</span>
+    </div>
+    <div style="overflow-x:clip;overflow-y:visible;">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Reason</th>
+            <th>Condition</th>
+            <th>Action Taken</th>
+            <th>Refund</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ret in instance_returns %}
+          <tr>
+            <td style="font-size:0.82rem;white-space:nowrap;">
+              {{ ret.return_date.strftime('%Y-%m-%d') if ret.return_date else '—' }}
+            </td>
+            <td style="font-size:0.84rem;">{{ ret.reason or '—' }}</td>
+            <td>
+              <span class="status-pill
+                {% if ret.condition == 'Good' %}status-processed
+                {% elif ret.condition in ('Damaged','Defective') %}status-idle
+                {% elif ret.condition == 'Broken' %}status-disputed
+                {% endif %}">
+                {{ ret.condition or '—' }}
+              </span>
+            </td>
+            <td style="font-size:0.84rem;">{{ ret.action or '—' }}</td>
+            <td style="font-size:0.84rem;">
+              {% if ret.refund_amount %}
+                <span style="font-weight:600;color:var(--color-danger);">-${{ '%.2f'|format(ret.refund_amount) }}</span>
+                {% if ret.refund_method and ret.refund_method != 'none' %}
+                  <span style="font-size:0.72rem;color:var(--text-muted);display:block;">{{ ret.refund_method|replace('_',' ')|title }}</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if ret.refund_status == 'issued' %}
+              <span class="status-pill status-processed">Issued</span>
+              {% elif ret.refund_status == 'pending' %}
+              <span class="status-pill status-under_process">Pending</span>
+              {% elif ret.refund_status == 'denied' %}
+              <span class="status-pill status-idle">None</span>
+              {% else %}
+              <span style="color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Mark Disputed Modal -->
+<div id="disputeModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+  <div style="background:var(--surface-1);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:100%;max-width:440px;margin:1rem;overflow:hidden;">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
+      <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-exclamation-triangle" style="color:#d97706;font-size:1.05rem;"></i>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:0.95rem;">Mark Unit as Disputed</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;">{{ instance.serial }}</div>
+      </div>
+      <button onclick="document.getElementById('disputeModal').style.display='none'" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('stock_bp.mark_disputed', instance_id=instance.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="padding:1.25rem 1.5rem;">
+        <div class="mb-3">
+          <label class="form-label">Reason</label>
+          <select name="reason" class="form-select" required>
+            <option value="">— Select reason —</option>
+            <option value="Wrong Item">Wrong Item</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Missing Parts">Missing Parts</option>
+            <option value="Customer Dispute">Customer Dispute</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Note (optional)</label>
+          <input type="text" name="note" class="form-control" placeholder="Additional details…">
+        </div>
+      </div>
+      <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('disputeModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background:#d97706;border-color:#d97706;">
+          <i class="bi bi-exclamation-triangle"></i> Confirm Disputed
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const locSelect = document.querySelector('select[name="location_id"]');
+  const binSelect = document.getElementById('shelf-bin-edit');
+  const manageLink = document.getElementById('bin-manage-link');
+  const currentBin = {{ ('"' + (instance.bin.name if instance.bin else instance.shelf_bin or '') + '"') | safe }};
+  const currentLocId = {{ instance.location_id or 'null' }};
+
+  function loadBins(locationId, selectedBin) {
+    if (!locationId) {
+      binSelect.innerHTML = '<option value="">— no bin —</option>';
+      if (manageLink) manageLink.style.display = 'none';
+      return;
+    }
+    fetch('/stock/bins/for_location?location_id=' + locationId + '&bin_type=units')
+      .then(r => r.json())
+      .then(bins => {
+        binSelect.innerHTML = '<option value="">— no bin —</option>';
+        bins.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.name;
+          opt.textContent = b.name;
+          if (b.name === selectedBin) opt.selected = true;
+          binSelect.appendChild(opt);
+        });
+        if (selectedBin && !bins.find(b => b.name === selectedBin)) {
+          const opt = document.createElement('option');
+          opt.value = selectedBin;
+          opt.textContent = selectedBin + ' (legacy)';
+          opt.selected = true;
+          binSelect.appendChild(opt);
+        }
+        // Add "+ New Bin" sentinel option
+        const newOpt = document.createElement('option');
+        newOpt.value = '__new__';
+        newOpt.textContent = '＋ New Bin…';
+        binSelect.appendChild(newOpt);
+        if (manageLink) {
+          manageLink.href = '/stock/location/' + locationId + '/bins';
+          manageLink.style.display = 'inline';
+        }
+      });
+  }
+
+  binSelect.addEventListener('change', function() {
+    if (this.value !== '__new__') return;
+    const name = prompt('New bin name (will be created in selected location):');
+    if (!name || !name.trim()) { this.value = ''; return; }
+    const locId = locSelect.value;
+    if (!locId) { showToast('Select a location first.', 'warning'); this.value = ''; return; }
+    fetch('/stock/bins/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name.trim().toUpperCase(), location_id: parseInt(locId)}),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.id) {
+        loadBins(locId, data.name);
+        showToast((data.existed ? 'Using existing bin: ' : 'Bin created: ') + data.name, 'success');
+      } else {
+        showToast(data.error || 'Could not create bin.', 'danger');
+        this.value = '';
+      }
+    });
+  });
+
+  if (currentLocId) loadBins(currentLocId, currentBin);
+  locSelect.addEventListener('change', function () { loadBins(this.value, ''); });
+}());
+</script>
 {% endblock %}

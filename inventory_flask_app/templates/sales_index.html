@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Sales{% endblock %}
+{% block page_title %}Sales{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Sales</h1>
+    <div class="page-subtitle">Manage sales and sold inventory</div>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;max-width:600px;">
+  <a href="{{ url_for('sales_bp.sold_units_view') }}" class="card" style="text-decoration:none;color:inherit;transition:var(--transition-fast);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div class="card-body" style="padding:1.25rem;display:flex;align-items:center;gap:0.875rem;">
+      <div style="width:40px;height:40px;background:rgba(var(--primary-rgb,99,102,241),0.1);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-bag-check" style="font-size:1.2rem;color:var(--primary);"></i>
+      </div>
+      <div>
+        <div style="font-size:0.9rem;font-weight:600;">Sold Items</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">View all sold units</div>
+      </div>
+    </div>
+  </a>
+
+  <a href="{{ url_for('sales_bp.create_sale_form') }}" class="card" style="text-decoration:none;color:inherit;transition:var(--transition-fast);" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div class="card-body" style="padding:1.25rem;display:flex;align-items:center;gap:0.875rem;">
+      <div style="width:40px;height:40px;background:rgba(var(--success-rgb,16,185,129),0.1);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-plus-circle" style="font-size:1.2rem;color:var(--color-success);"></i>
+      </div>
+      <div>
+        <div style="font-size:0.9rem;font-weight:600;">Create Sale</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">Record a new sale</div>
+      </div>
+    </div>
+  </a>
+</div>
+{% endblock %}

@@ -1,48 +1,136 @@
-
-
 {% extends "base.html" %}
+{% block title %}Submit Return{% endblock %}
+{% block page_title %}Submit Return{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h2>Submit Product Return</h2>
-  <form method="POST">
-    <div class="mb-3">
-      <label class="form-label"><strong>Serial:</strong></label>
-      <p class="form-control-plaintext">{{ instance.serial }}</p>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Submit Return</h1>
+    <div class="page-subtitle">Serial: <span style="font-family:monospace;">{{ instance.serial }}</span>
+      {% if invoice %}
+        &middot; Invoice <span style="font-family:monospace;">{{ invoice.invoice_number }}</span>
+      {% endif %}
     </div>
-
-    <div class="mb-3">
-      <label for="reason" class="form-label">Reason for Return</label>
-      <input type="text" class="form-control" id="reason" name="reason" required>
-    </div>
-
-    <div class="mb-3">
-      <label for="condition" class="form-label">Condition</label>
-      <select class="form-select" id="condition" name="condition" required>
-        <option value="">-- Select --</option>
-        <option value="Good">Good</option>
-        <option value="Damaged">Damaged</option>
-        <option value="Broken">Broken</option>
-      </select>
-    </div>
-
-    <div class="mb-3">
-      <label for="action" class="form-label">Action</label>
-      <select class="form-select" id="action" name="action" required>
-        <option value="">-- Select --</option>
-        <option value="Restock">Restock</option>
-        <option value="Repair">Repair</option>
-        <option value="Scrap">Scrap</option>
-        <option value="Refund">Refund</option>
-      </select>
-    </div>
-
-    <div class="mb-3">
-      <label for="notes" class="form-label">Additional Notes</label>
-      <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-    </div>
-
-    <button type="submit" class="btn btn-primary">Submit Return</button>
-    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-secondary">Cancel</a>
-  </form>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()"
+       onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.view_returns') }}'"
+       class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
 </div>
+
+<div class="animate-fade-up" style="max-width:520px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {# ── Return Details ─────────────────────────────────────────── #}
+        <div class="mb-3">
+          <label class="form-label">Reason for Return <span style="color:var(--color-danger);">*</span></label>
+          <input type="text" class="form-control" name="reason" required autofocus>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Condition <span style="color:var(--color-danger);">*</span></label>
+          <select class="form-select" name="condition" required>
+            <option value="">Select…</option>
+            <option value="Good">Good</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Broken">Broken</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Action <span style="color:var(--color-danger);">*</span></label>
+          <select class="form-select" name="action" required>
+            <option value="">Select…</option>
+            <option value="Restock">Restock</option>
+            <option value="Repair">Repair</option>
+            <option value="Scrap">Scrap</option>
+            <option value="Refund">Refund</option>
+            <option value="Exchange">Exchange</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Action Taken / Resolution Note</label>
+          <input type="text" class="form-control" name="action_taken"
+                 placeholder="e.g. Restocked, sent for repair, exchanged for SN-12345…">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Additional Notes</label>
+          <textarea class="form-control" name="notes" rows="2" placeholder="Optional notes…"></textarea>
+        </div>
+
+        {# ── Refund Section ─────────────────────────────────────────── #}
+        <hr style="margin:1.25rem 0;border-color:var(--border);">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;">Refund / Credit</div>
+
+        <div class="mb-3">
+          <label class="form-label">Refund Method</label>
+          <select class="form-select" name="refund_method" id="refundMethod">
+            <option value="none">No Refund</option>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="credit_note">Issue Credit Note</option>
+          </select>
+        </div>
+
+        <div class="mb-3" id="refundAmountRow">
+          <label class="form-label">
+            Refund Amount
+            {% if sale and sale.price_at_sale is defined and sale.price_at_sale %}
+              <span style="font-size:0.78rem;color:var(--text-muted);font-weight:400;">
+                (sale price: ${{ "%.2f"|format(sale.price_at_sale) }})
+              </span>
+            {% endif %}
+          </label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control" name="refund_amount"
+                   step="0.01" min="0"
+                   {% if sale and sale.price_at_sale is defined and sale.price_at_sale %}
+                     placeholder="{{ "%.2f"|format(sale.price_at_sale) }}"
+                   {% else %}
+                     placeholder="0.00"
+                   {% endif %}>
+          </div>
+          <div id="creditNoteNote" style="display:none;margin-top:0.35rem;font-size:0.78rem;color:var(--text-muted);">
+            <i class="bi bi-info-circle"></i> A credit note number will be auto-generated and emailed if an email is on file.
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <a href="javascript:history.back()"
+             onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.view_returns') }}'"
+             class="btn btn-ghost flex-fill">Cancel</a>
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check2-circle"></i> Submit Return
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const refundMethod = document.getElementById('refundMethod');
+const refundAmountRow = document.getElementById('refundAmountRow');
+const creditNoteNote = document.getElementById('creditNoteNote');
+
+function toggleRefund() {
+  const val = refundMethod.value;
+  refundAmountRow.style.display = (val === 'none') ? 'none' : '';
+  creditNoteNote.style.display = (val === 'credit_note') ? '' : 'none';
+}
+
+refundMethod.addEventListener('change', toggleRefund);
+toggleRefund();
+</script>
 {% endblock %}

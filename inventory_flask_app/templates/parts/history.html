@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}History — {{ part.name }}{% endblock %}
+{% block page_title %}Part History{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ part.name }}</h1>
+    <div class="page-subtitle">
+      <span style="font-family:monospace;font-size:0.85rem;">{{ part.part_number }}</span>
+      &nbsp;·&nbsp; {{ movements|length }} movement{{ 's' if movements|length != 1 }}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.part_history_export', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+    </a>
+    <a href="{{ url_for('parts_bp.stock_in') }}?part_id={{ part.id }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-box-arrow-in-down"></i> Stock In
+    </a>
+    <a href="{{ url_for('parts_bp.sell') }}?part_id={{ part.id }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-bag-check"></i> Sell
+    </a>
+    <a href="{{ url_for('parts_bp.edit_part', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('parts_bp.parts_list') }}'" class="btn btn-ghost btn-sm">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <a href="{{ url_for('parts_bp.part_detail', part_id=part.id) }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-arrow-left"></i> Detail
+    </a>
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-list"></i> All Parts
+    </a>
+  </div>
+</div>
+
+<!-- Part info cards -->
+<div class="animate-fade-up" style="margin-bottom:1.5rem;">
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+
+    {% for s in part.stocks %}
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;min-width:140px;">
+      <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.25rem;">
+        {{ s.location.name }}
+      </div>
+      <div style="font-size:1.5rem;font-weight:700;color:{% if s.quantity < (part.min_stock or 1) %}var(--color-danger){% else %}var(--text-primary){% endif %};">
+        {{ s.quantity }}
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">units</div>
+    </div>
+    {% else %}
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;">
+      <div style="color:var(--text-muted);font-size:0.875rem;">No stock in any location</div>
+    </div>
+    {% endfor %}
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;min-width:140px;">
+      <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.25rem;">Min Stock</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--text-primary);">{{ part.min_stock or 1 }}</div>
+    </div>
+
+    {% if part.price %}
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;min-width:140px;">
+      <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.25rem;">Unit Price</div>
+      <div style="font-size:1.5rem;font-weight:700;color:var(--text-primary);">${{ '%.2f'|format(part.price) }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Sales history -->
+{% if part.sales %}
+<div class="animate-fade-up" style="margin-bottom:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <h6 style="font-weight:600;font-size:0.875rem;color:var(--text-primary);margin:0;">
+      <i class="bi bi-bag-check me-1" style="color:var(--color-success);"></i> Sales History
+    </h6>
+    <a href="{{ url_for('parts_bp.sell') }}?part_id={{ part.id }}" class="btn btn-ghost btn-sm" style="font-size:0.78rem;">
+      <i class="bi bi-plus"></i> New Sale
+    </a>
+  </div>
+  <div class="table-card" style="margin-bottom:0;">
+    <div style="overflow-x:auto;">
+      <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Customer</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:right;">Unit Price</th>
+            <th style="text-align:right;">Total</th>
+            <th>By</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in part.sales | sort(attribute='sold_at', reverse=True) %}
+          <tr>
+            <td style="white-space:nowrap;color:var(--text-muted);">{{ s.sold_at.strftime('%Y-%m-%d') }}</td>
+            <td>{{ s.customer.name if s.customer else '—' }}</td>
+            <td style="text-align:center;font-weight:600;">{{ s.quantity }}</td>
+            <td style="text-align:right;">{% if s.unit_price %}${{ '%.2f'|format(s.unit_price) }}{% else %}—{% endif %}</td>
+            <td style="text-align:right;font-weight:600;">
+              {% if s.unit_price %}${{ '%.2f'|format(s.unit_price * s.quantity) }}{% else %}—{% endif %}
+            </td>
+            <td style="color:var(--text-muted);">{{ s.user.username if s.user else '—' }}</td>
+            <td style="color:var(--text-muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                title="{{ s.note or '' }}">{{ s.note or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border);">
+            <td colspan="2" style="font-weight:600;font-size:0.8rem;color:var(--text-muted);">Totals</td>
+            <td style="text-align:center;font-weight:700;">{{ part.sales | sum(attribute='quantity') }}</td>
+            <td></td>
+            <td style="text-align:right;font-weight:700;">
+              {% set total_rev = namespace(v=0) %}
+              {% for s in part.sales %}{% if s.unit_price %}{% set total_rev.v = total_rev.v + s.unit_price * s.quantity %}{% endif %}{% endfor %}
+              {% if total_rev.v %}${{ '%.2f'|format(total_rev.v) }}{% else %}—{% endif %}
+            </td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Movement table -->
+<div class="animate-fade-up">
+  {% if movements %}
+  <div class="table-card">
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date / Time</th>
+            <th>Type</th>
+            <th style="text-align:center;">Qty</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Unit</th>
+            <th>By</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in movements %}
+
+          {% if m.movement_type == 'stock_in' %}
+            {% set badge_style = 'background:rgba(34,197,94,0.15);color:#15803d;' %}
+            {% set badge_label = 'Stock In' %}
+            {% set qty_sign = '+' %}
+            {% set qty_color = 'color:#15803d;' %}
+          {% elif m.movement_type == 'stock_out' %}
+            {% set badge_style = 'background:rgba(249,115,22,0.15);color:#c2410c;' %}
+            {% set badge_label = 'Stock Out' %}
+            {% set qty_sign = '−' %}
+            {% set qty_color = 'color:#c2410c;' %}
+          {% elif m.movement_type == 'consume' %}
+            {% set badge_style = 'background:rgba(239,68,68,0.15);color:#b91c1c;' %}
+            {% set badge_label = 'Consumed' %}
+            {% set qty_sign = '−' %}
+            {% set qty_color = 'color:#b91c1c;' %}
+          {% elif m.movement_type == 'transfer' %}
+            {% set badge_style = 'background:rgba(59,130,246,0.15);color:#1d4ed8;' %}
+            {% set badge_label = 'Transfer' %}
+            {% set qty_sign = '↔' %}
+            {% set qty_color = 'color:#1d4ed8;' %}
+          {% elif m.movement_type == 'sell' %}
+            {% set badge_style = 'background:rgba(16,185,129,0.15);color:#047857;' %}
+            {% set badge_label = 'Sold' %}
+            {% set qty_sign = '−' %}
+            {% set qty_color = 'color:#047857;' %}
+          {% else %}
+            {% set badge_style = 'background:var(--surface-2);color:var(--text-muted);' %}
+            {% set badge_label = m.movement_type | title %}
+            {% set qty_sign = '' %}
+            {% set qty_color = '' %}
+          {% endif %}
+
+          <tr>
+            <td style="font-size:0.82rem;white-space:nowrap;color:var(--text-muted);">
+              {{ m.created_at.strftime('%b %d, %Y') }}<br>
+              <span style="font-size:0.75rem;">{{ m.created_at.strftime('%H:%M') }}</span>
+            </td>
+
+            <td>
+              <span style="display:inline-block;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.72rem;font-weight:700;{{ badge_style }}">
+                {{ badge_label }}
+              </span>
+            </td>
+
+            <td style="text-align:center;font-weight:700;{{ qty_color }}">
+              {{ qty_sign }}{{ m.quantity }}
+            </td>
+
+            <td style="font-size:0.84rem;color:var(--text-muted);">
+              {{ m.from_location.name if m.from_location else '—' }}
+            </td>
+
+            <td style="font-size:0.84rem;color:var(--text-muted);">
+              {{ m.to_location.name if m.to_location else '—' }}
+            </td>
+
+            <td style="font-size:0.82rem;">
+              {% if m.instance %}
+              <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=m.instance_id) }}"
+                 style="color:var(--primary);font-family:monospace;">
+                {{ m.instance.serial }}
+              </a>
+              {% else %}—{% endif %}
+            </td>
+
+            <td style="font-size:0.82rem;color:var(--text-muted);">
+              {{ m.user.username if m.user else '—' }}
+            </td>
+
+            <td style="font-size:0.82rem;color:var(--text-muted);max-width:180px;
+                       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                title="{{ m.note or '' }}">
+              {{ m.note or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span>{{ movements|length }} movement{{ 's' if movements|length != 1 }}</span>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clock-history"></i>
+    <p>No movement history yet for this part.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

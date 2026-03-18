@@ -1,160 +1,150 @@
 {% extends "base.html" %}
+{% block title %}Tech Profile — {{ user.username }}{% endblock %}
+{% block page_title %}Tech Profile{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4 mt-4">
-  <div class="card shadow rounded-4 border-0">
-    <div class="card-header bg-primary text-white">
-      <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-        <h4 class="mb-0">
-          <i class="bi bi-person-badge me-2"></i>
-          Technician Profile — {{ user.username }}
-        </h4>
-        <form class="d-flex flex-wrap gap-2 align-items-end" method="get">
-          <div class="col-auto">
-            <label for="stage" class="form-label mb-0 fw-semibold">Stage:</label>
-            <select name="stage" id="stage" class="form-select rounded-pill form-select-sm">
-              <option value="">All</option>
-              {% for s in unique_stages %}
-                <option value="{{ s }}" {% if stage==s %}selected{% endif %}>{{ s|capitalize }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-auto">
-            <label for="start_date" class="form-label mb-0 fw-semibold">From:</label>
-            <input type="date" name="start_date" id="start_date" value="{{ start_date or '' }}" class="form-control rounded-pill form-control-sm">
-          </div>
-          <div class="col-auto">
-            <label for="end_date" class="form-label mb-0 fw-semibold">To:</label>
-            <input type="date" name="end_date" id="end_date" value="{{ end_date or '' }}" class="form-control rounded-pill form-control-sm">
-          </div>
-          <div class="col-auto">
-            <label for="serial" class="form-label mb-0 fw-semibold">Scan/Serial:</label>
-            <input type="text" name="serial" id="serial" value="{{ serial_query or '' }}" class="form-control rounded-pill form-control-sm" placeholder="Scan or type serial">
-          </div>
-          <div class="col-auto">
-            <button class="btn btn-outline-primary btn-sm rounded-pill px-4" type="submit">
-              <i class="bi bi-funnel me-1"></i>Filter
-            </button>
-          </div>
-          <div class="col-auto">
-            <a class="btn btn-outline-success btn-sm rounded-pill ms-2"
-               href="{{ url_for('reports_bp.tech_profile_export', username=user.username, stage=stage, start_date=start_date, end_date=end_date, serial=serial_query) }}">
-              <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
-            </a>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div class="card-body pb-2">
-      {% if log_rows and log_rows|length > 0 %}
-      <div class="mb-3 d-flex justify-content-between align-items-center px-2">
-        <div>
-          <strong>Total Records:</strong> {{ log_rows|length }}
-        </div>
-        <form method="get" class="d-flex gap-2 align-items-center">
-          <input type="hidden" name="stage" value="{{ stage }}">
-          <input type="hidden" name="start_date" value="{{ start_date }}">
-          <input type="hidden" name="end_date" value="{{ end_date }}">
-          <input type="hidden" name="serial" value="{{ serial_query }}">
-          <select name="group_by" class="form-select form-select-sm rounded-pill">
-            <option value="">Group By</option>
-            <option value="stage" {% if request.args.get('group_by') == 'stage' %}selected{% endif %}>Stage</option>
-            <option value="action" {% if request.args.get('group_by') == 'action' %}selected{% endif %}>Action</option>
-          </select>
-          <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">↻ Group</button>
-        </form>
-      </div>
-      {% endif %}
-      <div class="table-responsive">
-        {% if request.args.get('group_by') %}
-          {% for group_name, group_rows in grouped_logs.items() %}
-            <h5 class="mt-4 mb-2">{{ group_name }}</h5>
-            <table class="table table-striped table-hover align-middle shadow-sm w-100" style="min-width: 960px;">
-              <thead class="table-light">
-                <tr>
-                  <th class="text-nowrap">Serial</th>
-                  <th class="text-nowrap">Asset</th>
-                  <th class="text-nowrap">Model</th>
-                  <th class="text-nowrap">Stage</th>
-                  <th class="text-nowrap">Action</th>
-                  <th class="text-nowrap">Status</th>
-                  <th class="text-nowrap">Time</th>
-                  <th class="text-nowrap">Note</th>
-                  <th class="text-nowrap">History</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in group_rows %}
-                <tr>
-                  <td>{{ row.serial }}</td>
-                  <td>{{ row.asset }}</td>
-                  <td>{{ row.model }}</td>
-                  <td><span class="badge bg-info text-dark rounded-pill px-3">{{ row.stage|capitalize }}</span></td>
-                  <td><span class="badge {% if row.action == 'check-in' %}bg-success{% else %}bg-danger{% endif %} text-white rounded-pill">{{ row.action|capitalize }}</span></td>
-                  <td><span class="badge bg-secondary">{{ row.status|capitalize }}</span></td>
-                  <td>{{ row.time.strftime('%Y-%m-%d %H:%M') }}</td>
-                  <td>{{ row.note or '' }}</td>
-                  <td><a href="{{ url_for('stock_bp.unit_history', serial=row.serial) }}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-clock-history"></i> History</a></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% endfor %}
-        {% else %}
-          <table class="table table-striped table-hover align-middle shadow-sm w-100" style="min-width: 960px;">
-            <thead class="table-light">
-              <tr>
-                <th class="text-nowrap">Serial</th>
-                <th class="text-nowrap">Asset</th>
-                <th class="text-nowrap">Model</th>
-                <th class="text-nowrap">Stage</th>
-                <th class="text-nowrap">Action</th>
-                <th class="text-nowrap">Status</th>
-                <th class="text-nowrap">Time</th>
-                <th class="text-nowrap">Note</th>
-                <th class="text-nowrap">History</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in log_rows %}
-              <tr>
-                <td>{{ row.serial }}</td>
-                <td>{{ row.asset }}</td>
-                <td>{{ row.model }}</td>
-                <td><span class="badge bg-info text-dark rounded-pill px-3">{{ row.stage|capitalize }}</span></td>
-                <td><span class="badge {% if row.action == 'check-in' %}bg-success{% else %}bg-danger{% endif %} text-white rounded-pill">{{ row.action|capitalize }}</span></td>
-                <td><span class="badge bg-secondary">{{ row.status|capitalize }}</span></td>
-                <td>{{ row.time.strftime('%Y-%m-%d %H:%M') }}</td>
-                <td>{{ row.note or '' }}</td>
-                <td><a href="{{ url_for('stock_bp.unit_history', serial=row.serial) }}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-clock-history"></i> History</a></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        {% endif %}
-      </div>
-      <a href="{{ url_for('reports_bp.tech_productivity') }}" class="btn btn-outline-secondary rounded-pill mt-3">
-        <i class="bi bi-arrow-left-circle me-1"></i>Back to Productivity Report
-      </a>
-    </div>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ user.username }}</h1>
+    <div class="page-subtitle">{% if log_rows %}{{ log_rows|length }} records{% endif %}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.tech_profile_export', username=user.username, stage=stage, start_date=start_date, end_date=end_date, serial=serial_query) }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-excel"></i> Export Excel
+    </a>
+    <a href="{{ url_for('reports_bp.tech_productivity') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
   </div>
 </div>
+
+<!-- Filters -->
+<div class="animate-fade-up" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <form method="get" class="d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label">Stage</label>
+      <select name="stage" class="form-select" style="width:140px;">
+        <option value="">All</option>
+        {% for s in unique_stages %}
+          <option value="{{ s }}" {% if stage == s %}selected{% endif %}>{{ s|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">From</label>
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="form-control" style="width:155px;">
+    </div>
+    <div>
+      <label class="form-label">To</label>
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="form-control" style="width:155px;">
+    </div>
+    <div>
+      <label class="form-label">Serial</label>
+      <input type="text" name="serial" id="serial" value="{{ serial_query or '' }}" class="form-control" placeholder="Scan or type…" style="width:160px;">
+    </div>
+    <button type="submit" class="btn btn-primary" style="align-self:flex-end;">
+      <i class="bi bi-funnel"></i> Filter
+    </button>
+  </form>
+</div>
+
+{% if log_rows and log_rows|length > 0 %}
+<!-- Group-by control -->
+<div class="animate-fade-up" style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+  <form method="get" class="d-flex gap-2 align-items-center">
+    <input type="hidden" name="stage" value="{{ stage }}">
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+    <input type="hidden" name="serial" value="{{ serial_query }}">
+    <select name="group_by" class="form-select form-select-sm" style="width:140px;">
+      <option value="">No Grouping</option>
+      <option value="stage" {% if request.args.get('group_by') == 'stage' %}selected{% endif %}>Group by Stage</option>
+      <option value="action" {% if request.args.get('group_by') == 'action' %}selected{% endif %}>Group by Action</option>
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-repeat"></i> Apply</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="animate-fade-up">
+  {% macro log_table(rows) %}
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th>Asset</th>
+            <th>Model</th>
+            <th>Stage</th>
+            <th>Action</th>
+            <th>Status</th>
+            <th>Time</th>
+            <th>Note</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial }}</span></td>
+            <td>{{ row.asset or '—' }}</td>
+            <td>{{ row.model | nonan }}</td>
+            <td><span class="status-pill status-under_process">{{ row.stage|capitalize }}</span></td>
+            <td>
+              <span class="status-pill {% if row.action == 'check-in' %}status-processed{% else %}status-disputed{% endif %}">
+                {{ row.action|capitalize }}
+              </span>
+            </td>
+            <td><span class="status-pill" style="background:var(--surface-3);color:var(--text-muted);">{{ row.status|capitalize }}</span></td>
+            <td style="font-size:0.82rem;color:var(--text-muted);">{{ row.time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td style="font-size:0.82rem;color:var(--text-muted);">{{ row.note or '—' }}</td>
+            <td>
+              <a href="{{ url_for('stock_bp.unit_history', serial=row.serial) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-clock-history"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endmacro %}
+
+  {% if request.args.get('group_by') %}
+    {% for group_name, group_rows in grouped_logs.items() %}
+      <div style="margin-bottom:1.5rem;">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+          {{ group_name }}
+          <span style="font-size:0.78rem;background:var(--surface-3);border-radius:20px;padding:0.15em 0.5em;margin-left:0.5rem;color:var(--text-muted);">{{ group_rows|length }}</span>
+        </div>
+        <div class="table-card">{{ log_table(group_rows) }}</div>
+      </div>
+    {% endfor %}
+  {% elif log_rows and log_rows|length > 0 %}
+    <div class="table-card">{{ log_table(log_rows) }}</div>
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-person-badge"></i>
+      <p>No records found for the selected filters.</p>
+    </div>
+  {% endif %}
+</div>
+
 <audio id="beep-sound" src="{{ url_for('static', filename='audio/beep.mp3') }}" preload="auto"></audio>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
-  function playBeep() {
-    const beep = document.getElementById("beep-sound");
-    if (beep) beep.play();
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('serial');
+  if (input) {
+    input.addEventListener('change', function() {
+      if (this.value.trim()) {
+        const beep = document.getElementById('beep-sound');
+        if (beep) beep.play();
+      }
+    });
   }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    const serialInput = document.getElementById("serial");
-    if (serialInput) {
-      serialInput.addEventListener("change", function () {
-        if (this.value.trim()) {
-          playBeep();
-        }
-      });
-    }
-  });
+});
 </script>
 {% endblock %}

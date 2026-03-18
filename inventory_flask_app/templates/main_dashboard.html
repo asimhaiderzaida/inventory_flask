@@ -1,241 +1,1006 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+{% set currency = settings.currency or 'AED' %}
 <style>
-.stat-card {
-  background: linear-gradient(to right, #f8f9fc, #ffffff);
-  border-radius: 1rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  font-size: 0.95rem;
-  padding: 1rem 1.25rem;
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-}
-.stat-icon {
-  font-size: 1.4rem;
-  margin-right: 0.4rem;
-}
-.stat-value {
-  font-size: 1.45rem;
-  font-weight: 700;
-  color: var(--primary-color, #0d6efd);
-}
-.stat-label {
-  font-size: 0.85rem;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.btn-xs { font-size: 0.85rem !important; padding: 0.14rem 0.5rem !important; }
-</style>
-<h2 class="mb-3 d-flex align-items-center gap-2">
-  {% if settings.dashboard_logo %}
-    <img src="{{ settings.dashboard_logo }}" alt="Logo" style="height: 42px;">
-  {% else %}
-    <i class="bi bi-bar-chart-line-fill text-primary" style="font-size:2.2rem;"></i>
-  {% endif %}
-  <span class="fw-bold">{{ settings.dashboard_name or "Dashboard" }}</span>
-</h2>
+/* ── Dashboard-specific tokens ──────────────────────────────── */
+.db-primary   { --c: #3B82F6; --c-bg: #EFF6FF; --c-text: #1D4ED8; }
+.db-green     { --c: #10B981; --c-bg: #ECFDF5; --c-text: #065F46; }
+.db-amber     { --c: #F59E0B; --c-bg: #FFFBEB; --c-text: #92400E; }
+.db-red       { --c: #EF4444; --c-bg: #FEF2F2; --c-text: #991B1B; }
+.db-purple    { --c: #8B5CF6; --c-bg: #F5F3FF; --c-text: #5B21B6; }
 
-<!-- Smart Quick Actions -->
-<div class="d-flex flex-wrap gap-2 mb-4">
-  <a href="/stock/stock_receiving/select" class="btn btn-outline-primary btn-sm">
-    <i class="bi bi-box-arrow-in-down me-1"></i> Receive Stock
-  </a>
-  <a href="/customer_orders?status=pending" class="btn btn-outline-success btn-sm">
-    <i class="bi bi-truck me-1"></i> Pending Deliveries
-  </a>
-  {% if false %}
-  <a href="/inventory/export?filter=low_stock" class="btn btn-outline-warning btn-sm">
-    <i class="bi bi-exclamation-circle me-1"></i> Low Stock Report
-  </a>
-  {% endif %}
-  {% if false %}
-  <a href="/create_invoice" class="btn btn-outline-dark btn-sm">
-    <i class="bi bi-receipt me-1"></i> Create Invoice
-  </a>
-  {% endif %}
+/* ── KPI card (primary, larger) ─────────────────────────────── */
+.kpi-card {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 1.4rem 1.5rem 1.2rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow .15s ease, transform .15s ease;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); transform: translateY(-1px); color: inherit; }
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--c);
+}
+.kpi-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-bottom: .75rem;
+}
+.kpi-value {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+  margin-bottom: .25rem;
+  letter-spacing: -.02em;
+}
+.kpi-label {
+  font-size: .78rem;
+  font-weight: 500;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .75rem;
+  font-weight: 600;
+  margin-top: .4rem;
+  padding: .15rem .45rem;
+  border-radius: 20px;
+}
+.kpi-trend.up   { background: #ECFDF5; color: #065F46; }
+.kpi-trend.down { background: #FEF2F2; color: #991B1B; }
+.kpi-trend.flat { background: #F3F4F6; color: #6B7280; }
+
+/* ── Operations card (smaller) ─────────────────────────────── */
+.ops-card {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.ops-card:hover { box-shadow: 0 4px 10px rgba(0,0,0,.09); transform: translateY(-1px); color: inherit; }
+.ops-dot {
+  width: 38px; height: 38px;
+  border-radius: 9px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.ops-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.ops-lbl {
+  font-size: .73rem;
+  font-weight: 500;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .1rem;
+}
+
+/* ── Section heading ────────────────────────────────────────── */
+.dash-section-title {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #9CA3AF;
+  margin-bottom: .75rem;
+  margin-top: .25rem;
+}
+
+/* ── Panel card ─────────────────────────────────────────────── */
+.panel {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.panel-header {
+  padding: 1rem 1.25rem .75rem;
+  border-bottom: 1px solid #F3F4F6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.panel-title {
+  font-size: .88rem;
+  font-weight: 700;
+  color: #111827;
+}
+.panel-body { padding: 1rem 1.25rem; }
+
+/* ── Chart period buttons ────────────────────────────────────── */
+.period-btn {
+  padding: .25rem .65rem;
+  border-radius: 6px;
+  font-size: .74rem;
+  font-weight: 600;
+  border: 1px solid #E5E7EB;
+  background: none;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all .12s;
+}
+.period-btn:hover { border-color: #3B82F6; color: #3B82F6; }
+.period-btn.active { background: #3B82F6; border-color: #3B82F6; color: #fff; }
+
+/* ── Chart tab ───────────────────────────────────────────────── */
+.chart-tab-btn {
+  padding: .28rem .7rem;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid #E5E7EB;
+  background: none;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all .12s;
+}
+.chart-tab-btn:hover { border-color: #3B82F6; color: #3B82F6; }
+.chart-tab-btn.active { background: #EFF6FF; border-color: #3B82F6; color: #1D4ED8; }
+
+/* ── Alert item ──────────────────────────────────────────────── */
+.alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  border-left: 3px solid var(--c);
+  background: var(--c-bg);
+  text-decoration: none;
+  color: var(--c-text);
+  font-size: .82rem;
+  font-weight: 500;
+  transition: opacity .12s;
+  gap: .5rem;
+}
+.alert-item:hover { opacity: .85; color: var(--c-text); }
+.alert-item-count {
+  font-weight: 800;
+  font-size: .88rem;
+  flex-shrink: 0;
+}
+
+/* ── Recent sales table ─────────────────────────────────────── */
+.recent-table td, .recent-table th {
+  padding: .55rem .65rem;
+  vertical-align: middle;
+  font-size: .82rem;
+}
+.recent-table th {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #9CA3AF;
+  border-bottom: 1px solid #F3F4F6;
+  background: none;
+}
+.recent-table td { border-bottom: 1px solid #F9FAFB; }
+.recent-table tr:last-child td { border-bottom: none; }
+
+/* ── Tech table ──────────────────────────────────────────────── */
+.tech-table td, .tech-table th {
+  padding: .45rem .65rem;
+  vertical-align: middle;
+  font-size: .81rem;
+}
+.tech-table th {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #9CA3AF;
+  border-bottom: 1px solid #F3F4F6;
+  background: none;
+}
+.tech-table td { border-bottom: 1px solid #F9FAFB; }
+.tech-table tr:last-child td { border-bottom: none; }
+
+/* ── Payment badge ───────────────────────────────────────────── */
+.pay-badge {
+  display: inline-block;
+  padding: .12rem .45rem;
+  border-radius: 4px;
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.pay-cash   { background: #ECFDF5; color: #065F46; }
+.pay-card   { background: #EFF6FF; color: #1D4ED8; }
+.pay-credit { background: #FFF7ED; color: #9A3412; }
+.pay-transfer { background: #F5F3FF; color: #5B21B6; }
+
+@media (max-width: 575px) {
+  .kpi-value { font-size: 1.4rem; }
+  .ops-num   { font-size: 1.25rem; }
+  .kpi-card  { padding: 1rem 1.1rem .9rem; }
+}
+</style>
+
+{# ── SECTION 1: Alert banners ──────────────────────────────────────────────── #}
+{% if overdue_count %}
+<div class="animate-fade-up mb-3">
+  <div style="background:#FFF1F2;border:1px solid #FECDD3;border-left:4px solid #EF4444;border-radius:10px;padding:.8rem 1.1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:.7rem;">
+      <i class="bi bi-alarm-fill" style="color:#EF4444;font-size:1.05rem;flex-shrink:0;"></i>
+      <div>
+        <div style="font-weight:700;font-size:.88rem;color:#991B1B;">{{ overdue_count }} unit{{ 's' if overdue_count != 1 }} SLA overdue in processing</div>
+        <div style="font-size:.78rem;color:#B91C1C;margin-top:.1rem;">
+          {% for u in overdue_units[:3] %}{{ u.serial }} ({{ u.stage }}, {{ u.hours_over }}h over){% if not loop.last %}, {% endif %}{% endfor %}{% if overdue_units|length > 3 %} and {{ overdue_units|length - 3 }} more{% endif %}
+        </div>
+      </div>
+    </div>
+    <a href="{{ url_for('pipeline_bp.pipeline') }}" class="btn btn-sm" style="background:#DC2626;color:#fff;border:none;white-space:nowrap;font-size:.78rem;">
+      <i class="bi bi-columns-gap"></i> View Pipeline
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Page header ───────────────────────────────────────────────────────────── #}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">
+      {% if settings.dashboard_logo %}<img src="{{ settings.dashboard_logo }}" alt="logo" style="height:26px;vertical-align:middle;margin-right:8px;">{% endif %}
+      {{ settings.dashboard_name or "Dashboard" }}
+    </h1>
+    <div class="page-subtitle">Welcome back, {{ current_user.full_name or current_user.username }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.stock_intake') }}" class="btn btn-ghost btn-sm"><i class="bi bi-box-arrow-in-down"></i> Receive Stock</a>
+    <a href="{{ url_for('sales_bp.create_sale_form') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New Sale</a>
+  </div>
 </div>
 
-{% set stats = [
-  {'label': 'Total Sales', 'value': total_sales, 'icon': '<i class="bi bi-graph-up-arrow text-success"></i>', 'url': '/sales/sold_units'},
-  {'label': 'Total Inventory', 'value': total_inventory, 'icon': '<i class="bi bi-box-seam text-primary"></i>', 'url': '/stock/under_process?status=all'},
-  {'label': 'Unprocessed', 'value': unprocessed, 'icon': '<i class="bi bi-hourglass text-secondary"></i>', 'url': '/stock/under_process?status=unprocessed'},
-  {'label': 'Under Process', 'value': under_process, 'icon': '<i class="bi bi-arrow-repeat text-primary"></i>', 'url': '/stock/under_process?status=under_process'},
-  {'label': 'Processed', 'value': processed, 'icon': '<i class="bi bi-check-circle text-success"></i>', 'url': '/stock/under_process?status=processed'},
-  {'label': 'Disputed', 'value': disputed, 'icon': '<i class="bi bi-x-circle text-danger"></i>', 'url': '/stock/under_process?status=disputed'},
-  {'label': 'Idle Units', 'value': idle_units_count, 'icon': '<i class="bi bi-hourglass-split text-danger"></i>', 'url': '/idle_units'},
-  {'label': 'Returns', 'value': return_count, 'icon': '<i class="bi bi-arrow-counterclockwise text-warning"></i>', 'url': '/returns'}
-] %}
+{# ── SECTION 2: Primary KPIs ───────────────────────────────────────────────── #}
+<div class="dash-section-title animate-fade-up">Key Metrics</div>
+<div class="row g-3 mb-4 animate-fade-up">
 
-<div class="row g-2 mb-3">
-  {% for stat in stats %}
-  <div class="col-6 col-md-4 col-lg-2 mb-3 d-flex">
-    <a href="{{ stat.url }}" class="text-decoration-none flex-grow-1 w-100">
-      <div class="card stat-card border-0 h-100">
-        <div class="card-body text-center d-flex flex-column justify-content-center h-100 py-2 px-2">
-          <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
-            <div class="stat-icon">{{ stat.icon|safe }}</div>
-            <div class="stat-label">{{ stat.label }}</div>
-          </div>
-          <div class="stat-value text-center" id="{{ stat.label|lower|replace(' ', '-') }}-count">{{ stat.value }}</div>
-        </div>
+  {% if current_user.role == 'technician' %}
+  {# ── TECHNICIAN KPIs ── #}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('stock_bp.under_process') }}" class="kpi-card db-primary">
+      <div class="kpi-icon"><i class="bi bi-box-seam"></i></div>
+      <div class="kpi-value" id="kpi-inventory">{{ total_inventory }}</div>
+      <div class="kpi-label">Total Inventory (units)</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-box-arrow-in-down"></i> {{ unprocessed }} unprocessed
       </div>
     </a>
   </div>
-  {% endfor %}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('stock_bp.under_process') }}" class="kpi-card db-primary">
+      <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+      <div class="kpi-value" id="kpi-under-process">{{ under_process }}</div>
+      <div class="kpi-label">{{ get_status_label('under_process') }}</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-person-gear"></i> Across all techs
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card db-amber">
+      <div class="kpi-icon"><i class="bi bi-person-check"></i></div>
+      <div class="kpi-value">{{ my_units|length }}</div>
+      <div class="kpi-label">My Assigned Units</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-wrench"></i> Currently assigned to me
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-check2-all"></i></div>
+      <div class="kpi-value">{{ my_completions_today }}</div>
+      <div class="kpi-label">Stage Completions Today</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-calendar-check"></i> Stages moved today
+      </div>
+    </div>
+  </div>
+
+  {% elif current_user.role == 'sales' %}
+  {# ── SALES KPIs ── #}
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+      <div class="kpi-value" id="kpi-revenue">{{ '{:,.0f}'.format(revenue_this_month) }}</div>
+      <div class="kpi-label">Revenue This Month ({{ currency }})</div>
+      {% if revenue_trend is not none %}
+      <div class="kpi-trend {{ 'up' if revenue_trend >= 0 else 'down' }}">
+        <i class="bi {{ 'bi-arrow-up-short' if revenue_trend >= 0 else 'bi-arrow-down-short' }}"></i>
+        {{ '{:+.1f}'.format(revenue_trend) }}% vs last month
+      </div>
+      {% else %}
+      <div class="kpi-trend flat"><i class="bi bi-dash"></i> No prior data</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('sales_bp.sold_units_view') }}" class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
+      <div class="kpi-value" id="kpi-sold">{{ units_sold_this_month }}</div>
+      <div class="kpi-label">Units Sold This Month</div>
+      {% if sales_trend is not none %}
+      <div class="kpi-trend {{ 'up' if sales_trend >= 0 else 'down' }}">
+        <i class="bi {{ 'bi-arrow-up-short' if sales_trend >= 0 else 'bi-arrow-down-short' }}"></i>
+        {{ '{:+.1f}'.format(sales_trend) }}% vs last month
+      </div>
+      {% else %}
+      <div class="kpi-trend flat"><i class="bi bi-dash"></i> No prior data</div>
+      {% endif %}
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('order_bp.customer_orders') }}" class="kpi-card db-amber">
+      <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
+      <div class="kpi-value">{{ pending_orders }}</div>
+      <div class="kpi-label">Active Reservations</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-clock"></i> Pending pickup
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card {{ 'db-amber' if outstanding_ar > 0 else 'db-green' }}">
+      <div class="kpi-icon"><i class="bi bi-file-earmark-check"></i></div>
+      <div class="kpi-value" id="kpi-ar">{{ '{:,.0f}'.format(outstanding_ar) }}</div>
+      <div class="kpi-label">Outstanding AR ({{ currency }})</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-exclamation-circle"></i> Unpaid invoices
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  {# ── ADMIN / SUPERVISOR / STAFF KPIs ── #}
+  {# Revenue This Month #}
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+      <div class="kpi-value" id="kpi-revenue">{{ '{:,.0f}'.format(revenue_this_month) }}</div>
+      <div class="kpi-label">Revenue This Month ({{ currency }})</div>
+      {% if revenue_trend is not none %}
+      <div class="kpi-trend {{ 'up' if revenue_trend >= 0 else 'down' }}">
+        <i class="bi {{ 'bi-arrow-up-short' if revenue_trend >= 0 else 'bi-arrow-down-short' }}"></i>
+        {{ '{:+.1f}'.format(revenue_trend) }}% vs last month
+      </div>
+      {% else %}
+      <div class="kpi-trend flat"><i class="bi bi-dash"></i> No prior data</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Total Inventory #}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('stock_bp.group_view_page') }}" class="kpi-card db-primary">
+      <div class="kpi-icon"><i class="bi bi-box-seam"></i></div>
+      <div class="kpi-value" id="kpi-inventory">{{ total_inventory }}</div>
+      <div class="kpi-label">Total Inventory (units)</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-box-arrow-in-down"></i> {{ unprocessed }} unprocessed
+      </div>
+    </a>
+  </div>
+
+  {# Units Sold This Month #}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('sales_bp.sold_units_view') }}" class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
+      <div class="kpi-value" id="kpi-sold">{{ units_sold_this_month }}</div>
+      <div class="kpi-label">Units Sold This Month</div>
+      {% if sales_trend is not none %}
+      <div class="kpi-trend {{ 'up' if sales_trend >= 0 else 'down' }}">
+        <i class="bi {{ 'bi-arrow-up-short' if sales_trend >= 0 else 'bi-arrow-down-short' }}"></i>
+        {{ '{:+.1f}'.format(sales_trend) }}% vs last month
+      </div>
+      {% else %}
+      <div class="kpi-trend flat"><i class="bi bi-dash"></i> No prior data</div>
+      {% endif %}
+    </a>
+  </div>
+
+  {# Net Profit This Month #}
+  {% if current_user.role in ('admin', 'supervisor') %}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('accounting_bp.pl') }}" class="kpi-card db-purple">
+      <div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-value" id="kpi-profit" style="color:{{ '#10B981' if net_profit_month >= 0 else '#EF4444' }};">
+        {{ '{:,.0f}'.format(net_profit_month) }}
+      </div>
+      <div class="kpi-label">Net Profit This Month ({{ currency }})</div>
+      <div class="kpi-trend {{ 'up' if net_profit_month >= 0 else 'down' }}" style="margin-top:.4rem;">
+        <i class="bi {{ 'bi-check-circle' if net_profit_month >= 0 else 'bi-exclamation-circle' }}"></i>
+        {{ 'Profitable' if net_profit_month >= 0 else 'Loss' }}
+      </div>
+    </a>
+  </div>
+  {% else %}
+  {# Staff sees Under Process in place of Profit #}
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('stock_bp.under_process') }}" class="kpi-card db-primary">
+      <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+      <div class="kpi-value" id="kpi-under-process">{{ under_process }}</div>
+      <div class="kpi-label">{{ get_status_label('under_process') }}</div>
+      <div class="kpi-trend flat" style="margin-top:.4rem;">
+        <i class="bi bi-person-gear"></i> In your workshop
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% endif %}
 </div>
 
-<div class="row">
-  <div class="col-12 mb-3">
-    <!-- Dynamic Filter Dropdown -->
-    <form method="get" class="row g-2 mb-4">
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <select name="model" class="form-select rounded-pill shadow-sm" onchange="this.form.submit()" style="min-height: 42px;">
-          <option value="">Filter by Product Model</option>
-          {% for model in available_models %}
-            <option value="{{ model }}" {% if request.args.get('model') == model %}selected{% endif %}>{{ model }}</option>
-          {% endfor %}
-        </select>
+{# ── SECTION 3: Operations row (hidden for sales role) ────────────────────── #}
+{% if current_user.role != 'sales' %}
+<div class="dash-section-title animate-fade-up">Operations</div>
+<div class="row g-3 mb-4 animate-fade-up">
+
+  <div class="col-6 col-sm-3">
+    <a href="{{ url_for('stock_bp.under_process') }}" class="ops-card db-primary">
+      <div class="ops-dot"><i class="bi bi-arrow-repeat"></i></div>
+      <div>
+        <div class="ops-num" id="ops-under-process">{{ under_process }}</div>
+        <div class="ops-lbl">{{ get_status_label('under_process') }}</div>
       </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="form-control rounded-pill shadow-sm" onchange="this.form.submit()" style="min-height: 42px;">
+    </a>
+  </div>
+
+  <div class="col-6 col-sm-3">
+    <a href="{{ url_for('pipeline_bp.pipeline') }}" class="ops-card db-red">
+      <div class="ops-dot"><i class="bi bi-alarm"></i></div>
+      <div>
+        <div class="ops-num" id="ops-overdue">{{ overdue_count }}</div>
+        <div class="ops-lbl">SLA Overdue</div>
       </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="form-control rounded-pill shadow-sm" onchange="this.form.submit()" style="min-height: 42px;">
+    </a>
+  </div>
+
+  <div class="col-6 col-sm-3">
+    <a href="{{ url_for('stock_bp.under_process', status='unprocessed') }}" class="ops-card db-amber">
+      <div class="ops-dot"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div class="ops-num" id="ops-backlog">{{ stale_backlog }}</div>
+        <div class="ops-lbl">Backlog &gt;3 days</div>
       </div>
-      <div class="col-12 col-md-3 mb-2 mb-md-0">
-        <button class="btn btn-outline-secondary w-100 rounded-pill shadow-sm" type="submit" style="height: 42px;">Apply Filters</button>
+    </a>
+  </div>
+
+  <div class="col-6 col-sm-3">
+    {% if current_user.role in ('admin', 'supervisor') %}
+    <a href="{{ url_for('accounting_bp.receivables') }}" class="ops-card {{ 'db-amber' if outstanding_ar > 0 else 'db-green' }}">
+      <div class="ops-dot"><i class="bi bi-file-earmark-check"></i></div>
+      <div>
+        <div class="ops-num" id="ops-ar">{{ '{:,.0f}'.format(outstanding_ar) }}</div>
+        <div class="ops-lbl">Outstanding AR ({{ currency }})</div>
       </div>
-    </form>
-    <p class="text-muted small">Use filters above to refine chart data. Inventory views include asset details.</p>
+    </a>
+    {% else %}
+    <a href="{{ url_for('order_bp.customer_orders') }}" class="ops-card db-primary">
+      <div class="ops-dot"><i class="bi bi-bag-check"></i></div>
+      <div>
+        <div class="ops-num">{{ pending_orders }}</div>
+        <div class="ops-lbl">Active Reservations</div>
+      </div>
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="col-6 col-sm-3">
+    <a href="{{ url_for('returns_bp.view_returns') }}" class="ops-card db-purple">
+      <div class="ops-dot"><i class="bi bi-arrow-return-left"></i></div>
+      <div>
+        <div class="ops-num" id="ops-returns">{{ returns_this_month }}</div>
+        <div class="ops-lbl">Returns This Month</div>
+      </div>
+    </a>
   </div>
 </div>
+{% endif %}{# end sales role hide #}
 
-<div class="row">
-  <div class="col-12">
-    <div class="card dashboard-card my-3" style="max-width: 720px;">
-      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-        <h6 class="mb-0 me-2 text-secondary fw-semibold" style="font-size: 1rem;">📈 Analytics Overview</h6>
-        <button class="btn btn-outline-success btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('sales')">Sales</button>
-        <button class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('stock')">Stock</button>
-        <button class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.87rem;" onclick="switchChart('models')">Top Models</button>
+{# ── SECTION 4: Chart (hidden for technician role) ────────────────────────── #}
+{% if current_user.role != 'technician' %}
+<div class="animate-fade-up mb-4">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><i class="bi bi-bar-chart-line me-2" style="color:#3B82F6;"></i>Sales Activity</span>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <div style="display:flex;gap:.25rem;">
+          <button class="chart-tab-btn active" onclick="switchChartType('sales', this)">Units Sold</button>
+          <button class="chart-tab-btn" onclick="switchChartType('revenue', this)">Revenue ({{ currency }})</button>
+        </div>
+        <!-- Desktop period buttons -->
+        <div class="d-none d-md-flex gap-1 ms-2">
+          <button class="period-btn" onclick="setPeriod(7, this)">7d</button>
+          <button class="period-btn active" onclick="setPeriod(30, this)">30d</button>
+          <button class="period-btn" onclick="setPeriod(90, this)">90d</button>
+        </div>
+        <!-- Mobile period select -->
+        <select class="form-select form-select-sm d-md-none chart-period-select" id="chartPeriodSelect" style="width:auto;" onchange="onPeriodSelectChange(this)">
+          <option value="7">7 days</option>
+          <option value="30" selected>30 days</option>
+          <option value="90">90 days</option>
+        </select>
       </div>
+    </div>
+    <div class="panel-body" style="padding-top:.75rem;height:240px;position:relative;">
+      <canvas id="salesChart"></canvas>
+    </div>
+  </div>
+</div>
+{% endif %}{# end technician chart hide #}
+
+{# ── SECTION 5: Recent sales + Alerts ─────────────────────────────────────── #}
+<div class="row g-3 mb-4 animate-fade-up">
+
+  {# Left: Recent Sales (hidden for technician) #}
+  {% if current_user.role != 'technician' %}
+  <div class="col-12 col-lg-7">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-receipt me-2" style="color:#10B981;"></i>Recent Sales</span>
+        <a href="{{ url_for('sales_bp.sold_units_view') }}" class="btn btn-ghost btn-sm" style="font-size:.75rem;">View All</a>
+      </div>
+      {% if recent_sales %}
       <div style="overflow-x:auto;">
-        <canvas id="mainChart" height="160"></canvas>
+        <table class="table mb-0 recent-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th style="text-align:right;">Amount</th>
+              <th>Payment</th>
+              <th>Invoice</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in recent_sales %}
+            <tr>
+              <td style="color:#6B7280;white-space:nowrap;">{{ s.date.strftime('%d %b') if s.date else '—' }}</td>
+              <td style="font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.customer }}</td>
+              <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">{{ currency }} {{ '{:,.0f}'.format(s.amount) }}</td>
+              <td>
+                {% if s.payment_method %}
+                <span class="pay-badge pay-{{ s.payment_method }}">{{ s.payment_method }}</span>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if s.invoice_id %}
+                <a href="{{ url_for('invoices_bp.view_invoice', invoice_id=s.invoice_id) }}" style="font-size:.78rem;color:#3B82F6;font-family:monospace;">{{ s.invoice_number or ('#' ~ s.invoice_id) }}</a>
+                {% else %}<span style="color:#D1D5DB;">—</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <ul class="mb-0 mt-2 ps-3" style="font-size: 0.96rem;">
-        {% for product in top_models %}
-          <li>{{ product.product_name }} – {{ product.instance_count }}</li>
-        {% endfor %}
-      </ul>
+      {% else %}
+      <div class="panel-body">
+        <div class="empty-state" style="padding:2rem 0;">
+          <i class="bi bi-receipt"></i>
+          <p>No sales recorded yet</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}{# end technician hide recent sales #}
+
+  {# Right: Alerts & Attention #}
+  <div class="col-12 {% if current_user.role == 'technician' %}col-lg-12{% else %}col-lg-5{% endif %}">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-bell me-2" style="color:#F59E0B;"></i>Alerts &amp; Attention</span>
+      </div>
+      <div class="panel-body d-flex flex-column gap-2">
+        {% set has_alert = false %}
+
+        {% if overdue_count > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('pipeline_bp.pipeline') }}" class="alert-item db-red">
+          <span><i class="bi bi-alarm me-2"></i>{{ overdue_count }} unit{{ 's' if overdue_count != 1 }} SLA overdue</span>
+          <span class="alert-item-count">{{ overdue_count }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if low_stock_parts|length > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('parts_bp.parts_list') }}" class="alert-item db-amber">
+          <span><i class="bi bi-tools me-2"></i>{{ low_stock_parts|length }} part{{ 's' if low_stock_parts|length != 1 }} low on stock</span>
+          <span class="alert-item-count">{{ low_stock_parts|length }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if aged_inventory_count > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('reports_bp.idle_units', threshold=1) }}" class="alert-item db-amber">
+          <span><i class="bi bi-clock-history me-2"></i>{{ aged_inventory_count }} unit{{ 's' if aged_inventory_count != 1 }} aged 60+ days</span>
+          <span class="alert-item-count">{{ aged_inventory_count }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if current_user.role in ('admin', 'supervisor') and outstanding_ar > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('accounting_bp.receivables') }}" class="alert-item db-amber">
+          <span><i class="bi bi-file-earmark-check me-2"></i>{{ currency }} {{ '{:,.0f}'.format(outstanding_ar) }} outstanding payments</span>
+          <span class="alert-item-count"><i class="bi bi-chevron-right" style="font-size:.65rem;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if pending_orders > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('order_bp.customer_orders') }}" class="alert-item db-primary">
+          <span><i class="bi bi-bag-check me-2"></i>{{ pending_orders }} unit{{ 's' if pending_orders != 1 }} reserved</span>
+          <span class="alert-item-count">{{ pending_orders }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if stale_backlog > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('stock_bp.under_process', status='unprocessed') }}" class="alert-item db-amber">
+          <span><i class="bi bi-hourglass-split me-2"></i>{{ stale_backlog }} unprocessed unit{{ 's' if stale_backlog != 1 }} &gt;3 days old</span>
+          <span class="alert-item-count">{{ stale_backlog }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if not has_alert %}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 0;color:#10B981;gap:.5rem;">
+          <i class="bi bi-check-circle-fill" style="font-size:1.8rem;"></i>
+          <div style="font-weight:600;font-size:.88rem;color:#065F46;">All clear — no alerts</div>
+          <div style="font-size:.78rem;color:#6B7280;">Everything is running smoothly</div>
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
 
+{# ── SECTION 6: Technician Workload (admin/supervisor only) ───────────────── #}
+{% if tech_workload and current_user.role in ('admin', 'supervisor', 'staff') %}{% if tech_workload %}
+<div class="animate-fade-up mb-4">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><i class="bi bi-person-gear me-2" style="color:#3B82F6;"></i>Technician Workload</span>
+      <a href="{{ url_for('reports_bp.tech_productivity') }}" class="btn btn-ghost btn-sm" style="font-size:.75rem;">Productivity Report</a>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table mb-0 tech-table">
+        <thead>
+          <tr>
+            <th>Technician</th>
+            <th style="text-align:center;">Assigned</th>
+            <th>Oldest Unit</th>
+            <th>Avg Stage Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tech_workload %}
+          <tr>
+            <td style="font-weight:600;">
+              <i class="bi bi-person-circle me-1" style="color:#9CA3AF;"></i>{{ t.name }}
+            </td>
+            <td style="text-align:center;">
+              <span style="background:#EFF6FF;color:#1D4ED8;border-radius:6px;padding:.1rem .55rem;font-weight:700;font-size:.82rem;">{{ t.count }}</span>
+            </td>
+            <td>
+              {% if t.age_hours is not none %}
+                {% if t.age_hours >= 48 %}
+                  <span style="color:#EF4444;font-weight:600;font-size:.8rem;"><i class="bi bi-clock-fill me-1"></i>{{ (t.age_hours // 24) }}d {{ t.age_hours % 24 }}h</span>
+                {% elif t.age_hours >= 24 %}
+                  <span style="color:#F59E0B;font-weight:600;font-size:.8rem;"><i class="bi bi-clock me-1"></i>{{ t.age_hours }}h</span>
+                {% else %}
+                  <span style="color:#6B7280;font-size:.8rem;"><i class="bi bi-clock me-1"></i>{{ t.age_hours }}h</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="color:#6B7280;font-size:.8rem;">
+              {% if t.avg_minutes %}
+                {% if t.avg_minutes >= 60 %}{{ (t.avg_minutes // 60)|int }}h {{ (t.avg_minutes % 60)|int }}m avg
+                {% else %}{{ t.avg_minutes }}m avg{% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}{% endif %}{# end admin/supervisor tech workload #}
+
+{# ── SECTION 7: Technician — My Assigned Units ────────────────────────────── #}
+{% if current_user.role == 'technician' %}
+<div class="animate-fade-up mb-4">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><i class="bi bi-person-check me-2" style="color:#3B82F6;"></i>My Assigned Units</span>
+      <a href="{{ url_for('scanner_bp.scan_unit') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-upc-scan"></i> Quick Scan
+      </a>
+    </div>
+    {% if my_units %}
+    <div style="overflow-x:auto;">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th>Stage</th>
+            <th>Time in Stage</th>
+            <th>SLA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in my_units %}
+          <tr>
+            <td>
+              <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=u.instance.id) }}"
+                 style="font-family:monospace;font-weight:600;color:#3B82F6;">{{ u.serial }}</a>
+            </td>
+            <td>
+              <span class="status-pill status-under_process">{{ u.stage }}</span>
+            </td>
+            <td>
+              {% if u.hours_in is not none %}
+                {% if u.hours_in >= 48 %}
+                  <span style="color:#EF4444;font-weight:600;font-size:.82rem;"><i class="bi bi-clock-fill me-1"></i>{{ (u.hours_in // 24)|int }}d {{ (u.hours_in % 24)|int }}h</span>
+                {% elif u.hours_in >= 24 %}
+                  <span style="color:#F59E0B;font-weight:600;font-size:.82rem;"><i class="bi bi-clock me-1"></i>{{ u.hours_in }}h</span>
+                {% else %}
+                  <span style="color:#6B7280;font-size:.82rem;"><i class="bi bi-clock me-1"></i>{{ u.hours_in }}h</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if u.sla_hours %}
+                {% if u.is_overdue %}
+                  <span style="background:#FEF2F2;color:#DC2626;border-radius:6px;padding:.15rem .6rem;font-size:.78rem;font-weight:600;">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Overdue ({{ u.sla_hours }}h limit)
+                  </span>
+                {% else %}
+                  <span style="background:#ECFDF5;color:#065F46;border-radius:6px;padding:.15rem .6rem;font-size:.78rem;">
+                    <i class="bi bi-check-circle me-1"></i>On time ({{ u.sla_hours }}h limit)
+                  </span>
+                {% endif %}
+              {% else %}
+                <span style="color:#9CA3AF;font-size:.78rem;">No SLA set</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="panel-body">
+      <div class="empty-state" style="padding:2rem 0;">
+        <i class="bi bi-person-check"></i>
+        <p>No units currently assigned to you</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}{# end technician my units #}
+
+{# ── SECTION 8: Sales — Pending Reservations ──────────────────────────────── #}
+{% if current_user.role == 'sales' and pending_orders > 0 %}
+<div class="animate-fade-up mb-4">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><i class="bi bi-bag-check me-2" style="color:#F59E0B;"></i>Pending Reservations</span>
+      <a href="{{ url_for('order_bp.customer_orders') }}" class="btn btn-ghost btn-sm" style="font-size:.75rem;">View All</a>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;align-items:center;gap:1rem;padding:.5rem 0;">
+        <span style="font-size:2rem;font-weight:800;color:#F59E0B;">{{ pending_orders }}</span>
+        <div>
+          <div style="font-weight:600;color:var(--text-primary);">Units awaiting delivery</div>
+          <div style="font-size:.82rem;color:var(--text-muted);">Reserved by customers — follow up to close the sale</div>
+        </div>
+        <a href="{{ url_for('order_bp.customer_orders') }}" class="btn btn-primary ms-auto">
+          <i class="bi bi-arrow-right"></i> View Orders
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}{# end sales reservations panel #}
+
+{# ── Chart.js ──────────────────────────────────────────────────────────────── #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const ctxMain = document.getElementById('mainChart').getContext('2d');
-  const chartData = {
-    sales: {
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-      data: [8, 12, 10, 15, 9, 14, 18]
-    },
-    stock: {
-      labels: {{ analytic_overview.keys() | list | tojson }},
-      data: {{ analytic_overview.values() | list | tojson }}
-    },
-    models: {
-      labels: {{ top_models | map(attribute='product_name') | list | tojson }},
-      data: {{ top_models | map(attribute='instance_count') | list | tojson }}
-    }
-  };
+const ALL_LABELS  = {{ sales_chart.labels  | tojson }};
+const ALL_SALES   = {{ sales_chart.sales   | tojson }};
+const ALL_REVENUE = {{ sales_chart.revenue | tojson }};
+const CURRENCY    = '{{ currency }}';
 
-  let currentChart = new Chart(ctxMain, {
+let currentPeriod   = 30;
+let currentType     = 'sales';
+let salesChartInst  = null;
+
+function getSlice(days) {
+  const n = Math.min(days, ALL_LABELS.length);
+  return {
+    labels:  ALL_LABELS.slice(-n),
+    sales:   ALL_SALES.slice(-n),
+    revenue: ALL_REVENUE.slice(-n),
+  };
+}
+
+function formatLabel(d) {
+  // d is 'YYYY-MM-DD' → 'DD Mon'
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return parseInt(day) + ' ' + months[parseInt(m) - 1];
+}
+
+function buildChart() {
+  const slice = getSlice(currentPeriod);
+  const isSales = currentType === 'sales';
+  const color   = isSales ? '#10B981' : '#8B5CF6';
+  const data    = isSales ? slice.sales : slice.revenue;
+  const labels  = slice.labels.map(formatLabel);
+
+  const canvasEl = document.getElementById('salesChart');
+  if (!canvasEl) return;
+  const ctx = canvasEl.getContext('2d');
+  if (salesChartInst) salesChartInst.destroy();
+  salesChartInst = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: chartData.sales.labels,
+      labels,
       datasets: [{
-        label: 'Weekly Sales',
-        data: chartData.sales.data,
-        backgroundColor: 'rgba(40,167,69,0.6)'
+        data,
+        backgroundColor: color + '22',
+        borderColor: color,
+        borderWidth: 2,
+        borderRadius: 5,
+        hoverBackgroundColor: color + '44',
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
       plugins: {
         legend: { display: false },
-        title: { display: true, text: 'Weekly Sales Overview' }
+        tooltip: {
+          backgroundColor: '#111827',
+          titleFont: { size: 11 },
+          bodyFont: { size: 12, weight: '600' },
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            label: ctx => isSales
+              ? ctx.parsed.y + ' unit' + (ctx.parsed.y !== 1 ? 's' : '')
+              : CURRENCY + ' ' + ctx.parsed.y.toLocaleString()
+          }
+        }
       },
       scales: {
-        y: { beginAtZero: true }
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 10 },
+            maxTicksLimit: currentPeriod <= 7 ? 7 : currentPeriod <= 30 ? 10 : 12,
+            maxRotation: 0,
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#F9FAFB', lineWidth: 1 },
+          border: { display: false },
+          ticks: {
+            font: { size: 10 },
+            stepSize: isSales ? 1 : undefined,
+            callback: v => isSales ? v : (v >= 1000 ? (v/1000).toFixed(0)+'k' : v),
+          }
+        }
       }
     }
   });
-
-  function switchChart(type) {
-    currentChart.data.labels = chartData[type].labels;
-    currentChart.data.datasets[0].data = chartData[type].data;
-    currentChart.options.plugins.title.text =
-      type === 'sales' ? 'Weekly Sales Overview' :
-      type === 'stock' ? 'Stock by Category' :
-      'Top Products by Instances';
-    currentChart.update();
-  }
-
-  document.querySelectorAll('.sparkline').forEach(canvas => {
-    const ctx = canvas.getContext('2d');
-    const data = JSON.parse(canvas.getAttribute('data-values'));
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map((_, i) => i),
-        datasets: [{
-          data: data,
-          borderColor: '#28a745',
-          backgroundColor: 'rgba(40,167,69,0.1)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true
-        }]
-      },
-      options: {
-        responsive: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-        scales: { x: { display: false }, y: { display: false } }
-      }
-    });
-  });
-</script>
-<script>
-function updateDashboardStats() {
-  fetch('/api/dashboard_stats')
-    .then(res => res.json())
-    .then(data => {
-      if (data.unprocessed !== undefined) document.getElementById('unprocessed-count').textContent = data.unprocessed;
-      if (data.under_process !== undefined) document.getElementById('under-process-count').textContent = data.under_process;
-      if (data.processed !== undefined) document.getElementById('processed-count').textContent = data.processed;
-      if (data.disputed !== undefined) document.getElementById('disputed-count').textContent = data.disputed;
-      if (data.total_sales !== undefined) document.getElementById('total-sales-count').textContent = data.total_sales;
-      if (data.total_inventory !== undefined) document.getElementById('total-inventory-count').textContent = data.total_inventory;
-      // --- PATCH: update the analytics bar chart ---
-      if (currentChart && currentChart.data && currentChart.options.plugins.title.text === 'Stock by Category') {
-        currentChart.data.labels = ['Unprocessed', 'Under Process', 'Processed', 'Disputed'];
-        currentChart.data.datasets[0].data = [
-          data.unprocessed || 0,
-          data.under_process || 0,
-          data.processed || 0,
-          data.disputed || 0
-        ];
-        currentChart.update();
-      }
-    });
 }
-setInterval(updateDashboardStats, 15000); // 15 seconds
-window.addEventListener('DOMContentLoaded', updateDashboardStats);
+
+function switchChartType(type, btn) {
+  currentType = type;
+  document.querySelectorAll('.chart-tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildChart();
+}
+
+function setPeriod(days, btn) {
+  currentPeriod = days;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Sync mobile select
+  const sel = document.getElementById('chartPeriodSelect');
+  if (sel) sel.value = String(days);
+  buildChart();
+}
+
+function onPeriodSelectChange(sel) {
+  currentPeriod = parseInt(sel.value);
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  buildChart();
+}
+
+buildChart();
+
+/* ── Live stat refresh (60s) ──────────────────────────────── */
+function refreshStats() {
+  fetch('/api/dashboard_stats')
+    .then(r => r.json())
+    .then(d => {
+      const map = {
+        'total_inventory':       'kpi-inventory',
+        'units_sold_this_month': 'kpi-sold',
+        'under_process':         ['ops-under-process', 'kpi-under-process'],
+        'overdue_count':         'ops-overdue',
+        'stale_backlog':         'ops-backlog',
+        'returns_this_month':    'ops-returns',
+      };
+      for (const [key, id] of Object.entries(map)) {
+        if (d[key] === undefined) continue;
+        const ids = Array.isArray(id) ? id : [id];
+        ids.forEach(i => {
+          const el = document.getElementById(i);
+          if (el) el.textContent = d[key];
+        });
+      }
+      // AR formatted
+      const arEl = document.getElementById('ops-ar');
+      if (arEl && d.outstanding_ar !== undefined)
+        arEl.textContent = Math.round(d.outstanding_ar).toLocaleString();
+      // Revenue formatted
+      const revEl = document.getElementById('kpi-revenue');
+      if (revEl && d.revenue_this_month !== undefined)
+        revEl.textContent = Math.round(d.revenue_this_month).toLocaleString();
+    })
+    .catch(() => {});
+}
+setInterval(refreshStats, 60000);
 </script>
+
 {% endblock %}

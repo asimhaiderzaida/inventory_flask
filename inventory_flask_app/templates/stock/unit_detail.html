@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% block title %}Unit Detail — {{ instance.serial }}{% endblock %}
+{% block page_title %}Unit Detail{% endblock %}
+
+{% block content %}
+{# ── Page header ─────────────────────────────────────────────────────── #}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title" style="font-family:monospace;">{{ instance.serial }}</h1>
+    <div class="page-subtitle">{{ (instance.product.model if instance.product else '') | nonan }} &mdash; Read-only view</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    {% if current_user.role in ('admin', 'supervisor') %}
+    <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=instance.id) }}" class="btn btn-primary">
+      <i class="bi bi-pencil"></i> Edit Unit
+    </a>
+    {% endif %}
+    {% if sale and not instance_returns %}
+    <a href="{{ url_for('returns_bp.create_return', instance_id=instance.id, sale_id=sale.id) }}" class="btn btn-ghost" style="color:var(--color-danger);">
+      <i class="bi bi-arrow-return-left"></i> Process Return
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Breadcrumb ───────────────────────────────────────────────────────── #}
+<nav style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem;" aria-label="breadcrumb">
+  <a href="{{ url_for('stock_bp.under_process') }}" style="text-decoration:none;color:var(--text-muted);">Stock</a>
+  <span style="margin:0 0.4rem;">/</span>
+  <span style="color:var(--text-primary);">Unit Detail</span>
+</nav>
+
+{# ── Two-column layout ────────────────────────────────────────────────── #}
+<div class="row g-3 animate-fade-up">
+
+  {# LEFT — Unit info ──────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">
+          <i class="bi bi-info-circle me-1"></i>Unit Information
+        </h6>
+        {% set p = instance.product %}
+        {% set info_rows = [
+          ('Serial',    instance.serial),
+          ('Asset Tag', instance.asset),
+          ('Make',      p.make if p else None),
+          ('Model',     p.model if p else None),
+          ('Item Name', p.item_name if p else None),
+          ('CPU',       p.cpu if p else None),
+          ('RAM',       p.ram if p else None),
+          ('Storage',   p.disk1size if p else None),
+          ('Display',   p.display if p else None),
+          ('GPU',       p.gpu1 if p else None),
+          ('Grade',     p.grade if p else None),
+        ] %}
+        {% for label, value in info_rows %}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">{{ label }}</span>
+          <span style="font-size:0.85rem;font-weight:500;color:var(--text-primary);text-align:right;font-family:{% if label in ('Serial','Asset Tag') %}monospace{% else %}inherit{% endif %};">{{ value or '—' }}</span>
+        </div>
+        {% endfor %}
+
+        {# Status #}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Status</span>
+          <span class="status-pill status-{{ instance.status }}">{{ instance.status | replace('_', ' ') | title }}</span>
+        </div>
+
+        {# Process Stage #}
+        {% if instance.process_stage %}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Stage</span>
+          <span style="font-size:0.85rem;font-weight:500;">{{ instance.process_stage }}</span>
+        </div>
+        {% endif %}
+
+        {# Location / Bin #}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Location</span>
+          <span style="font-size:0.85rem;font-weight:500;">{{ instance.location.name if instance.location else '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Bin</span>
+          <span style="font-size:0.85rem;font-weight:500;font-family:monospace;">{{ instance.bin_name or '—' }}</span>
+        </div>
+
+        {# Asking Price #}
+        {% if instance.asking_price %}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Asking Price</span>
+          <span style="font-size:0.85rem;font-weight:700;color:var(--color-success);">${{ '%.2f'|format(instance.asking_price) }}</span>
+        </div>
+        {% endif %}
+
+        {# Age in stock #}
+        {% if instance.created_at %}
+        {% set age_days = ((now_utc() - instance.created_at).days) if now_utc is defined else none %}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;">
+          <span style="font-size:0.78rem;color:var(--text-muted);">Received</span>
+          <span style="font-size:0.82rem;color:var(--text-secondary);" title="{{ instance.created_at.strftime('%Y-%m-%d %H:%M') }}">
+            {{ instance.created_at.strftime('%Y-%m-%d') }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# RIGHT — Timeline ──────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1.25rem;">
+          <i class="bi bi-clock-history me-1"></i>History &amp; Timeline
+          <span style="font-weight:400;margin-left:0.5rem;">(newest first)</span>
+        </h6>
+
+        {% if not logs and not sale and not instance_returns %}
+        <div class="empty-state" style="padding:2rem 0;">
+          <i class="bi bi-clock"></i>
+          <p>No history recorded yet.</p>
+        </div>
+        {% else %}
+
+        {# Build unified event list from logs, sale, returns #}
+        <div style="position:relative;">
+          {# Timeline line #}
+          <div style="position:absolute;left:18px;top:0;bottom:0;width:2px;background:var(--border);z-index:0;"></div>
+
+          {# --- Sale event --- #}
+          {% if sale %}
+          <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
+            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:#d1fae5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:1rem;border:2px solid #fff;box-shadow:0 0 0 2px #a7f3d0;">
+              <i class="bi bi-cart-check"></i>
+            </div>
+            <div style="flex:1;padding-top:0.15rem;">
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
+                Sold to {{ sale.customer.name }}
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
+                Price: <strong style="color:var(--color-success);">${{ '%.2f'|format(sale.price_at_sale) }}</strong>
+                {% if sale.payment_method %}&nbsp;&bull;&nbsp;{{ sale.payment_method | title }}{% endif %}
+                {% if sale.invoice %}
+                  &nbsp;&bull;&nbsp;<a href="{{ url_for('invoices_bp.view_invoice', invoice_id=sale.invoice_id) }}" style="font-size:0.78rem;">Invoice #{{ sale.invoice.invoice_number or sale.invoice_id }}</a>
+                {% endif %}
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
+                {{ sale.date_sold.strftime('%Y-%m-%d %H:%M') if sale.date_sold else '—' }}
+                {% if sale.user %}&nbsp;&bull;&nbsp;by {{ sale.user.username }}{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {# --- Return events --- #}
+          {% for ret in instance_returns %}
+          <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
+            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:1rem;border:2px solid #fff;box-shadow:0 0 0 2px #fca5a5;">
+              <i class="bi bi-arrow-return-left"></i>
+            </div>
+            <div style="flex:1;padding-top:0.15rem;">
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
+                Return — {{ ret.reason or 'No reason given' }}
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
+                Condition: <strong>{{ ret.condition or '—' }}</strong>
+                {% if ret.action %}&nbsp;&bull;&nbsp;Action: {{ ret.action }}{% endif %}
+                {% if ret.refund_amount %}&nbsp;&bull;&nbsp;Refund: <span style="color:var(--color-danger);">-${{ '%.2f'|format(ret.refund_amount) }}</span>{% endif %}
+              </div>
+              {% if ret.action_taken %}
+              <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ ret.action_taken }}</div>
+              {% endif %}
+              {% if ret.credit_note_number %}
+              <div style="font-size:0.78rem;color:var(--primary);margin-top:0.1rem;"><i class="bi bi-file-text me-1"></i>Credit Note: {{ ret.credit_note_number }}</div>
+              {% endif %}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
+                {{ ret.return_date.strftime('%Y-%m-%d %H:%M') if ret.return_date else '—' }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+          {# --- Process log events --- #}
+          {% for log in logs %}
+          {% set is_checkin = log.action in ('checkin', 'check_in') %}
+          {% set is_checkout = log.action in ('checkout', 'check_out') %}
+          {% set is_sale = log.action and 'sale' in log.action %}
+          {% set is_return = log.action and 'return' in log.action %}
+          {% set is_move = log.action and 'move' in log.action %}
+          {% set is_dispute = log.action and 'disput' in log.action %}
+
+          {# Choose icon + color #}
+          {% if is_checkin %}
+            {% set ev_icon = 'bi-box-arrow-in-down' %}
+            {% set ev_bg = '#eff6ff' %}{% set ev_color = '#1d4ed8' %}{% set ev_ring = '#bfdbfe' %}
+          {% elif is_checkout %}
+            {% set ev_icon = 'bi-box-arrow-up' %}
+            {% set ev_bg = '#f5f3ff' %}{% set ev_color = '#6d28d9' %}{% set ev_ring = '#ddd6fe' %}
+          {% elif is_sale %}
+            {% set ev_icon = 'bi-cart' %}
+            {% set ev_bg = '#d1fae5' %}{% set ev_color = '#059669' %}{% set ev_ring = '#a7f3d0' %}
+          {% elif is_return %}
+            {% set ev_icon = 'bi-arrow-return-left' %}
+            {% set ev_bg = '#fee2e2' %}{% set ev_color = '#dc2626' %}{% set ev_ring = '#fca5a5' %}
+          {% elif is_move %}
+            {% set ev_icon = 'bi-arrows-move' %}
+            {% set ev_bg = '#fef3c7' %}{% set ev_color = '#d97706' %}{% set ev_ring = '#fde68a' %}
+          {% elif is_dispute %}
+            {% set ev_icon = 'bi-exclamation-triangle' %}
+            {% set ev_bg = '#fff7ed' %}{% set ev_color = '#ea580c' %}{% set ev_ring = '#fed7aa' %}
+          {% else %}
+            {% set ev_icon = 'bi-arrow-right-circle' %}
+            {% set ev_bg = 'var(--surface-2)' %}{% set ev_color = 'var(--text-secondary)' %}{% set ev_ring = 'var(--border)' %}
+          {% endif %}
+
+          <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
+            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:{{ ev_bg }};color:{{ ev_color }};display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:2px solid #fff;box-shadow:0 0 0 2px {{ ev_ring }};">
+              <i class="bi {{ ev_icon }}"></i>
+            </div>
+            <div style="flex:1;padding-top:0.15rem;">
+              {# Description line #}
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
+                {% if log.action %}
+                  {{ log.action | replace('_', ' ') | title }}
+                {% elif log.from_stage or log.to_stage %}
+                  Stage: {{ log.from_stage or '—' }} → {{ log.to_stage or '—' }}
+                {% else %}
+                  Process Log
+                {% endif %}
+              </div>
+
+              {# Stage / team detail #}
+              {% if log.from_stage or log.to_stage %}
+              <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
+                {% if log.from_stage and log.to_stage %}
+                  {{ log.from_stage }} <i class="bi bi-arrow-right" style="font-size:0.7rem;"></i> {{ log.to_stage }}
+                {% elif log.to_stage %}
+                  → {{ log.to_stage }}
+                {% elif log.from_stage %}
+                  {{ log.from_stage }} →
+                {% endif %}
+                {% if log.from_team or log.to_team %}
+                  &nbsp;&bull;&nbsp;
+                  {% if log.from_team and log.to_team %}{{ log.from_team }} → {{ log.to_team }}
+                  {% elif log.to_team %}→ {{ log.to_team }}
+                  {% else %}{{ log.from_team }} →{% endif %}
+                {% endif %}
+              </div>
+              {% endif %}
+
+              {# Note #}
+              {% if log.note %}
+              <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ log.note }}</div>
+              {% endif %}
+
+              {# Duration #}
+              {% if log.duration_minutes %}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
+                <i class="bi bi-stopwatch me-1"></i>Duration: {{ log.duration_minutes }} min
+                {%- if log.duration_minutes >= 60 %} ({{ (log.duration_minutes / 60) | round(1) }} hr){% endif %}
+              </div>
+              {% endif %}
+
+              {# Meta: date + user #}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
+                {{ log.moved_at.strftime('%Y-%m-%d %H:%M') if log.moved_at else '—' }}
+                {% if log.user %}&nbsp;&bull;&nbsp;{{ log.user.username }}{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Bottom cards ─────────────────────────────────────────────────────── #}
+<div class="row g-3 animate-fade-up" style="margin-top:0.25rem;">
+
+  {# Sale details card #}
+  {% if sale %}
+  <div class="col-12 col-md-6">
+    <div class="card" style="border-color:rgba(16,185,129,0.3);">
+      <div class="card-body" style="padding:1.25rem;">
+        <h6 style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#059669;margin-bottom:0.75rem;">
+          <i class="bi bi-cart-check me-1"></i>Sale Details
+        </h6>
+        <div style="display:flex;flex-direction:column;gap:0.35rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Customer</span>
+            <a href="{{ url_for('customers_bp.customer_profile', customer_id=sale.customer_id) }}" style="font-weight:600;text-decoration:none;">{{ sale.customer.name }}</a>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Sale Price</span>
+            <span style="font-weight:700;color:var(--color-success);">${{ '%.2f'|format(sale.price_at_sale) }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Date</span>
+            <span>{{ sale.date_sold.strftime('%Y-%m-%d') if sale.date_sold else '—' }}</span>
+          </div>
+          {% if sale.payment_method %}
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Payment</span>
+            <span>{{ sale.payment_method | title }}</span>
+          </div>
+          {% endif %}
+          {% if sale.invoice %}
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Invoice</span>
+            <a href="{{ url_for('invoices_bp.view_invoice', invoice_id=sale.invoice_id) }}" style="font-weight:600;text-decoration:none;">
+              #{{ sale.invoice.invoice_number or sale.invoice_id }}
+            </a>
+          </div>
+          {% endif %}
+          {% if sale.notes %}
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;border-top:1px solid var(--border);padding-top:0.4rem;">{{ sale.notes }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Return details card #}
+  {% if instance_returns %}
+  <div class="col-12 col-md-6">
+    <div class="card" style="border-color:rgba(239,68,68,0.3);">
+      <div class="card-body" style="padding:1.25rem;">
+        <h6 style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#dc2626;margin-bottom:0.75rem;">
+          <i class="bi bi-arrow-return-left me-1"></i>Return{{ 's' if instance_returns|length > 1 }} ({{ instance_returns|length }})
+        </h6>
+        {% for ret in instance_returns %}
+        {% if not loop.first %}<hr style="border-color:var(--border);margin:0.75rem 0;">{% endif %}
+        <div style="display:flex;flex-direction:column;gap:0.3rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Date</span>
+            <span>{{ ret.return_date.strftime('%Y-%m-%d') if ret.return_date else '—' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Reason</span>
+            <span style="font-weight:500;max-width:60%;text-align:right;">{{ ret.reason or '—' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Condition</span>
+            <span class="status-pill
+              {% if ret.condition == 'Good' %}status-processed
+              {% elif ret.condition in ('Damaged','Defective') %}status-idle
+              {% elif ret.condition == 'Broken' %}status-disputed
+              {% endif %}">{{ ret.condition or '—' }}</span>
+          </div>
+          {% if ret.refund_amount %}
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Refund</span>
+            <span style="font-weight:700;color:var(--color-danger);">-${{ '%.2f'|format(ret.refund_amount) }}
+              {% if ret.refund_method and ret.refund_method != 'none' %}<span style="font-weight:400;font-size:0.78rem;"> ({{ ret.refund_method | replace('_',' ') | title }})</span>{% endif %}
+            </span>
+          </div>
+          {% endif %}
+          {% if ret.credit_note_number %}
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+            <span style="color:var(--text-muted);">Credit Note</span>
+            <span style="font-family:monospace;color:var(--primary);">{{ ret.credit_note_number }}</span>
+          </div>
+          {% endif %}
+          {% if ret.action_taken %}
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ ret.action_taken }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# Dispute modal (hidden, only shown if mark-disputed button is used elsewhere) #}
+{% endblock %}

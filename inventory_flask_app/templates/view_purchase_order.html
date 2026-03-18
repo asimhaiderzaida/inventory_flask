@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}PO {{ po.po_number }}{% endblock %}
+{% block page_title %}{{ po.po_number }}{% endblock %}
+
+{% block content %}
+{% set pct = ((received / total) * 100) | int if total > 0 else 0 %}
+
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title" style="font-family:monospace;">{{ po.po_number }}</h1>
+    <div class="page-subtitle">
+      {{ po.vendor.name if po.vendor else 'No vendor' }}
+      {% if po.location %} · {{ po.location.name }}{% endif %}
+      · Created {{ po.created_at.strftime('%b %d, %Y') if po.created_at else '—' }}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if po.status in ('pending', 'partial') %}
+    <a href="{{ url_for('stock_bp.stock_receiving_select') }}?po_id={{ po.id }}" class="btn btn-primary">
+      <i class="bi bi-truck me-1"></i>Receive Stock
+    </a>
+    {% endif %}
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.stock_intake') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Stock Intake
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up">
+
+  {# ── Summary cards ── #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card" style="padding:1rem 1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;">Status</div>
+        <div style="font-size:1.1rem;font-weight:700;">
+          {% if po.status == 'pending' %}
+          <span style="color:#ca8a04;">Pending</span>
+          {% elif po.status == 'partial' %}
+          <span style="color:var(--primary);">Partial</span>
+          {% elif po.status == 'received' %}
+          <span style="color:var(--color-success);">Received</span>
+          {% else %}
+          <span style="color:var(--text-muted);">{{ po.status | title }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card" style="padding:1rem 1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;">Expected</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);">{{ total }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card" style="padding:1rem 1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;">Received</div>
+        <div style="font-size:1.5rem;font-weight:800;color:var(--color-success);">{{ received }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card" style="padding:1rem 1.25rem;">
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;">Outstanding</div>
+        <div style="font-size:1.5rem;font-weight:800;color:{% if total - received > 0 %}var(--color-warning){% else %}var(--text-muted){% endif %};">{{ total - received }}</div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Progress bar ── #}
+  {% if total > 0 %}
+  <div class="card mb-4" style="padding:1rem 1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+      <span style="font-size:0.82rem;font-weight:600;">Receiving Progress</span>
+      <span style="font-size:0.82rem;color:var(--text-muted);">{{ pct }}% · {{ received }} of {{ total }}</span>
+    </div>
+    <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+      <div style="width:{{ pct }}%;height:100%;background:{% if pct == 100 %}var(--color-success){% else %}var(--primary){% endif %};border-radius:4px;transition:width 0.3s;"></div>
+    </div>
+    {% if missing > 0 or extra > 0 %}
+    <div style="display:flex;gap:1rem;margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted);">
+      {% if missing %}<span style="color:var(--color-danger);">{{ missing }} missing</span>{% endif %}
+      {% if extra %}<span style="color:var(--color-warning);">{{ extra }} extra</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if po.notes %}
+  <div class="card mb-4" style="padding:1rem 1.25rem;">
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.35rem;">Notes</div>
+    <div style="font-size:0.88rem;">{{ po.notes }}</div>
+  </div>
+  {% endif %}
+
+  {# ── Items table ── #}
+  {% if items %}
+  <div class="table-card">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:0.85rem;font-weight:600;">Expected Items</span>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        {% set status_counts = {} %}
+        {% for item in items %}{% set _ = status_counts.update({item.status: status_counts.get(item.status, 0) + 1}) %}{% endfor %}
+        {% if status_counts.get('received') %}<span class="status-pill status-processed" style="font-size:0.72rem;">{{ status_counts.received }} received</span>{% endif %}
+        {% if status_counts.get('expected') %}<span class="status-pill status-unprocessed" style="font-size:0.72rem;">{{ status_counts.expected }} expected</span>{% endif %}
+        {% if status_counts.get('missing') %}<span class="status-pill status-disputed" style="font-size:0.72rem;">{{ status_counts.missing }} missing</span>{% endif %}
+        {% if status_counts.get('extra') %}<span class="status-pill status-idle" style="font-size:0.72rem;">{{ status_counts.extra }} extra</span>{% endif %}
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th>Asset Tag</th>
+            <th>Model</th>
+            <th>CPU</th>
+            <th>RAM</th>
+            <th>Status</th>
+            <th>Received At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr {% if item.status == 'received' %}style="opacity:0.75;"{% elif item.status == 'missing' %}style="background:rgba(239,68,68,0.04);"{% elif item.status == 'extra' %}style="background:rgba(234,179,8,0.04);"{% endif %}>
+            <td style="font-family:monospace;font-size:0.85rem;font-weight:600;">{{ item.serial | nonan }}</td>
+            <td style="font-family:monospace;font-size:0.82rem;color:var(--text-muted);">{{ item.asset_tag | nonan }}</td>
+            <td style="font-size:0.83rem;">
+              {% set model_str = [] %}
+              {% if item.make %}{% set _ = model_str.append(item.make) %}{% endif %}
+              {% if item.model %}{% set _ = model_str.append(item.model) %}{% endif %}
+              {{ model_str | join(' ') or '—' }}
+            </td>
+            <td style="font-size:0.82rem;color:var(--text-secondary);">{{ item.cpu | nonan }}</td>
+            <td style="font-size:0.82rem;color:var(--text-secondary);">{{ item.ram | nonan }}</td>
+            <td>
+              {% if item.status == 'received' %}
+              <span class="status-pill status-processed" style="font-size:0.7rem;">Received</span>
+              {% elif item.status == 'missing' %}
+              <span class="status-pill status-disputed" style="font-size:0.7rem;">Missing</span>
+              {% elif item.status == 'extra' %}
+              <span class="status-pill status-idle" style="font-size:0.7rem;">Extra</span>
+              {% else %}
+              <span class="status-pill status-unprocessed" style="font-size:0.7rem;">Expected</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;">
+              {{ item.received_at.strftime('%b %d %H:%M') if item.received_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span style="font-size:0.8rem;color:var(--text-muted);">{{ items | length }} item{{ 's' if items | length != 1 else '' }}</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-list-ul"></i>
+    <p>No items recorded for this PO.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,37 +1,107 @@
 {% extends "base.html" %}
+{% block title %}Bin Lookup{% endblock %}
+{% block page_title %}Bin Lookup{% endblock %}
+
 {% block content %}
-<div class="container mt-5" style="max-width:400px;">
-  <div class="card shadow rounded-4 border-0">
-    <div class="card-header bg-success text-white">
-      <h5 class="mb-0"><i class="bi bi-upc-scan me-2"></i>Scan Bin Barcode</h5>
-    </div>
-    <div class="card-body">
-      <div id="bin-form-wrapper">
-        <form method="post" autocomplete="off" onsubmit="handleSubmit(event)">
-          <label class="form-label">Scan or enter Bin Barcode:</label>
-          <input type="text" name="bin_code" class="form-control rounded-pill fs-5" autofocus required placeholder="Scan or type bin code...">
-          <button id="submitBtn" class="btn btn-success mt-3 w-100 rounded-pill fw-bold" type="submit">
-            <i class="bi bi-search me-1"></i> Show Bin Contents
-          </button>
-          <div id="spinner" class="text-center mt-2" style="display:none;">
-            <div class="spinner-border text-success" role="status">
-              <span class="visually-hidden">Loading...</span>
-            </div>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Bin Lookup</h1>
+    <div class="page-subtitle">Scan or enter a bin code, or browse by location</div>
+  </div>
+</div>
+
+<div class="row g-3 animate-fade-up">
+
+  <!-- Search card -->
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">
+          Search by Bin Code
+        </h6>
+        <form method="post" autocomplete="off" id="bin-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <input type="text" name="bin_code" class="form-control" autofocus required
+                   placeholder="Scan or type bin code…"
+                   style="font-family:monospace;text-transform:uppercase;"
+                   oninput="this.value=this.value.toUpperCase()">
           </div>
+          <button id="submitBtn" class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-search"></i> Show Contents
+          </button>
         </form>
-      </div>
-      <div class="text-muted mt-2" style="font-size:0.98rem;">
-        Scan a bin barcode label with your scanner, or type a bin code and press Enter.
+        <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--text-muted);">
+          Scan a bin QR label or type the bin code.
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Browse by location -->
+  <div class="col-12 col-md-8">
+    <div class="card">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem;">
+          Browse by Location
+        </h6>
+
+        {% if locations %}
+          <div class="d-flex flex-column gap-3">
+          {% for loc in locations %}
+            {% set bins = loc_bins.get(loc.id, []) %}
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
+                <i class="bi bi-geo-alt-fill" style="color:var(--primary);font-size:0.85rem;"></i>
+                <span style="font-weight:600;font-size:0.9rem;">{{ loc.name }}</span>
+                <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                   style="font-size:0.75rem;color:var(--text-muted);text-decoration:none;margin-left:auto;">
+                  <i class="bi bi-pencil"></i> Manage
+                </a>
+              </div>
+              {% if bins %}
+              <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding-left:1.25rem;">
+                {% for b in bins %}
+                <a href="{{ url_for('stock_bp.bin_detail', bin_id=b.id) }}"
+                   style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.65rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);font-family:monospace;font-size:0.82rem;font-weight:600;text-decoration:none;color:var(--text-primary);">
+                  <i class="bi bi-grid-3x2-gap" style="font-size:0.7rem;color:var(--text-muted);"></i>
+                  {{ b.name }}
+                </a>
+                {% endfor %}
+                <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}"
+                   style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.65rem;background:transparent;border:1px dashed var(--border);border-radius:var(--radius-md);font-size:0.78rem;text-decoration:none;color:var(--text-muted);">
+                  <i class="bi bi-plus"></i> Add Bin
+                </a>
+              </div>
+              {% else %}
+              <div style="padding-left:1.25rem;font-size:0.8rem;color:var(--text-muted);">
+                No bins defined.
+                <a href="{{ url_for('stock_bp.manage_bins', location_id=loc.id) }}" style="color:var(--primary);">Add bins</a>
+              </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state" style="padding:1.5rem 0;">
+            <i class="bi bi-geo-alt"></i>
+            <p>No locations defined yet.</p>
+            <a href="{{ url_for('stock_bp.add_location') }}" class="btn btn-primary btn-sm">Add Location</a>
+          </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-function handleSubmit(e) {
+document.getElementById('bin-form').addEventListener('submit', function() {
   const btn = document.getElementById('submitBtn');
-  const spinner = document.getElementById('spinner');
-  btn.disabled = true;
-  spinner.style.display = 'block';
-}
+  if (btn) setButtonLoading(btn, true);
+});
 </script>
 {% endblock %}

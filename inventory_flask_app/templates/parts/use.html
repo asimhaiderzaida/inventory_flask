@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Use Part — Parts{% endblock %}
+{% block page_title %}Use Part{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Use Part</h1>
+    <div class="page-subtitle">Record a part used on a unit during repair or processing</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:560px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="post" id="useForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-3">
+          <label class="form-label">Unit Serial / Asset Tag <span style="color:var(--color-danger);">*</span></label>
+          <div style="position:relative;">
+            <input type="text" name="unit_serial" id="unit-serial" class="form-control"
+                   placeholder="e.g. SN123456 or AT789"
+                   value="{{ preselect_serial }}"
+                   autocomplete="off" required>
+            <div id="unit-lookup-result" style="font-size:0.8rem;margin-top:0.35rem;"></div>
+          </div>
+        </div>
+
+        {% if preselected_part %}
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:var(--radius-md);padding:0.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.9rem;">
+          <i class="bi bi-cpu" style="font-size:1.25rem;color:var(--primary);flex-shrink:0;"></i>
+          <div>
+            <div style="font-weight:600;font-size:0.95rem;">{{ preselected_part.name }}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);">
+              Part No: <code>{{ preselected_part.part_number }}</code>
+              &nbsp;·&nbsp; Current Stock: <strong>{{ preselected_part._current_stock }}</strong>
+            </div>
+          </div>
+        </div>
+        <select name="part_id" id="part-select" style="display:none;">
+          <option value="{{ preselected_part.id }}" selected>{{ preselected_part.name }}</option>
+        </select>
+        {% else %}
+        <div class="mb-3">
+          <label class="form-label">Part <span style="color:var(--color-danger);">*</span></label>
+          <select name="part_id" id="part-select" class="form-select" required style="width:100%;">
+            <option value="">Select a part…</option>
+            {% for p in parts %}
+            <option value="{{ p.id }}"
+              {% if preselect == p.id %}selected{% endif %}>
+              {{ p.part_number }} — {{ p.name }}
+              ({{ p._current_stock }} in stock)
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">Location <span style="color:var(--color-danger);">*</span></label>
+          <select name="location_id" id="location-select" class="form-select" required>
+            <option value="">Select location…</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+          <div id="stock-hint" style="font-size:0.8rem;color:var(--text-muted);margin-top:0.35rem;"></div>
+        </div>
+
+        <div class="mb-3" id="bin-select-wrap" style="display:none;">
+          <label class="form-label">Bin</label>
+          <select name="bin_id" id="bin-select" class="form-select"></select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Quantity <span style="color:var(--color-danger);">*</span></label>
+          <input type="number" name="quantity" id="qty-input" class="form-control"
+                 min="1" required placeholder="0">
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label">Note</label>
+          <input type="text" name="note" class="form-control"
+                 placeholder="e.g. replaced battery, swapped keyboard…">
+        </div>
+
+        <button type="submit" class="btn btn-warning w-100">
+          <i class="bi bi-tools"></i> Record Usage
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+const PART_STOCKS = {{ part_summaries | tojson }};
+
+$(function() {
+  if ($('#part-select').is(':visible')) {
+    $('#part-select').select2({ placeholder: 'Search or select a part…', width: '100%' });
+  }
+
+  function getQtyAtLocationBin(partId, locId, binId) {
+    const pdata = PART_STOCKS.find(function(p) { return p.id === partId; });
+    if (!pdata) return 0;
+    const entry = pdata.location_stocks.find(function(s) {
+      return s.location_id === locId && s.bin_id === binId;
+    });
+    return entry ? entry.quantity : 0;
+  }
+
+  function updateLocationStock() {
+    const partId = parseInt($('#part-select').val());
+    const locId  = parseInt($('#location-select').val());
+    if (!partId || !locId) { $('#stock-hint').text(''); return; }
+    const pdata  = PART_STOCKS.find(function(p) { return p.id === partId; });
+    if (!pdata)  { $('#stock-hint').text(''); return; }
+    const binWrap    = document.getElementById('bin-select-wrap');
+    const binVisible = binWrap && binWrap.style.display !== 'none';
+    let qty;
+    if (binVisible) {
+      const binVal = $('#bin-select').val();
+      qty = getQtyAtLocationBin(partId, locId, binVal ? parseInt(binVal) : null);
+    } else {
+      qty = pdata.location_stocks
+        .filter(function(s) { return s.location_id === locId; })
+        .reduce(function(sum, s) { return sum + s.quantity; }, 0);
+    }
+    $('#stock-hint').html(
+      qty > 0
+        ? '<i class="bi bi-box-seam"></i> Available: <strong>' + qty + '</strong>'
+        : '<span style="color:var(--color-danger);"><i class="bi bi-exclamation-triangle"></i> No stock here</span>'
+    );
+    $('#qty-input').attr('max', qty);
+  }
+
+  function filterBins() {
+    const partId = parseInt($('#part-select').val());
+    const locId  = parseInt($('#location-select').val());
+    const wrap   = document.getElementById('bin-select-wrap');
+    const binSel = document.getElementById('bin-select');
+    if (!partId || !locId || !wrap) { updateLocationStock(); return; }
+    const pdata = PART_STOCKS.find(function(p) { return p.id === partId; });
+    if (!pdata) { wrap.style.display = 'none'; updateLocationStock(); return; }
+    const locEntries = pdata.location_stocks.filter(function(s) { return s.location_id === locId; });
+    const binEntries = locEntries.filter(function(s) { return s.bin_id !== null && s.quantity > 0; });
+    const noBinEntry = locEntries.find(function(s) { return s.bin_id === null; });
+    if (binEntries.length === 0) { wrap.style.display = 'none'; updateLocationStock(); return; }
+    binSel.innerHTML = '';
+    if (noBinEntry && noBinEntry.quantity > 0) {
+      const opt = document.createElement('option');
+      opt.value = ''; opt.textContent = 'No bin (' + noBinEntry.quantity + ' in stock)';
+      binSel.appendChild(opt);
+    }
+    binEntries.forEach(function(s) {
+      const opt = document.createElement('option');
+      opt.value = s.bin_id; opt.textContent = s.bin_name + ' (' + s.quantity + ' in stock)';
+      binSel.appendChild(opt);
+    });
+    wrap.style.display = '';
+    updateLocationStock();
+  }
+
+  function filterLocations() {
+    const partId = parseInt($('#part-select').val());
+    const pdata  = PART_STOCKS.find(function(p) { return p.id === partId; });
+    const hasStockAt = pdata ? [...new Set(pdata.location_stocks.map(function(s) { return s.location_id; }))] : [];
+    $('#location-select option').each(function() {
+      if (!this.value) return;
+      $(this).prop('disabled', hasStockAt.length > 0 && !hasStockAt.includes(parseInt(this.value)));
+    });
+    const wrap = document.getElementById('bin-select-wrap');
+    if (wrap) wrap.style.display = 'none';
+    updateLocationStock();
+  }
+
+  $('#part-select').on('change', filterLocations);
+  $('#location-select').on('change', filterBins);
+  $('#bin-select').on('change', updateLocationStock);
+  if ($('#part-select').val()) {
+    filterLocations();
+    if (!$('#part-select').is(':visible')) {
+      // Part pre-filled — focus unit serial field so tech can scan straight away
+      setTimeout(function() { $('#unit-serial').focus(); }, 100);
+    }
+  }
+
+  // Unit serial live feedback
+  let lookupTimer;
+  $('#unit-serial').on('input', function() {
+    const serial = $(this).val().trim();
+    clearTimeout(lookupTimer);
+    if (!serial) { $('#unit-lookup-result').html(''); return; }
+    lookupTimer = setTimeout(function() {
+      $.get('{{ url_for("parts_bp.lookup_unit") }}', { serial: serial }, function(data) {  // noqa
+        if (data.found) {
+          $('#unit-lookup-result').html(
+            '<span style="color:var(--color-success);"><i class="bi bi-check-circle"></i> ' +
+            data.serial + ' — ' + data.item_name + ' (' + data.status + ')</span>'
+          );
+        } else {
+          $('#unit-lookup-result').html(
+            '<span style="color:var(--color-warning);"><i class="bi bi-exclamation-circle"></i> Unit not found — usage will be logged without unit link</span>'
+          );
+        }
+      }).fail(function() { $('#unit-lookup-result').html(''); });
+    }, 400);
+  });
+
+  // Trigger lookup on page load if serial is pre-filled
+  if ($('#unit-serial').val().trim()) {
+    $('#unit-serial').trigger('input');
+  }
+});
+</script>
+{% endblock %}

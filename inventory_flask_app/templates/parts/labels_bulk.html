@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Labels ({{ parts|length }})</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    /* ── Print layout ── */
+    @page {
+      size: A4;
+      margin: 0.35in;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .labels-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.12in;
+    }
+
+    .label {
+      width: 2in;
+      height: 1in;
+      padding: 0.07in 0.09in 0.04in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      background: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      page-break-inside: avoid;
+    }
+
+    .lname {
+      font-size: 9.5pt;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #000;
+      line-height: 1.2;
+    }
+
+    .lnum {
+      font-size: 7pt;
+      color: #444;
+      font-family: 'Courier New', monospace;
+      line-height: 1.2;
+      margin-top: 1pt;
+    }
+
+    .lbc {
+      display: block;
+      max-width: 100%;
+      flex-shrink: 0;
+    }
+
+    /* ── Screen styles ── */
+    @media screen {
+      html, body {
+        background: #f1f5f9;
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+        padding: 1.5rem;
+      }
+
+      .screen-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .btn-print {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: #3b82f6; color: #fff; border: none;
+        padding: 0.55rem 1.25rem; border-radius: 8px;
+        font-size: 0.9rem; font-weight: 600; cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-print:hover { background: #2563eb; }
+
+      .btn-back {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: transparent; color: #64748b;
+        border: 1px solid #cbd5e1;
+        padding: 0.55rem 1.1rem; border-radius: 8px;
+        font-size: 0.9rem; cursor: pointer; text-decoration: none;
+      }
+      .btn-back:hover { background: #f8fafc; color: #1e293b; }
+
+      .count-badge {
+        font-size: 0.82rem; color: #64748b;
+        background: #e2e8f0; border-radius: 20px;
+        padding: 0.25rem 0.75rem; font-weight: 500;
+      }
+
+      .labels-grid { gap: 0.6rem; }
+
+      .label {
+        border: 1px dashed #94a3b8;
+        border-radius: 3px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        /* 2in × 1in at 96dpi = 192 × 96px */
+        width: 192px;
+        height: 96px;
+        padding: 6px 8px 3px;
+      }
+
+      .lname { font-size: 8.5pt; }
+      .lnum  { font-size: 6.5pt; }
+    }
+
+    /* ── Print: hide controls, restore exact sizes ── */
+    @media print {
+      .screen-controls { display: none; }
+      .label {
+        width: 2in; height: 1in;
+        padding: 0.07in 0.09in 0.04in;
+        border: none; box-shadow: none; border-radius: 0;
+      }
+      .labels-grid { gap: 0.12in; }
+      .lname { font-size: 9.5pt; }
+      .lnum  { font-size: 7pt; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="screen-controls">
+    <button class="btn-print" onclick="window.print()">
+      &#x1F5A8;&nbsp; Print All Labels
+    </button>
+    <a class="btn-back" href="{{ url_for('parts_bp.parts_list') }}">
+      &#8592; Back to Parts
+    </a>
+    <span class="count-badge">{{ parts|length }} label{{ 's' if parts|length != 1 }}</span>
+    {% set no_barcode = [] %}
+    {# We only receive parts that have barcodes from the route,
+       so this is informational only if somehow one slips through #}
+  </div>
+
+  <div class="labels-grid">
+    {% for part in parts %}
+    <div class="label">
+      <div class="lname">{{ part.name }}</div>
+      <div class="lnum">{{ part.part_number }}</div>
+      <svg class="lbc" data-barcode="{{ part.barcode | e }}"></svg>
+    </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    document.querySelectorAll('.lbc').forEach(function(svg) {
+      var code = svg.dataset.barcode;
+      if (!code) return;
+      JsBarcode(svg, code, {
+        format: 'CODE128',
+        width: 1.4,
+        height: 28,
+        displayValue: true,
+        fontSize: 7,
+        margin: 1,
+        lineColor: '#000',
+        background: '#fff',
+      });
+    });
+  </script>
+</body>
+</html>

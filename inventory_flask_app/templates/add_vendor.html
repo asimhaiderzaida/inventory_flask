@@ -1,44 +1,107 @@
 {% extends "base.html" %}
+{% block title %}Add Vendor{% endblock %}
+{% block page_title %}Add Vendor{% endblock %}
+
 {% block content %}
-<div class="container mt-5 d-flex justify-content-center">
-  <div class="card shadow border-0 rounded-4 p-4" style="max-width: 430px; width: 100%; background: #f6f7fa;">
-    <div class="mb-4 text-center">
-      <h3 class="fw-bold mb-1" style="letter-spacing:0.01em;">
-        <i class="bi bi-shop-window text-primary me-2"></i>Add Vendor
-      </h3>
-      <div class="text-muted" style="font-size:0.98rem;">Add or register a new vendor for PCMart</div>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Add Vendor</h1>
+    <div class="page-subtitle">Register a new vendor or supplier</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('vendors_bp.vendor_center') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:620px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST" action="{{ url_for('vendors_bp.add_vendor', next=request.args.get('next')) }}">
+        {{ form.hidden_tag() }}
+
+        <!-- Contact -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;">Vendor Information</div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="form-label">Vendor Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" class="form-control" name="name" placeholder="Company or vendor name" required autofocus>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Contact Person</label>
+            <input type="text" class="form-control" name="contact" placeholder="Primary contact name">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            <input type="text" class="form-control" name="phone" placeholder="Phone number">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" placeholder="vendor@example.com">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Website</label>
+            <input type="url" class="form-control" name="website" placeholder="https://vendor.com">
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.5rem;">Address (optional)</div>
+        <div class="row g-3 mb-3">
+          <div class="col-12">
+            <label class="form-label">Street Address</label>
+            <input type="text" class="form-control" name="address" placeholder="Street / building">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">City</label>
+            <input type="text" class="form-control" name="city" placeholder="City">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Country</label>
+            <select class="form-select" name="country">
+              <option value="">— Select country —</option>
+              {% for c in [
+                'United Arab Emirates','Saudi Arabia','Kuwait','Qatar','Bahrain','Oman',
+                'United Kingdom','United States','Canada','Australia','India','Pakistan',
+                'Egypt','Jordan','Lebanon','Turkey','Germany','France','Netherlands',
+                'Singapore','Malaysia','Philippines','Nigeria','Kenya','South Africa',
+                'China','Hong Kong','Taiwan','Japan','South Korea','Other'
+              ] %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Commercial -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.5rem;">Commercial</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Payment Terms</label>
+            <select class="form-select" name="payment_terms">
+              <option value="">— Select terms —</option>
+              {% for t in ['Net 15','Net 30','Net 60','Net 90','COD','Prepaid','On Account'] %}
+              <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Internal Notes -->
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;margin-top:0.5rem;">Internal Notes</div>
+        <div class="mb-4">
+          <textarea class="form-control" name="notes" rows="3" placeholder="E.g. preferred contact method, quality notes, special terms…"></textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+          <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('vendors_bp.vendor_center') }}'" class="btn btn-ghost flex-fill">Cancel</a>
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check2-circle"></i> Save Vendor
+          </button>
+        </div>
+      </form>
     </div>
-    <form method="POST" action="{{ url_for('vendors_bp.add_vendor', next=request.args.get('next')) }}">
-      {{ form.hidden_tag() }}
-      <div class="mb-3">
-        <label for="name" class="form-label">Vendor Name</label>
-        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="name" name="name" placeholder="Enter vendor name" required>
-      </div>
-      <div class="mb-3">
-        <label for="email" class="form-label">Vendor Email</label>
-        <input type="email" class="form-control form-control-lg rounded-pill px-3" id="email" name="email" placeholder="Enter vendor email">
-      </div>
-      <div class="mb-3">
-        <label for="phone" class="form-label">Vendor Phone</label>
-        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="phone" name="phone" placeholder="Enter vendor phone">
-      </div>
-      <div class="mb-3">
-        <label for="address" class="form-label">Vendor Address</label>
-        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="address" name="address" placeholder="Enter vendor address">
-      </div>
-      <div class="mb-3">
-        <label for="contact" class="form-label">Contact Person</label>
-        <input type="text" class="form-control form-control-lg rounded-pill px-3" id="contact" name="contact" placeholder="Enter contact person name">
-      </div>
-      <div class="d-grid gap-2 mt-3">
-        <button type="submit" class="btn btn-success rounded-pill fw-semibold btn-lg w-100 mt-2">
-          <i class="bi bi-check2-circle me-1"></i> Save Vendor
-        </button>
-        <a href="{{ url_for('vendors_bp.vendor_center') }}" class="btn btn-outline-secondary rounded-pill btn-lg w-100 mt-2">
-          <i class="bi bi-arrow-left-circle me-1"></i> Back to Vendor Center
-        </a>
-      </div>
-    </form>
   </div>
 </div>
 {% endblock %}

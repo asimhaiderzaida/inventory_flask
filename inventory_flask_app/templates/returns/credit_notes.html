@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Credit Notes{% endblock %}
+{% block page_title %}Credit Notes{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Credit Notes</h1>
+    <div class="page-subtitle">Manage issued credit notes and apply them to invoices</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('returns_bp.view_returns') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Returns
+    </a>
+  </div>
+</div>
+
+{# ── Stats bar ─────────────────────────────────────────────── #}
+<div class="animate-fade-up" style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:130px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Total Shown</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;">{{ credit_notes|length }}</div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:130px;{% if total_unapplied > 0 %}border-color:#fca5a5;{% endif %}">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:{% if total_unapplied > 0 %}var(--color-danger){% else %}var(--text-muted){% endif %};margin-bottom:0.2rem;">Unapplied Balance</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;color:{% if total_unapplied > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};">
+      ${{ '%.2f'|format(total_unapplied) }}
+    </div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:130px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Unapplied Count</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;">{{ credit_notes|selectattr('status','equalto','unapplied')|list|length }}</div>
+  </div>
+  <div class="card" style="padding:0.75rem 1.25rem;flex:1;min-width:130px;">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Applied</div>
+    <div style="font-size:1.5rem;font-weight:800;line-height:1;color:var(--color-success);">{{ credit_notes|selectattr('status','equalto','applied')|list|length }}</div>
+  </div>
+</div>
+
+{# ── Filter bar ───────────────────────────────────────────── #}
+<div class="animate-fade-up" style="margin-bottom:0.75rem;">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+    <input type="text" name="q" value="{{ q_search }}" class="form-control form-control-sm"
+           style="max-width:220px;" placeholder="Search CN#, customer…">
+    <select name="status" class="form-select form-select-sm" style="max-width:150px;">
+      <option value="">All Status</option>
+      {% for s, l in [('unapplied','Unapplied'),('applied','Applied'),('void','Void')] %}
+      <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ l }}</option>
+      {% endfor %}
+    </select>
+    <select name="customer_id" class="form-select form-select-sm" style="max-width:180px;">
+      <option value="">All Customers</option>
+      {% for c in customers %}
+      <option value="{{ c.id }}" {% if f_customer == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Filter</button>
+    {% if q_search or f_status or f_customer %}
+    <a href="{{ url_for('returns_bp.credit_notes') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{# ── Table ─────────────────────────────────────────────────── #}
+<div class="animate-fade-up">
+  {% if credit_notes %}
+  <div class="table-card">
+    <div style="overflow-x:auto;">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>CN Number</th>
+            <th>Customer</th>
+            <th>Amount</th>
+            <th>Applied</th>
+            <th>Status</th>
+            <th>Issued By</th>
+            <th>Issued At</th>
+            <th>Applied To</th>
+            <th style="width:80px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cn in credit_notes %}
+          <tr>
+            <td style="font-family:monospace;font-size:0.84rem;font-weight:600;color:var(--primary);">
+              {{ cn.credit_note_number }}
+            </td>
+            <td style="font-size:0.84rem;">
+              {% if cn.customer %}
+                <a href="{{ url_for('customers_bp.customer_profile', customer_id=cn.customer.id, view='returns') }}" style="text-decoration:none;">
+                  {{ cn.customer.name }}
+                </a>
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-weight:600;">${{ '%.2f'|format(cn.amount) }}</td>
+            <td style="font-size:0.84rem;">
+              {% if cn.applied_amount %}
+                ${{ '%.2f'|format(cn.applied_amount) }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if cn.status == 'applied' %}
+              <span class="status-pill status-processed">Applied</span>
+              {% elif cn.status == 'unapplied' %}
+              <span class="status-pill status-unprocessed">Unapplied</span>
+              {% elif cn.status == 'void' %}
+              <span class="status-pill status-disputed">Void</span>
+              {% else %}
+              <span class="status-pill status-idle">{{ cn.status|title }}</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.82rem;color:var(--text-muted);">
+              {{ cn.issuer.full_name or cn.issuer.username if cn.issuer else '—' }}
+            </td>
+            <td style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">
+              {{ cn.issued_at.strftime('%Y-%m-%d') if cn.issued_at else '—' }}
+            </td>
+            <td style="font-size:0.82rem;">
+              {% if cn.applied_ar and cn.applied_ar.invoice %}
+                <span style="font-family:monospace;">{{ cn.applied_ar.invoice.invoice_number }}</span>
+                <span style="color:var(--text-muted);display:block;font-size:0.74rem;">
+                  {{ cn.applied_at.strftime('%Y-%m-%d') if cn.applied_at else '' }}
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if cn.status == 'unapplied' %}
+              <a href="{{ url_for('returns_bp.apply_credit_note', cn_id=cn.id) }}"
+                 class="btn btn-primary btn-sm">Apply</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <div style="font-size:0.82rem;color:var(--text-secondary);">{{ credit_notes|length }} credit note{{ 's' if credit_notes|length != 1 }}</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-receipt"></i>
+    <p>No credit notes found{% if q_search or f_status or f_customer %} matching filters{% endif %}.</p>
+    {% if q_search or f_status or f_customer %}
+    <a href="{{ url_for('returns_bp.credit_notes') }}" class="btn btn-ghost btn-sm">Clear filters</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Transfer Parts{% endblock %}
+{% block page_title %}Transfer Parts{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Transfer Parts</h1>
+    <div class="page-subtitle">Move stock between locations</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('parts_bp.parts_list') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:560px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="post" id="transferForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-3">
+          <label class="form-label">Part <span style="color:var(--color-danger);">*</span></label>
+          <select name="part_id" id="part-select" class="form-select" required style="width:100%;">
+            <option value="">Select a part…</option>
+            {% for p in parts %}
+            <option value="{{ p.id }}"
+              {% if preselect == p.id %}selected{% endif %}>
+              {{ p.part_number }} — {{ p.name }}
+              ({{ p._current_stock }} total)
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Two-column From / To layout -->
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">From Location <span style="color:var(--color-danger);">*</span></label>
+            <select name="from_location_id" id="from-location" class="form-select" required>
+              <option value="">Select…</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+            <div id="from-stock-hint" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;"></div>
+            <div id="from-bin-wrap" style="display:none;margin-top:0.5rem;">
+              <select name="from_bin_id" id="from-bin" class="form-select form-select-sm">
+                <option value="">— no specific bin —</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">To Location <span style="color:var(--color-danger);">*</span></label>
+            <select name="to_location_id" id="to-location" class="form-select" required>
+              <option value="">Select…</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+            <div id="to-stock-hint" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;"></div>
+            <div id="to-bin-wrap" style="display:none;margin-top:0.5rem;">
+              <select name="to_bin_id" id="to-bin" class="form-select form-select-sm">
+                <option value="">— no specific bin —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visual arrow between locations -->
+        <div id="transfer-preview" style="display:none;background:var(--surface-2);border-radius:var(--radius-md);padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.84rem;text-align:center;color:var(--text-secondary);">
+          <span id="from-label">—</span>
+          <i class="bi bi-arrow-right mx-2" style="color:var(--primary);"></i>
+          <span id="to-label">—</span>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Quantity <span style="color:var(--color-danger);">*</span></label>
+          <input type="number" name="quantity" id="qty-input" class="form-control"
+                 min="1" required placeholder="0">
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label">Note</label>
+          <input type="text" name="note" class="form-control"
+                 placeholder="Reason for transfer…">
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-arrows-move"></i> Transfer Stock
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+const PART_STOCKS = {{ part_summaries | tojson }};
+
+$(function() {
+  $('#part-select').select2({ placeholder: 'Search or select a part…', width: '100%' });
+
+  function stockAt(partId, locId) {
+    const pdata = PART_STOCKS.find(p => p.id === partId);
+    if (!pdata) return 0;
+    const ls = pdata.location_stocks.find(s => s.location_id === locId);
+    return ls ? ls.quantity : 0;
+  }
+
+  function updateHints() {
+    const partId  = parseInt($('#part-select').val());
+    const fromId  = parseInt($('#from-location').val());
+    const toId    = parseInt($('#to-location').val());
+
+    if (partId && fromId) {
+      const qty = stockAt(partId, fromId);
+      $('#from-stock-hint').html(qty > 0
+        ? `<i class="bi bi-box-seam"></i> Available: <strong>${qty}</strong>`
+        : `<span style="color:var(--color-danger);">No stock here</span>`
+      );
+      $('#qty-input').attr('max', qty);
+    } else {
+      $('#from-stock-hint').text('');
+    }
+
+    if (partId && toId) {
+      const qty = stockAt(partId, toId);
+      $('#to-stock-hint').html(`<i class="bi bi-box-seam"></i> Currently: <strong>${qty}</strong>`);
+    } else {
+      $('#to-stock-hint').text('');
+    }
+
+    // Transfer preview row
+    if (fromId && toId && fromId !== toId) {
+      const fromName = $('#from-location option:selected').text().split('(')[0].trim();
+      const toName   = $('#to-location option:selected').text().split('(')[0].trim();
+      $('#from-label').text(fromName);
+      $('#to-label').text(toName);
+      $('#transfer-preview').show();
+    } else {
+      $('#transfer-preview').hide();
+    }
+
+    // Block same-location selection
+    $('#from-location option, #to-location option').prop('disabled', false);
+    if (fromId) {
+      $(`#to-location option[value="${fromId}"]`).prop('disabled', true);
+    }
+    if (toId) {
+      $(`#from-location option[value="${toId}"]`).prop('disabled', true);
+    }
+  }
+
+  // Filter From-location to only locations with stock
+  function filterFromLocations() {
+    const partId = parseInt($('#part-select').val());
+    const pdata  = PART_STOCKS.find(p => p.id === partId);
+    const hasStockAt = pdata ? pdata.location_stocks.map(s => s.location_id) : [];
+    $('#from-location option').each(function() {
+      if (!this.value) return;
+      $(this).prop('disabled', hasStockAt.length > 0 && !hasStockAt.includes(parseInt(this.value)));
+    });
+    updateHints();
+  }
+
+  function loadTransferBins(side, locationId) {
+    var sel  = document.getElementById(side + '-bin');
+    var wrap = document.getElementById(side + '-bin-wrap');
+    sel.innerHTML = '<option value="">— no specific bin —</option>';
+    if (!locationId) { wrap.style.display = 'none'; return; }
+    fetch('/parts/api/bins?location_id=' + locationId)
+      .then(function(r) { return r.json(); })
+      .then(function(bins) {
+        if (bins.length === 0) { wrap.style.display = 'none'; return; }
+        bins.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name + (b.current_qty ? ' (' + b.current_qty + ')' : '');
+          sel.appendChild(opt);
+        });
+        wrap.style.display = '';
+      });
+  }
+
+  $('#part-select').on('change', filterFromLocations);
+  $('#from-location').on('change', function() { loadTransferBins('from', this.value); });
+  $('#to-location').on('change', function() { loadTransferBins('to', this.value); });
+  $('#from-location, #to-location').on('change', updateHints);
+
+  if ($('#part-select').val()) filterFromLocations();
+
+  // Client-side validation: same location check
+  $('#transferForm').on('submit', function(e) {
+    const from = $('#from-location').val();
+    const to   = $('#to-location').val();
+    if (from && to && from === to) {
+      e.preventDefault();
+      showToast('From and To locations must be different.', 'warning');
+    }
+  });
+});
+</script>
+{% endblock %}

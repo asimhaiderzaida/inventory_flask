@@ -1,34 +1,89 @@
 {% extends "base.html" %}
+{% block title %}Confirm Return{% endblock %}
+{% block page_title %}Confirm Return{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h2>Confirm Return</h2>
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Confirm Return</h1>
+    <div class="page-subtitle">Review unit details before proceeding</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()"
+       onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.lookup_return') }}'"
+       class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:520px;">
   <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title">Product Info</h5>
-      <p><strong>Asset:</strong> {{ instance.asset }}</p>
-      <p><strong>Serial:</strong> {{ instance.serial }}</p>
-      <p><strong>Model:</strong> {{ instance.product.model if instance.product else '' }}</p>
-      <p><strong>Item:</strong> {{ instance.product.item_name if instance.product else '' }}</p>
-      <p><strong>CPU:</strong> {{ instance.product.cpu if instance.product else '' }}</p>
-      <p><strong>RAM:</strong> {{ instance.product.ram if instance.product else '' }}</p>
-      <p><strong>Storage:</strong> {{ instance.product.disk1size if instance.product else '' }}</p>
-      <p><strong>Sold:</strong> {{ 'Yes' if instance.is_sold else 'No' }}</p>
-      {% if sale and sale.customer %}
-        <p><strong>Customer:</strong> {{ sale.customer.name }}</p>
-      {% endif %}
-      {% if sale and sale.sale_date %}
-        <p><strong>Sale Date:</strong> {{ sale.sale_date.strftime('%Y-%m-%d') }}</p>
-      {% endif %}
-      {% if sale and sale.price_at_sale %}
-        <p><strong>Sale Price:</strong> {{ sale.price_at_sale }}</p>
-      {% endif %}
-      {% if sale and sale.sale_transaction and sale.sale_transaction.invoice_number %}
-        <p><strong>Invoice #:</strong> {{ sale.sale_transaction.invoice_number }}</p>
-      {% endif %}
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.85rem;font-weight:600;">Unit Info</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem;">
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:0.4rem 1rem;font-size:0.88rem;margin:0;">
+        <dt style="color:var(--text-muted);font-weight:500;">Asset</dt>
+        <dd style="margin:0;">{{ instance.asset or '—' }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Serial</dt>
+        <dd style="margin:0;font-family:monospace;">{{ instance.serial }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Item</dt>
+        <dd style="margin:0;">{{ (instance.product.item_name if instance.product else None) | nonan }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Model</dt>
+        <dd style="margin:0;">{{ (instance.product.model if instance.product else None) | nonan }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">CPU</dt>
+        <dd style="margin:0;">{{ (instance.product.cpu if instance.product else None) | nonan }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">RAM</dt>
+        <dd style="margin:0;">{{ (instance.product.ram if instance.product else None) | nonan }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Storage</dt>
+        <dd style="margin:0;">{{ (instance.product.disk1size if instance.product else None) | nonan }}</dd>
+        <dt style="color:var(--text-muted);font-weight:500;">Status</dt>
+        <dd style="margin:0;"><span class="status-pill status-{{ instance.status }}">{{ instance.status or 'unprocessed' }}</span></dd>
+
+        {% if sale %}
+          {# sale can be a SaleItem or SaleTransaction depending on lookup path #}
+          {% set txn = sale.sale_transaction if sale.sale_transaction is defined else sale %}
+          {% if txn and txn.customer %}
+          <dt style="color:var(--text-muted);font-weight:500;">Customer</dt>
+          <dd style="margin:0;">{{ txn.customer.name }}</dd>
+          {% endif %}
+          {% if txn and txn.date_sold %}
+          <dt style="color:var(--text-muted);font-weight:500;">Sale Date</dt>
+          <dd style="margin:0;">{{ txn.date_sold.strftime('%Y-%m-%d') }}</dd>
+          {% endif %}
+          {% if sale.price_at_sale is defined and sale.price_at_sale %}
+          <dt style="color:var(--text-muted);font-weight:500;">Sale Price</dt>
+          <dd style="margin:0;font-weight:600;">${{ "%.2f"|format(sale.price_at_sale) }}</dd>
+          {% elif txn and txn.price_at_sale is defined and txn.price_at_sale %}
+          <dt style="color:var(--text-muted);font-weight:500;">Sale Price</dt>
+          <dd style="margin:0;font-weight:600;">${{ "%.2f"|format(txn.price_at_sale) }}</dd>
+          {% endif %}
+          {% if txn and txn.invoice and txn.invoice.invoice_number %}
+          <dt style="color:var(--text-muted);font-weight:500;">Invoice #</dt>
+          <dd style="margin:0;font-family:monospace;">{{ txn.invoice.invoice_number }}</dd>
+          {% endif %}
+        {% else %}
+          {% if instance.is_sold %}
+          <dt style="color:var(--text-muted);font-weight:500;">Note</dt>
+          <dd style="margin:0;color:var(--color-warning);">Unit is marked sold but no sale record found.</dd>
+          {% else %}
+          <dt style="color:var(--text-muted);font-weight:500;">Note</dt>
+          <dd style="margin:0;color:var(--text-muted);">No sale record found — unit may not have been sold.</dd>
+          {% endif %}
+        {% endif %}
+      </dl>
     </div>
   </div>
 
-  <a href="{{ url_for('returns_bp.create_return', instance_id=instance.id) }}" class="btn btn-success">Proceed with Return</a>
-  <a href="{{ url_for('returns_bp.lookup_return') }}" class="btn btn-secondary">Cancel</a>
+  <div class="d-flex gap-2">
+    <a href="javascript:history.back()"
+       onclick="if(history.length<=1) window.location='{{ url_for('returns_bp.lookup_return') }}'"
+       class="btn btn-ghost flex-fill">Cancel</a>
+    <a href="{{ url_for('returns_bp.create_return', instance_id=instance.id, sale_id=sale_id) if sale_id else url_for('returns_bp.create_return', instance_id=instance.id) }}"
+       class="btn btn-primary flex-fill">
+      <i class="bi bi-arrow-right-circle"></i> Proceed with Return
+    </a>
+  </div>
 </div>
 {% endblock %}

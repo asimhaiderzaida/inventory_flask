@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Accounts Receivable{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Accounts Receivable</h1>
+    <p class="page-subtitle">Outstanding customer balances</p>
+  </div>
+</div>
+
+<!-- Status filter tabs -->
+<div class="mb-3 animate-fade-up">
+  <div class="btn-group btn-group-sm">
+    <a href="{{ url_for('accounting_bp.receivables') }}"
+       class="btn {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      Open / Partial / Overdue
+    </a>
+    <a href="{{ url_for('accounting_bp.receivables', status='paid') }}"
+       class="btn {% if status_filter == 'paid' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      Paid
+    </a>
+    <a href="{{ url_for('accounting_bp.receivables', status='written_off') }}"
+       class="btn {% if status_filter == 'written_off' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      Written Off
+    </a>
+    <a href="{{ url_for('accounting_bp.receivables', status='all') }}"
+       class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      All
+    </a>
+  </div>
+</div>
+
+<div class="table-card animate-fade-up">
+  {% if ar_list %}
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th>Customer</th>
+        <th>Invoice</th>
+        <th>Due Date</th>
+        <th class="text-end">Amount Due</th>
+        <th class="text-end">Paid</th>
+        <th class="text-end">Balance</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ar in ar_list %}
+      <tr>
+        <td>
+          <a href="{{ url_for('customers_bp.customer_profile', customer_id=ar.customer_id) }}"
+             class="text-decoration-none">{{ ar.customer.name }}</a>
+        </td>
+        <td class="small">
+          {% if ar.invoice %}
+          <a href="{{ url_for('invoices_bp.invoice_view', invoice_id=ar.invoice_id) }}"
+             class="text-decoration-none text-muted">
+            #{{ ar.invoice.invoice_number or ar.invoice_id }}
+          </a>
+          {% else %}—{% endif %}
+        </td>
+        <td class="small {% if ar.is_overdue %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+          {{ ar.due_date.strftime('%d %b %Y') if ar.due_date else '—' }}
+          {% if ar.is_overdue %}
+          <span class="badge bg-danger ms-1">{{ ar.days_overdue }}d</span>
+          {% endif %}
+        </td>
+        <td class="text-end">{{ '{:,.2f}'.format(ar.amount_due) }}</td>
+        <td class="text-end text-success">{{ '{:,.2f}'.format(ar.amount_paid) }}</td>
+        <td class="text-end fw-semibold {% if ar.balance > 0 %}text-warning{% endif %}">
+          {{ '{:,.2f}'.format(ar.balance) }}
+        </td>
+        <td>
+          {% if ar.status == 'open' %}
+          <span class="status-pill" style="background:rgba(59,130,246,.15);color:#3b82f6;">Open</span>
+          {% elif ar.status == 'partial' %}
+          <span class="status-pill" style="background:rgba(245,158,11,.15);color:#d97706;">Partial</span>
+          {% elif ar.status == 'overdue' %}
+          <span class="status-pill status-disputed">Overdue</span>
+          {% elif ar.status == 'paid' %}
+          <span class="status-pill status-processed">Paid</span>
+          {% elif ar.status == 'written_off' %}
+          <span class="status-pill status-idle">Written Off</span>
+          {% else %}
+          <span class="status-pill">{{ ar.status }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('accounting_bp.ar_detail', ar_id=ar.id) }}"
+             class="btn btn-xs btn-outline-primary">Details</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="table-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">{{ ar_list | length }} record{{ 's' if ar_list | length != 1 }}</span>
+    <span class="fw-bold">Outstanding: {{ currency }} {{ '{:,.2f}'.format(total_outstanding) }}</span>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-file-earmark-check"></i>
+    <p>No receivables match the selected filter.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

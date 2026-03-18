@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Receiving Result{% endblock %}
+{% block page_title %}Receiving Result{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Receiving Complete — {{ po.po_number }}</h1>
+    <div class="page-subtitle">
+      Vendor: <strong>{{ po.vendor.name if po.vendor else 'No Vendor' }}</strong>
+      &nbsp;·&nbsp; PO Status: <strong>{{ po.status | title }}</strong>
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.stock_receiving_select') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Receive Another PO
+    </a>
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+      <i class="bi bi-house"></i> Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Summary stats -->
+<div class="animate-fade-up" style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+  <div style="background:rgba(34,197,94,0.08);border:1px solid var(--color-success);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--color-success);">{{ created_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Created (new)</div>
+  </div>
+  <div style="background:rgba(59,130,246,0.08);border:1px solid var(--primary);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--primary);">{{ updated_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Updated (specs changed)</div>
+  </div>
+  <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--text-muted);">{{ skipped_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Skipped (up to date)</div>
+  </div>
+  {% if failed_count %}
+  <div style="background:rgba(239,68,68,0.08);border:1px solid var(--color-danger);border-radius:var(--radius-md);padding:0.75rem 1.25rem;min-width:120px;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:700;color:var(--color-danger);">{{ failed_count }}</div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">Failed (errors)</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Batch status update for actionable instances -->
+{% set actionable = result_rows | selectattr('instance') | list %}
+{% if actionable %}
+<div class="animate-fade-up">
+  <form method="post" action="{{ url_for('stock_bp.batch_update_status') }}" id="batch-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;">
+      <div>
+        <label class="form-label">Override Status</label>
+        <select name="status" class="form-select" style="width:160px;">
+          <option value="">Keep current…</option>
+          <option value="unprocessed">Unprocessed</option>
+          <option value="under_process">Under Process</option>
+          <option value="processed">Processed</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Override Location</label>
+        <select name="location_id" class="form-select" style="width:180px;">
+          <option value="">Keep current…</option>
+          {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="align-self:flex-end;">
+        <i class="bi bi-check-circle"></i> Batch Update Selected
+      </button>
+    </div>
+{% endif %}
+
+<!-- Result table -->
+<div class="animate-fade-up table-card mb-4">
+  <div style="overflow-x:auto;">
+    <table class="table" id="result-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all" style="cursor:pointer;"></th>
+          <th>Outcome</th>
+          <th>Serial</th>
+          <th>Asset</th>
+          <th>Item</th>
+          <th>Make / Model</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th>Grade</th>
+          <th>Changes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in result_rows %}
+        <tr>
+          <td>
+            {% if row.instance %}
+              <input type="checkbox" class="batch-checkbox" name="instance_ids" value="{{ row.instance.id }}">
+            {% endif %}
+          </td>
+          <td>
+            {% if row.outcome == 'created' %}
+              <span class="status-pill status-processed" style="font-size:0.75rem;">Created</span>
+            {% elif row.outcome == 'updated' %}
+              <span class="status-pill" style="background:rgba(59,130,246,0.12);color:var(--primary);font-size:0.75rem;">Updated</span>
+            {% elif row.outcome == 'skipped' %}
+              <span class="status-pill status-idle" style="font-size:0.75rem;">Skipped</span>
+            {% else %}
+              <span class="status-pill status-disputed" style="font-size:0.75rem;">Failed</span>
+            {% endif %}
+          </td>
+          <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial }}</span></td>
+          {% if row.instance %}
+            <td>{{ row.instance.asset or '—' }}</td>
+            <td>{{ (row.instance.product.item_name if row.instance.product else None) | nonan }}</td>
+            <td>
+              {{ (row.instance.product.make if row.instance.product else None) | nonan }}
+              {{ (row.instance.product.model if row.instance.product else None) | nonan }}
+            </td>
+            <td>{{ (row.instance.product.cpu if row.instance.product else None) | nonan }}</td>
+            <td>{{ (row.instance.product.ram if row.instance.product else None) | nonan }}</td>
+            <td>{{ (row.instance.product.grade if row.instance.product else None) | nonan }}</td>
+          {% else %}
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+          {% endif %}
+          <td style="max-width:260px;">
+            {% if row.changes %}
+              <ul style="margin:0;padding-left:1rem;font-size:0.78rem;color:var(--text-muted);">
+                {% for field, diff in row.changes.items() %}
+                  <li>
+                    <strong>{{ field }}</strong>:
+                    <span style="color:var(--color-danger);text-decoration:line-through;">{{ diff.old or '—' }}</span>
+                    <i class="bi bi-arrow-right" style="font-size:0.7rem;"></i>
+                    <span style="color:var(--color-success);">{{ diff.new }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% elif row.outcome == 'failed' %}
+              <span style="font-size:0.78rem;color:var(--color-danger);">{{ row.error | default('Unknown error') }}</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if row.instance %}
+              <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=row.instance.id) }}"
+                 class="btn btn-ghost btn-sm" target="_blank" title="View unit">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+              <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance.id) }}"
+                 class="btn btn-ghost btn-sm" target="_blank" title="Print label">
+                <i class="bi bi-printer"></i>
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="11" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No units processed.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if actionable %}
+  </form>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const table = $('.table').DataTable({ pageLength: 50, order: [] });
+
+  const selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      const checked = this.checked;
+      table.rows().every(function() {
+        const cb = this.node().querySelector('.batch-checkbox');
+        if (cb) cb.checked = checked;
+      });
+    });
+  }
+
+  const form = document.getElementById('batch-form');
+  if (form) {
+    form.addEventListener('submit', function() {
+      document.querySelectorAll('input[name="instance_ids"][type="hidden"]').forEach(el => el.remove());
+      table.rows().every(function() {
+        const cb = this.node().querySelector('.batch-checkbox');
+        if (cb && cb.checked) {
+          const h = document.createElement('input');
+          h.type = 'hidden'; h.name = 'instance_ids'; h.value = cb.value;
+          form.appendChild(h);
+        }
+      });
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Purchase Orders Report{% endblock %}
+{% block page_title %}Purchase Orders Report{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Purchase Orders</h1>
+    <div class="page-subtitle">{{ data|length }} purchase order{{ 's' if data|length != 1 }}{% if status_filter %} — {{ status_filter }}{% endif %}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.purchase_orders_export') }}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+    </a>
+    <a href="{{ url_for('reports_bp.reports_index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Reports
+    </a>
+  </div>
+</div>
+
+<!-- Status filter -->
+<div class="animate-fade-up" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.75rem 1.25rem;margin-bottom:1.5rem;">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <span style="font-size:0.84rem;color:var(--text-muted);">Status:</span>
+    {% for s in ['', 'pending', 'partial', 'received', 'cancelled'] %}
+    <a href="{{ url_for('reports_bp.purchase_orders_report', status=s) }}"
+       class="btn btn-sm {% if status_filter == s %}btn-primary{% else %}btn-ghost{% endif %}">
+      {{ s or 'All' }}
+    </a>
+    {% endfor %}
+  </form>
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>PO #</th>
+          <th>Vendor</th>
+          <th>Status</th>
+          <th style="text-align:right;">Total</th>
+          <th style="text-align:right;">Received</th>
+          <th style="text-align:right;">Missing</th>
+          <th style="text-align:right;">Expected</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data %}
+        {% set po = row.po %}
+        <tr>
+          <td style="font-weight:600;font-family:monospace;">{{ po.po_number }}</td>
+          <td style="font-size:0.84rem;">{{ po.vendor.name if po.vendor else '—' }}</td>
+          <td>
+            <span class="status-pill status-{% if po.status == 'received' %}processed{% elif po.status == 'partial' %}under_process{% elif po.status == 'cancelled' %}disputed{% else %}unprocessed{% endif %}">
+              {{ po.status }}
+            </span>
+          </td>
+          <td style="text-align:right;">{{ row.total_items }}</td>
+          <td style="text-align:right;color:var(--color-success);font-weight:600;">{{ row.received }}</td>
+          <td style="text-align:right;{% if row.missing > 0 %}color:var(--color-danger);font-weight:600;{% else %}color:var(--text-muted);{% endif %}">{{ row.missing }}</td>
+          <td style="text-align:right;color:var(--text-muted);">{{ row.expected }}</td>
+          <td style="font-size:0.82rem;color:var(--text-muted);">{{ po.created_at.strftime('%d %b %Y') if po.created_at else '—' }}</td>
+          <td>
+            <a href="{{ url_for('stock_bp.view_purchase_order', po_id=po.id) }}" class="btn btn-ghost btn-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-file-earmark-text"></i>
+              <p>No purchase orders found</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

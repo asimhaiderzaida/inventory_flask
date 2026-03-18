@@ -1,118 +1,146 @@
+{% set s = settings|default({}) %}
+{% set currency = s.currency or 'AED' %}
+{% set vat_rate_val = (s.vat_rate or '5')|float %}
+
 <style>
-@media print {
-    .no-print {
-        display: none;
-    }
-}
+  .pv-wrap { font-family: 'Inter', Arial, sans-serif; color: var(--text-primary, #111); }
+  .pv-head { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; padding-bottom:1.25rem; margin-bottom:1.5rem; border-bottom:1px solid var(--border, #e5e7eb); }
+  .pv-inv-word { font-size:1.75rem; font-weight:800; letter-spacing:-0.04em; line-height:1; }
+  .pv-bill-lbl { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-muted,#9ca3af); margin-bottom:0.3rem; }
+  .pv-tbl { width:100%; border-collapse:collapse; font-size:0.83rem; margin-bottom:1.5rem; }
+  .pv-tbl thead tr { background:var(--surface-2,#f9fafb); border-bottom:2px solid var(--border,#e5e7eb); }
+  .pv-tbl th { padding:0.55rem 0.7rem; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-muted,#9ca3af); white-space:nowrap; }
+  .pv-tbl td { padding:0.6rem 0.7rem; border-bottom:1px solid var(--border,#e5e7eb); vertical-align:top; }
+  .pv-tbl .r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pv-specs { font-size:0.73rem; color:var(--text-muted,#9ca3af); margin-top:0.15rem; line-height:1.55; }
+  .pv-totals { border-collapse:collapse; min-width:250px; font-size:0.875rem; }
+  .pv-totals td { padding:0.25rem 0.65rem; }
+  .pv-totals .grand td { border-top:2px solid var(--border,#e5e7eb); padding-top:0.5rem; }
+  .pv-notice { background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; padding:0.6rem 0.9rem; font-size:0.8rem; color:#92400e; margin-bottom:1rem; }
+  .pv-footer-txt { font-size:0.78rem; color:var(--text-muted,#9ca3af); margin:0 0 0.3rem; }
 </style>
-<style>
-.invoice-table th.serial-col, .invoice-table td.serial-col { width: 12%; }
-.invoice-table th.model-col, .invoice-table td.model-col { width: 40%; }
-.invoice-table th.currency-col, .invoice-table td.currency-col { width: 9%; text-align: right; }
-</style>
 
-<div class="container">
-    {% if settings.invoice_logo %}
-      <div class="text-center mb-3">
-        <img src="{{ settings.invoice_logo }}" alt="Logo" style="max-height: 70px;">
-      </div>
-    {% endif %}
-    <h2>
-      {% if settings.invoice_title %}
-        {{ settings.invoice_title }}
-      {% else %}
-        🧾 Invoice #{{ invoice.id if invoice else invoice_number }}
+<div class="pv-wrap" style="padding:0.25rem 0.25rem 1rem;">
+
+  <!-- Header -->
+  <div class="pv-head">
+    <div>
+      {% if s.invoice_logo or s.dashboard_logo %}
+      <img src="{{ s.invoice_logo or s.dashboard_logo }}" alt="Logo" style="max-height:48px;margin-bottom:0.5rem;display:block;">
       {% endif %}
-    </h2>
-
-    <p><strong>Customer:</strong> {{ customer.name }}</p>
-    <p><strong>Invoice Date:</strong>
-      {% if invoice %}
-        {{ invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else "" }}
-      {% else %}
-        {{ sale_date }}
+      {% if s.company_name or s.invoice_title %}
+      <div style="font-size:1rem;font-weight:700;">{{ s.company_name or s.invoice_title }}</div>
       {% endif %}
-    </p>
-
-    <div style="overflow-x:auto;">
-        <table class="table table-bordered mt-4 invoice-table">
-            <thead>
-                <tr>
-                    <th class="serial-col">Serial</th>
-                    <th class="model-col">Model & Specs</th>
-                    <th class="currency-col">Unit Price (AED)</th>
-                    <th class="currency-col">VAT %</th>
-                    <th class="currency-col">VAT Amount (AED)</th>
-                    <th class="currency-col">Total With VAT (AED)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in items %}
-                    {% set unit_price = item.unit_price if item.unit_price is defined else (item.price_at_sale if item.price_at_sale is defined else item.price) %}
-                    {% set vat_rate = item.vat_rate if item.vat_rate is defined else 5 %}
-                    {% set vat_amount = unit_price * (vat_rate / 100) %}
-                    {% set total_with_vat = unit_price + vat_amount %}
-                    <tr>
-                        <td class="serial-col">
-                          SN: {{ item.serial }}<br>
-                          AT: {{ item.asset }}
-                        </td>
-                        <td class="model-col">
-                          <div><strong>{{ item.product_name or '-' }}</strong></div>
-                          <div>Model: {{ item.model or '-' }}</div>
-                          <div>CPU: {{ item.cpu or '-' }}</div>
-                          <div>RAM: {{ item.ram or '-' }}</div>
-                          <div>Disk: {{ item.disk1size or '-' }}</div>
-                          <div>Display: {{ item.display or '-' }}</div>
-                          <div>GPU1: {{ item.gpu1 or '-' }}</div>
-                          <div>GPU2: {{ item.gpu2 or '-' }}</div>
-                          <div>Grade: {{ item.grade or '-' }}</div>
-                        </td>
-                        <td class="currency-col">{{ "%.2f"|format(unit_price) }}</td>
-                        <td class="currency-col">{{ vat_rate }}</td>
-                        <td class="currency-col">{{ "%.2f"|format(vat_amount) }}</td>
-                        <td class="currency-col">{{ "%.2f"|format(total_with_vat) }}</td>
-                    </tr>
-                    <!-- Display item name and disk size in a summary row for unified product specs -->
-                    <tr>
-                        <td colspan="6" style="background: #f9f9f9;">
-                          {% if item.product_name %}Item: <strong>{{ item.product_name }}</strong>{% endif %}
-                          {% if item.disk1size %} | Disk Size: {{ item.disk1size }}{% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+      {% if s.company_address %}
+      <div style="font-size:0.76rem;color:var(--text-muted,#9ca3af);white-space:pre-line;margin-top:0.1rem;">{{ s.company_address }}</div>
+      {% endif %}
+      {% if s.company_phone %}
+      <div style="font-size:0.76rem;color:var(--text-muted,#9ca3af);margin-top:0.1rem;">{{ s.company_phone }}</div>
+      {% endif %}
+      {% if s.company_email %}
+      <div style="font-size:0.76rem;color:var(--text-muted,#9ca3af);margin-top:0.1rem;">{{ s.company_email }}</div>
+      {% endif %}
+      {% if s.company_website %}
+      <div style="font-size:0.76rem;color:var(--text-muted,#9ca3af);">{{ s.company_website }}</div>
+      {% endif %}
     </div>
-
-    <h4 class="mt-4">Summary:</h4>
-    <ul>
-        <li><strong>Subtotal (AED):</strong> {{ "%.2f"|format(subtotal) }}</li>
-        <li><strong>Total VAT (AED):</strong> {{ "%.2f"|format(total_vat) }}</li>
-        <li><strong>Grand Total (AED, incl. VAT):</strong> {{ "%.2f"|format(grand_total) }}</li>
-    </ul>
-
-    {% if is_preview %}
-      <div class="mt-4">
-        <div class="alert alert-info">This is a preview only. To complete the sale, return to the previous tab and click "Create Invoice".</div>
-        <button onclick="window.close()" class="btn btn-secondary btn-lg w-100 mt-2">Close Preview</button>
-      </div>
-    {% endif %}
-
-    <div class="mt-4 no-print">
-        <a href="/main_dashboard" class="btn btn-primary btn-lg w-100 mt-2">Back to Dashboard</a>
+    <div style="text-align:right;">
+      <div class="pv-inv-word">INVOICE</div>
+      <div style="font-size:0.95rem;font-weight:700;margin-top:0.35rem;">{{ invoice_number }}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted,#9ca3af);margin-top:0.1rem;">{{ sale_date }}</div>
     </div>
+  </div>
 
-</div>
-{% if settings.invoice_footer or settings.invoice_terms %}
-  <div class="mt-5">
-    <hr>
-    {% if settings.invoice_footer %}
-      <p class="text-muted" style="font-size: 0.9rem;">{{ settings.invoice_footer }}</p>
+  <!-- Preview notice -->
+  {% if is_preview %}
+  <div class="pv-notice">
+    <i class="bi bi-eye me-1"></i> <strong>Preview only</strong> — this invoice has not been saved. Return to the sale form and click <strong>Confirm &amp; Create Invoice</strong>.
+  </div>
+  {% endif %}
+
+  <!-- Bill To -->
+  <div style="margin-bottom:1.5rem;">
+    <div class="pv-bill-lbl">Bill To</div>
+    <div style="font-weight:700;font-size:0.95rem;">{{ customer.name }}</div>
+    <div style="font-size:0.82rem;color:var(--text-secondary,#6b7280);line-height:1.6;">
+      {% if customer.phone %}<div>{{ customer.phone }}</div>{% endif %}
+      {% if customer.email %}<div>{{ customer.email }}</div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Items table -->
+  <table class="pv-tbl">
+    <thead>
+      <tr>
+        <th style="width:13%;">Serial / Asset</th>
+        <th>Item &amp; Specs</th>
+        <th class="r" style="width:12%;">Unit Price</th>
+        <th class="r" style="width:9%;">VAT {{ vat_rate_val|int if vat_rate_val == vat_rate_val|int else vat_rate_val }}%</th>
+        <th class="r" style="width:12%;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      {% set unit_price  = item.price_at_sale|float %}
+      {% set vat_amount  = unit_price * vat_rate_val / 100 %}
+      {% set total_line  = unit_price + vat_amount %}
+      <tr>
+        <td>
+          <div style="font-family:monospace;font-size:0.78rem;font-weight:600;">{{ item.serial or '—' }}</div>
+          {% if item.asset %}
+          <div style="font-family:monospace;font-size:0.73rem;color:var(--text-muted,#9ca3af);">{{ item.asset }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <div style="font-weight:600;">{{ item.product_name or item.item_name or item.name or '—' }}</div>
+          <div class="pv-specs">
+            {% set parts = [] %}
+            {% if item.model     %}{% set _ = parts.append(item.model)              %}{% endif %}
+            {% if item.cpu       %}{% set _ = parts.append(item.cpu)                %}{% endif %}
+            {% if item.ram       %}{% set _ = parts.append(item.ram)                %}{% endif %}
+            {% if item.disk1size %}{% set _ = parts.append(item.disk1size)          %}{% endif %}
+            {% if item.display   %}{% set _ = parts.append(item.display)            %}{% endif %}
+            {% if item.gpu1      %}{% set _ = parts.append(item.gpu1)               %}{% endif %}
+            {% if item.grade     %}{% set _ = parts.append('Grade: ' ~ item.grade)  %}{% endif %}
+            {{ parts | join(' · ') }}
+          </div>
+        </td>
+        <td class="r">{{ "%.2f"|format(unit_price) }}</td>
+        <td class="r" style="color:var(--text-muted,#9ca3af);">{{ "%.2f"|format(vat_amount) }}</td>
+        <td class="r" style="font-weight:600;">{{ "%.2f"|format(total_line) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:1.25rem;">
+    <table class="pv-totals">
+      <tr>
+        <td style="color:var(--text-secondary,#6b7280);">Subtotal</td>
+        <td style="text-align:right;">{{ "%.2f"|format(subtotal) }} {{ currency }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text-secondary,#6b7280);">VAT</td>
+        <td style="text-align:right;color:var(--text-secondary,#6b7280);">{{ "%.2f"|format(total_vat) }} {{ currency }}</td>
+      </tr>
+      <tr class="grand">
+        <td style="font-weight:700;">Grand Total</td>
+        <td style="text-align:right;font-weight:800;font-size:1.05rem;color:var(--primary,#2563eb);">{{ "%.2f"|format(grand_total) }} {{ currency }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Footer / Terms -->
+  {% if s.invoice_footer or s.invoice_terms %}
+  <div style="padding-top:0.85rem;border-top:1px solid var(--border,#e5e7eb);">
+    {% if s.invoice_footer %}
+    <p class="pv-footer-txt">{{ s.invoice_footer }}</p>
     {% endif %}
-    {% if settings.invoice_terms %}
-      <p class="text-muted" style="font-size: 0.85rem;"><strong>Terms:</strong> {{ settings.invoice_terms }}</p>
+    {% if s.invoice_terms %}
+    <p class="pv-footer-txt"><strong>Terms:</strong> {{ s.invoice_terms }}</p>
     {% endif %}
   </div>
-{% endif %}
+  {% endif %}
+
 </div>

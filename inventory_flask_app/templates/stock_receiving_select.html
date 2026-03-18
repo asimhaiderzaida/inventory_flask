@@ -1,35 +1,160 @@
 {% extends "base.html" %}
 {% block title %}Select PO for Receiving{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+{% block page_title %}Stock Receiving{% endblock %}
+
+{% block extra_head %}
+<style>
+.progress-bar-track {
+  background: var(--surface-3, #F3F4F6);
+  border-radius: 99px;
+  height: 6px;
+  overflow: hidden;
+  min-width: 80px;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--primary, #3B82F6);
+  transition: width 0.3s;
+}
+.progress-bar-fill.complete { background: #10B981; }
+</style>
 {% endblock %}
+
 {% block content %}
-<div class="container">
-  <div class="card shadow-sm rounded-4 p-4 mt-4 mb-5 animate__animated animate__fadeIn">
-    <h3 class="fw-bold mb-3">
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">
       {% if settings and settings.label_stock_receiving_header %}
         {{ settings.label_stock_receiving_header }}
       {% else %}
-        📦 Enter PO Number to Start Receiving
+        Stock Receiving
       {% endif %}
-    </h3>
-    <p class="text-muted small">After selecting a PO, you’ll be able to scan or upload units using either Serial Number or Asset Tag.</p>
-    <form method="POST" class="mt-3">
-      <div class="row g-3">
-        <div class="col-12 table-responsive-sm">
-          <label class="form-label text-nowrap">Select PO Number</label>
-          <select name="po_number" class="form-select form-select-lg animate__animated animate__fadeInUp" required>
-            <option value="" class="text-nowrap">-- Select PO --</option>
+    </h1>
+    <div class="page-subtitle">Select a PO to begin scanning received units</div>
+  </div>
+  <div class="page-actions">
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.stock_intake') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <a href="{{ url_for('stock_bp.create_purchase_order') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> New PO
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up">
+
+  <!-- Quick-select form -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:1.5rem;">
+      <h6 style="font-weight:700;margin-bottom:1rem;">Select a Purchase Order to receive</h6>
+      {% if po_list %}
+      <form method="POST" class="d-flex gap-3 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="flex:1;">
+          <select name="po_id" class="form-select" required>
+            <option value="">Select PO…</option>
             {% for po in po_list %}
-              <option value="{{ po.po_number }}" class="text-nowrap">{{ po.po_number }} (Vendor: {{ po.vendor.name if po.vendor else 'N/A' }})</option>
+              <option value="{{ po.id }}">
+                {{ po.po_number }}
+                — {{ po.vendor.name if po.vendor else 'No Vendor' }}
+                ({{ po.status|title }})
+                {% set s = stats_map.get(po.id, {}) %}
+                {% if s %} — {{ s.received }}/{{ s.total }} received{% endif %}
+              </option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-12">
-          <button type="submit" class="btn btn-primary btn-lg w-100 animate__animated animate__fadeInUp animate__delay-1s">Continue <i class="bi bi-arrow-right-circle"></i></button>
-        </div>
-      </div>
-    </form>
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+          Continue <i class="bi bi-arrow-right-circle"></i>
+        </button>
+      </form>
+      {% else %}
+      <p style="font-size:0.88rem;color:var(--text-muted);">No pending purchase orders found.</p>
+      {% endif %}
+    </div>
   </div>
+
+  <!-- Open POs table -->
+  {% if po_list %}
+  <div class="table-card">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <h6 style="font-weight:700;margin:0;">Open Purchase Orders</h6>
+      <span style="font-size:0.82rem;color:var(--text-muted);">{{ po_list|length }} PO{{ 's' if po_list|length != 1 }}</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" style="margin:0;">
+        <thead>
+          <tr>
+            <th>PO #</th>
+            <th>Vendor</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th style="text-align:right;">Expected</th>
+            <th style="text-align:right;">Received</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for po in po_list %}
+            {% set s = stats_map.get(po.id, {'total': 0, 'received': 0}) %}
+            {% set pct = ((s.received / s.total * 100) | int) if s.total else 0 %}
+            <tr>
+              <td>
+                <a href="{{ url_for('stock_bp.view_purchase_order', po_id=po.id) }}"
+                   style="font-weight:600;color:var(--primary);">{{ po.po_number }}</a>
+              </td>
+              <td>{{ po.vendor.name if po.vendor else '—' }}</td>
+              <td>{{ po.location.name if po.location else '—' }}</td>
+              <td>
+                {% if po.status == 'partial' %}
+                  <span class="status-pill" style="background:#FEF3C7;color:#92400E;">Partial</span>
+                {% else %}
+                  <span class="status-pill" style="background:#F3F4F6;color:#6B7280;">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.total %}
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <div class="progress-bar-track" style="width:80px;">
+                    <div class="progress-bar-fill {% if pct == 100 %}complete{% endif %}"
+                         style="width:{{ pct }}%;"></div>
+                  </div>
+                  <span style="font-size:0.78rem;color:var(--text-muted);">{{ pct }}%</span>
+                </div>
+                {% else %}
+                  <span style="color:var(--text-muted);font-size:0.82rem;">—</span>
+                {% endif %}
+              </td>
+              <td style="text-align:right;">{{ s.total or '—' }}</td>
+              <td style="text-align:right;">{{ s.received if s.total else '—' }}</td>
+              <td style="white-space:nowrap;font-size:0.82rem;color:var(--text-muted);">
+                {{ po.created_at.strftime('%d %b %Y') if po.created_at else '—' }}
+              </td>
+              <td>
+                <a href="{{ url_for('stock_bp.stock_receiving_select') }}?po_id={{ po.id }}"
+                   class="btn btn-primary btn-sm" style="white-space:nowrap;">
+                  <i class="bi bi-qr-code-scan"></i> Receive
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-inbox"></i>
+    <p>No open purchase orders. Create one first.</p>
+    <a href="{{ url_for('stock_bp.create_purchase_order') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Create a PO
+    </a>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}

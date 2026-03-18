@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ invoice.invoice_number or '#' ~ invoice.id }}{% endblock %}
+{% block page_title %}Invoice{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Invoice card max-width constraint ── */
+  .invoice-outer { max-width: 860px; }
+
+  /* ── Items table ── */
+  .inv-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  .inv-table thead tr {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+  }
+  .inv-table th {
+    padding: 0.65rem 0.8rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .inv-table th.right, .inv-table td.right { text-align: right; }
+  .inv-table tbody tr { border-bottom: 1px solid var(--border); }
+  .inv-table tbody tr:last-child { border-bottom: none; }
+  .inv-table td {
+    padding: 0.7rem 0.8rem;
+    vertical-align: top;
+  }
+  .inv-table td .specs-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    line-height: 1.6;
+  }
+  .inv-table td.currency {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ── Totals block ── */
+  .totals-table { border-collapse: collapse; min-width: 280px; font-size: 0.875rem; }
+  .totals-table td { padding: 0.3rem 0.75rem; }
+  .totals-table .grand-row { border-top: 2px solid var(--border); }
+  .totals-table .grand-row td { padding-top: 0.55rem; }
+
+  /* ── Email sent card ── */
+  .email-status-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid var(--color-success);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1.25rem;
+  }
+  .email-status-card i { color: var(--color-success); font-size: 1.1rem; flex-shrink: 0; }
+  .email-status-card span { font-size: 0.875rem; font-weight: 500; color: #166534; }
+
+  /* ── Invoice header layout ── */
+  .invoice-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .invoice-head-right {
+    text-align: right;
+  }
+  .invoice-word {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  /* ── Bill-to block ── */
+  .bill-to-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+  .bill-to-name { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+  .bill-to-detail { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; }
+
+  /* ── Section label ── */
+  .section-lbl {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+  }
+  @media (max-width: 575px) {
+    .invoice-head { flex-direction: column; align-items: stretch; }
+    .invoice-head-right { text-align: left; }
+    .invoice-word { font-size: 1.5rem; }
+  }
+
+  /* ── Print / Save as PDF ── */
+  @media print {
+    /* Hide chrome */
+    .sidebar,
+    .top-navbar,
+    .page-header,
+    .page-actions,
+    #emailStatusCard,
+    .btn,
+    .no-print { display: none !important; }
+
+    /* Full-width layout */
+    body { margin: 0; padding: 0; background: white !important; }
+    .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+
+    /* Invoice card: remove shadow/border, fill page */
+    .invoice-outer { max-width: 100% !important; }
+    .card { box-shadow: none !important; border: none !important; border-radius: 0 !important; margin: 0 !important; }
+    .card-body { padding: 0 !important; }
+
+    /* Make CSS variables resolve to readable values for print */
+    .inv-table th { color: #6b7280 !important; background: #f3f4f6 !important; }
+    .inv-table tbody tr { border-bottom: 1px solid #e2e8f0 !important; }
+    .totals-table .grand-row { border-top: 2px solid #0f172a !important; }
+    .bill-to-label, .section-lbl { color: #6b7280 !important; }
+    .bill-to-name { color: #0f172a !important; }
+    .bill-to-detail { color: #475569 !important; }
+    .invoice-head { border-bottom: 1px solid #e2e8f0 !important; }
+
+    /* Status pills print cleanly */
+    .status-pill { border: 1px solid #ccc !important; }
+
+    /* Don't break inside table rows */
+    tr { page-break-inside: avoid; }
+
+    /* Page settings */
+    @page { margin: 1.5cm; size: A4; }
+  }
+</style>
+
+<!-- Page header -->
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ invoice.invoice_number or 'Invoice #' ~ invoice.id }}</h1>
+    <div class="page-subtitle">
+      {{ customer.name }} &nbsp;&middot;&nbsp;
+      {{ invoice.created_at.strftime('%d %b %Y') if invoice.created_at else '' }}
+      {% if invoice.email_sent_at %}
+      &nbsp;&middot;&nbsp;
+      <span class="email-sent-badge" style="color:var(--color-success);font-size:0.82rem;">
+        <i class="bi bi-envelope-check-fill"></i>
+        Emailed {{ invoice.email_sent_at.strftime('%d %b %Y %H:%M') }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('returns_bp.lookup_return') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-return-left"></i> Process Return
+    </a>
+    <button onclick="window.print()" class="btn btn-ghost">
+      <i class="bi bi-printer"></i> Print / Save PDF
+    </button>
+    {% if customer.email %}
+    <button id="sendBtn" class="btn btn-primary" onclick="sendInvoice({{ invoice.id }})">
+      <i class="bi bi-envelope"></i>
+      {% if invoice.email_sent_at %}Resend{% else %}Send to Customer{% endif %}
+    </button>
+    {% else %}
+    <button class="btn btn-ghost" disabled title="No email address on file for this customer">
+      <i class="bi bi-envelope-x"></i> No Email on File
+    </button>
+    {% endif %}
+    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('sales_bp.sold_units_view') }}'" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<!-- Email status card (revealed after AJAX send) -->
+<div id="emailStatusCard" style="display:none;margin-bottom:1.25rem;" class="animate-fade-up">
+  <div class="email-status-card">
+    <i class="bi bi-envelope-check-fill"></i>
+    <span id="emailStatusText"></span>
+  </div>
+</div>
+
+{% set inv_accent = settings.invoice_accent_color or '#3b82f6' %}
+{% set inv_show_logo = settings.invoice_show_logo != 'false' %}
+
+<!-- Invoice card -->
+<div class="card animate-fade-up invoice-outer" style="border-top:4px solid {{ inv_accent }};">
+  <div class="card-body" style="padding:2rem 2rem 1.75rem;">
+
+    <!-- ── Invoice header ── -->
+    <div class="invoice-head">
+      <div>
+        {% if inv_show_logo %}
+          {% if settings.invoice_logo %}
+          <img src="{{ settings.invoice_logo }}" alt="Logo"
+               style="max-height:54px;margin-bottom:0.65rem;display:block;">
+          {% elif settings.dashboard_logo %}
+          <img src="{{ settings.dashboard_logo }}" alt="Logo"
+               style="max-height:54px;margin-bottom:0.65rem;display:block;">
+          {% endif %}
+        {% endif %}
+        {% if settings.company_name or settings.invoice_title %}
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text-primary);">{{ settings.company_name or settings.invoice_title }}</div>
+        {% endif %}
+        {% if settings.invoice_header_note %}
+        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.2rem;">{{ settings.invoice_header_note }}</div>
+        {% endif %}
+        {% if settings.company_address %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;white-space:pre-line;">{{ settings.company_address }}</div>
+        {% endif %}
+        {% if settings.company_phone %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;"><i class="bi bi-telephone me-1"></i>{{ settings.company_phone }}</div>
+        {% endif %}
+        {% if settings.company_email %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;"><i class="bi bi-envelope me-1"></i>{{ settings.company_email }}</div>
+        {% endif %}
+        {% if settings.company_website %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ settings.company_website }}</div>
+        {% endif %}
+      </div>
+      <div class="invoice-head-right">
+        <div class="invoice-word" style="color:{{ inv_accent }};">INVOICE</div>
+        <div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-top:0.4rem;">
+          {{ invoice.invoice_number or '#' ~ invoice.id }}
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.15rem;">
+          {{ invoice.created_at.strftime('%d %B %Y') if invoice.created_at else '' }}
+        </div>
+        {% if printed_time %}
+        <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.1rem;">
+          Printed {{ printed_time }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Bill To ── -->
+    <div style="margin-bottom:1.75rem;">
+      <div class="bill-to-label">Bill To</div>
+      <div class="bill-to-name">{{ customer.name }}</div>
+      <div class="bill-to-detail">
+        {% if customer.phone %}<div>{{ customer.phone }}</div>{% endif %}
+        {% if customer.email %}<div>{{ customer.email }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- ── Items table ── -->
+    <div class="section-lbl">Items</div>
+    <div style="overflow-x:auto;margin-bottom:1.75rem;">
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th style="width:13%;">Serial / Asset</th>
+            <th>Item &amp; Specs</th>
+            <th class="right" style="width:11%;">Unit Price</th>
+            {% if total_vat > 0 %}<th class="right" style="width:9%;">VAT {{ items[0].vat_rate if items else (settings.vat_rate or '5') }}%</th>{% endif %}
+            <th class="right" style="width:11%;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% set unit_price  = item.unit_price %}
+          {% set vat_amount  = item.vat_amount %}
+          {% set total_price = item.total_with_vat %}
+          <tr>
+            <td>
+              <div style="font-family:monospace;font-size:0.79rem;font-weight:600;">{{ item.serial }}</div>
+              {% if item.asset %}
+              <div style="font-family:monospace;font-size:0.74rem;color:var(--text-muted);">{{ item.asset }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <div style="font-weight:600;">{{ item.item_name or item.product_name or '—' }}</div>
+              <div class="specs-text">
+                {% set parts = [] %}
+                {% if item.model      %}{% set _ = parts.append(item.model)             %}{% endif %}
+                {% if item.cpu        %}{% set _ = parts.append(item.cpu)               %}{% endif %}
+                {% if item.ram        %}{% set _ = parts.append(item.ram)               %}{% endif %}
+                {% if item.disk1size  %}{% set _ = parts.append(item.disk1size)         %}{% endif %}
+                {% if item.display    %}{% set _ = parts.append(item.display)           %}{% endif %}
+                {% if item.gpu1       %}{% set _ = parts.append(item.gpu1)              %}{% endif %}
+                {% if item.grade      %}{% set _ = parts.append('Grade: ' ~ item.grade) %}{% endif %}
+                {{ parts | join(' · ') }}
+              </div>
+            </td>
+            <td class="right currency">{{ "%.2f"|format(unit_price) }}</td>
+            {% if total_vat > 0 %}<td class="right currency" style="color:var(--text-muted);">{{ "%.2f"|format(vat_amount) }}</td>{% endif %}
+            <td class="right currency" style="font-weight:600;">{{ "%.2f"|format(total_price) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Totals ── -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1.5rem;">
+      <table class="totals-table">
+        <tr>
+          <td style="color:var(--text-secondary);">Subtotal</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;">{{ "%.2f"|format(subtotal) }} {{ settings.currency or 'AED' }}</td>
+        </tr>
+        {% if total_vat > 0 %}
+        <tr>
+          <td style="color:var(--text-secondary);">VAT</td>
+          <td style="text-align:right;color:var(--text-secondary);font-variant-numeric:tabular-nums;">{{ "%.2f"|format(total_vat) }} {{ settings.currency or 'AED' }}</td>
+        </tr>
+        {% endif %}
+        <tr class="grand-row">
+          <td style="font-weight:700;font-size:0.95rem;">Grand Total</td>
+          <td style="text-align:right;font-weight:800;font-size:1.1rem;color:{{ inv_accent }};font-variant-numeric:tabular-nums;">
+            {{ "%.2f"|format(grand_total) }} {{ settings.currency or 'AED' }}
+          </td>
+        </tr>
+        {% if invoice.payment_method %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:0.82rem;padding-top:0.5rem;">Payment</td>
+          <td style="text-align:right;padding-top:0.5rem;">
+            {% if invoice.payment_method == 'cash' %}
+              <span class="status-pill" style="background:#d1fae5;color:#065f46;"><i class="bi bi-cash-coin me-1"></i>Cash</span>
+            {% elif invoice.payment_method == 'card' %}
+              <span class="status-pill" style="background:#dbeafe;color:#1e40af;"><i class="bi bi-credit-card me-1"></i>Card</span>
+            {% elif invoice.payment_method == 'transfer' %}
+              <span class="status-pill" style="background:#e0e7ff;color:#3730a3;"><i class="bi bi-bank me-1"></i>Bank Transfer</span>
+            {% elif invoice.payment_method == 'credit' %}
+              <span class="status-pill" style="background:#fef3c7;color:#92400e;"><i class="bi bi-person-check me-1"></i>Credit</span>
+            {% else %}
+              <span class="status-pill">{{ invoice.payment_method | capitalize }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- ── Bank Details ── -->
+    {% if settings.invoice_show_bank_details == 'true' and settings.invoice_bank_details %}
+    <div style="padding:1rem;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:1.25rem;border:1px solid var(--border);">
+      <div class="section-lbl" style="margin-bottom:0.5rem;">Bank Transfer Details</div>
+      <pre style="font-size:0.78rem;color:var(--text-secondary);white-space:pre-wrap;margin:0;font-family:inherit;">{{ settings.invoice_bank_details }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- ── Footer / Terms ── -->
+    {% if settings.invoice_footer or settings.invoice_terms or settings.invoice_footer_note %}
+    <div style="padding-top:1rem;border-top:1px solid var(--border);">
+      {% if settings.invoice_footer %}
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.35rem;">{{ settings.invoice_footer }}</p>
+      {% endif %}
+      {% if settings.invoice_terms %}
+      <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.35rem;">
+        <strong>Terms:</strong> {{ settings.invoice_terms }}
+      </p>
+      {% endif %}
+      {% if settings.invoice_footer_note %}
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0;font-style:italic;">{{ settings.invoice_footer_note }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div><!-- /card-body -->
+</div><!-- /card -->
+
+{# ── Returns linked to this invoice ──────────────────────── #}
+{% if invoice_returns %}
+<div class="card animate-fade-up invoice-outer" style="margin-top:1.25rem;">
+  <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-arrow-return-left me-2" style="color:var(--color-danger);"></i>Returns ({{ invoice_returns|length }})</span>
+    <a href="{{ url_for('returns_bp.view_returns') }}" style="font-size:0.78rem;color:var(--primary);text-decoration:none;">View all</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" style="font-size:0.84rem;">
+      <thead>
+        <tr>
+          <th>Serial</th>
+          <th>Reason</th>
+          <th>Condition</th>
+          <th>Action</th>
+          <th>Refund</th>
+          <th>Status</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in invoice_returns %}
+        <tr>
+          <td style="font-family:monospace;">{{ r.instance.serial if r.instance else '—' }}</td>
+          <td>{{ r.reason or '—' }}</td>
+          <td>
+            <span class="status-pill
+              {% if r.condition == 'Good' %}status-processed
+              {% elif r.condition in ('Damaged','Defective') %}status-idle
+              {% elif r.condition == 'Broken' %}status-disputed
+              {% endif %}">{{ r.condition or '—' }}</span>
+          </td>
+          <td>{{ r.action or '—' }}</td>
+          <td>{% if r.refund_amount %}<span style="color:var(--color-danger);font-weight:600;">-${{ '%.2f'|format(r.refund_amount) }}</span>{% else %}—{% endif %}</td>
+          <td>
+            {% if r.refund_status == 'issued' %}<span class="status-pill status-processed">Issued</span>
+            {% elif r.refund_status == 'pending' %}<span class="status-pill status-under_process">Pending</span>
+            {% else %}<span class="status-pill status-idle">None</span>{% endif %}
+          </td>
+          <td style="color:var(--text-muted);">{{ r.return_date.strftime('%Y-%m-%d') if r.return_date else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function sendInvoice(invoiceId) {
+  const btn = document.getElementById('sendBtn');
+  setButtonLoading(btn, true);
+
+  fetch('/invoices/send/' + invoiceId, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token() }}',
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    setButtonLoading(btn, false);
+    if (data.success) {
+      showToast(data.message, 'success');
+
+      /* Update button */
+      btn.innerHTML = '<i class="bi bi-envelope-check"></i> Resend';
+
+      /* Show inline status card */
+      document.getElementById('emailStatusText').textContent =
+        '\u2713 ' + data.message + (data.sent_at ? '  (' + data.sent_at + ')' : '');
+      document.getElementById('emailStatusCard').style.display = 'block';
+
+      /* Update subtitle badge */
+      const sub = document.querySelector('.page-subtitle');
+      if (sub && data.sent_at) {
+        var badge = sub.querySelector('.email-sent-badge');
+        var newBadge = document.createElement('span');
+        newBadge.className = 'email-sent-badge';
+        newBadge.style.cssText = 'color:var(--color-success);font-size:0.82rem;';
+        newBadge.innerHTML =
+          ' &nbsp;&middot;&nbsp; <i class="bi bi-envelope-check-fill"></i> Emailed ' + data.sent_at;
+        if (badge) {
+          badge.replaceWith(newBadge);
+        } else {
+          sub.appendChild(newBadge);
+        }
+      }
+    } else {
+      showToast(data.message || 'Failed to send invoice.', 'danger');
+    }
+  })
+  .catch(function () {
+    setButtonLoading(btn, false);
+    showToast('Network error. Please try again.', 'danger');
+  });
+}
+</script>
+{% endblock %}

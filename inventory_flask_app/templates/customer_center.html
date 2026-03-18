@@ -1,67 +1,206 @@
 {% extends "base.html" %}
+{% block title %}Customer Center{% endblock %}
+{% block page_title %}Customer Center{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4 mt-4">
-  <div class="d-flex align-items-center mb-3">
-    <h2 class="fw-bold text-primary"><i class="bi bi-people me-2"></i>Customer Center</h2>
+{% set customers = customers|default([]) %}
+{% set has_pagination = pagination is defined %}
+
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Customer Center</h1>
+    <div class="page-subtitle">Manage your customers</div>
   </div>
-  <section class="card shadow-sm p-4 rounded-4 border-0">
-    <form method="get" class="d-flex justify-content-center align-items-center gap-3 mb-4 flex-wrap">
-      <input type="text" name="search" class="form-control form-control-lg rounded-pill" style="max-width:340px;" placeholder="Search by name, phone, or email" value="{{ search or '' }}">
-      <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">
-        <i class="bi bi-search"></i> Search
-      </button>
-      <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-outline-success btn-sm rounded-pill px-3">
-        <i class="bi bi-person-plus"></i> Add
-      </a>
-    </form>
-    <div class="card mt-2 shadow-sm border-0 rounded-4 w-100">
-      <div class="card-body p-0">
-        <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0 align-middle">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th class="d-none d-md-table-cell">Email</th>
-              <th class="d-none d-md-table-cell">Company</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for customer in customers %}
-            <tr>
-              <td>{{ customer.name }}</td>
-              <td>{{ customer.phone }}</td>
-              <td class="d-none d-md-table-cell">{{ customer.email }}</td>
-              <td class="d-none d-md-table-cell">{{ customer.company or '' }}</td>
-              <td>
-                <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">View</a>
-                <a href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Edit</a>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" class="text-center">No customers found.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        <div class="d-flex justify-content-between align-items-center mt-3 px-3">
-          {% if pagination.has_prev %}
-            <a href="{{ url_for('customers_bp.customer_center', page=pagination.prev_num, search=search) }}" class="btn btn-outline-primary btn-sm">&laquo; Prev</a>
-          {% else %}
-            <span></span>
-          {% endif %}
+  <div class="page-actions">
+    <a href="{{ url_for('order_bp.customer_orders') }}" class="btn btn-ghost">
+      <i class="bi bi-truck"></i> Customer Orders
+    </a>
+    <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-primary">
+      <i class="bi bi-person-plus"></i> Add Customer
+    </a>
+  </div>
+</div>
 
-          <span class="text-muted small">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-
-          {% if pagination.has_next %}
-            <a href="{{ url_for('customers_bp.customer_center', page=pagination.next_num, search=search) }}" class="btn btn-outline-primary btn-sm">Next &raquo;</a>
-          {% else %}
-            <span></span>
-          {% endif %}
-        </div>
-        </div>
-      </div>
+<!-- Search + Sort -->
+<div class="animate-fade-up" style="margin-bottom:0.75rem;">
+  <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+    <input type="hidden" name="filter" value="{{ active_filter }}">
+    <div style="flex:1;min-width:180px;max-width:340px;">
+      <input type="text" name="search" class="form-control" placeholder="Name, phone, email, company…" value="{{ search or '' }}">
     </div>
-  </section>
+    <div>
+      <select name="sort" class="form-select" style="min-width:160px;">
+        <option value="name"          {% if sort_by == 'name'          %}selected{% endif %}>Sort: Name A–Z</option>
+        <option value="total_spent"   {% if sort_by == 'total_spent'   %}selected{% endif %}>Sort: Total Spent ↓</option>
+        <option value="last_purchase" {% if sort_by == 'last_purchase' %}selected{% endif %}>Sort: Last Purchase ↓</option>
+        <option value="balance"       {% if sort_by == 'balance'       %}selected{% endif %}>Sort: Balance ↓</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+    {% if search %}
+    <a href="{{ url_for('customers_bp.customer_center', filter=active_filter, sort=sort_by) }}" class="btn btn-ghost">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Filter tabs -->
+<div class="animate-fade-up" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+  {% set filter_tabs = [
+    ('all',          'All Customers',    'var(--primary)'),
+    ('has_balance',  'Has Balance',      'var(--color-danger)'),
+    ('no_purchases', 'No Purchases',     'var(--text-muted)'),
+    ('recent',       'Active (30d)',     'var(--color-success)'),
+  ] %}
+  {% for key, label, color in filter_tabs %}
+  <a href="{{ url_for('customers_bp.customer_center', filter=key, search=search, sort=sort_by) }}"
+     style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.3rem 0.8rem;border-radius:20px;font-size:0.8rem;font-weight:600;text-decoration:none;
+            {% if active_filter == key %}background:{{ color }};color:#fff;{% else %}background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="table-card animate-fade-up">
+  {% if customers and customers|length > 0 %}
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>
+            <a href="{{ url_for('customers_bp.customer_center', sort='name', search=search, filter=active_filter) }}"
+               style="text-decoration:none;color:inherit;">
+              Name {% if sort_by == 'name' %}<i class="bi bi-caret-down-fill" style="font-size:0.65rem;"></i>{% endif %}
+            </a>
+          </th>
+          <th class="d-none d-md-table-cell">Phone</th>
+          <th class="d-none d-lg-table-cell">Email</th>
+          <th class="d-none d-md-table-cell">
+            <a href="{{ url_for('customers_bp.customer_center', sort='total_spent', search=search, filter=active_filter) }}"
+               style="text-decoration:none;color:inherit;">
+              Spent {% if sort_by == 'total_spent' %}<i class="bi bi-caret-down-fill" style="font-size:0.65rem;"></i>{% endif %}
+            </a>
+          </th>
+          <th class="d-none d-lg-table-cell">
+            <a href="{{ url_for('customers_bp.customer_center', sort='last_purchase', search=search, filter=active_filter) }}"
+               style="text-decoration:none;color:inherit;">
+              Last Purchase {% if sort_by == 'last_purchase' %}<i class="bi bi-caret-down-fill" style="font-size:0.65rem;"></i>{% endif %}
+            </a>
+          </th>
+          <th>Balance</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr>
+          <td>
+            <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}"
+               style="font-weight:600;color:var(--text-primary);text-decoration:none;">
+              {{ customer.name }}
+            </a>
+            {% if customer.company %}
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{ customer.company }}</div>
+            {% endif %}
+            {% if customer._total_orders > 0 %}
+            <div style="font-size:0.74rem;color:var(--text-muted);">
+              {{ customer._total_orders }} order{{ 's' if customer._total_orders != 1 else '' }}
+            </div>
+            {% endif %}
+          </td>
+          <td class="d-none d-md-table-cell" style="font-size:0.84rem;color:var(--text-secondary);">
+            {% if customer.phone %}
+            <a href="tel:{{ customer.phone }}" style="color:var(--text-secondary);text-decoration:none;">{{ customer.phone }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="d-none d-lg-table-cell" style="font-size:0.82rem;color:var(--text-secondary);">
+            {% if customer.email %}
+            <a href="mailto:{{ customer.email }}" style="color:var(--text-secondary);text-decoration:none;">{{ customer.email }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="d-none d-md-table-cell" style="font-size:0.84rem;font-weight:600;">
+            {% if customer._total_spent > 0 %}
+            <span style="color:var(--color-success);">${{ '%.0f'|format(customer._total_spent) }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+          <td class="d-none d-lg-table-cell" style="font-size:0.8rem;color:var(--text-muted);">
+            {% if customer._last_purchase %}
+            {{ customer._last_purchase.strftime('%d %b %Y') }}
+            {% else %}
+            <span style="color:var(--text-muted);">Never</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if customer._open_balance > 0 %}
+            <span style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:0.18rem 0.55rem;font-size:0.76rem;font-weight:700;white-space:nowrap;">
+              <i class="bi bi-exclamation-circle me-1"></i>-${{ '%.0f'|format(customer._open_balance) }}
+            </span>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:0.82rem;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <!-- Desktop -->
+            <div class="d-none d-md-flex gap-1">
+              <a href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-eye"></i> View
+              </a>
+              <a href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}" class="btn btn-ghost btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+            <!-- Mobile dropdown -->
+            <div class="d-md-none dropdown">
+              <button class="btn btn-ghost btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{{ url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders') }}">
+                  <i class="bi bi-eye me-2"></i>View
+                </a></li>
+                <li><a class="dropdown-item" href="{{ url_for('customers_bp.edit_customer', customer_id=customer.id) }}">
+                  <i class="bi bi-pencil me-2"></i>Edit
+                </a></li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if has_pagination %}
+  <div class="table-footer">
+    <span style="font-size:0.82rem;color:var(--text-muted);">
+      Page {{ pagination.page }} of {{ pagination.pages }} &nbsp;&middot;&nbsp; {{ pagination.total }} customers total
+    </span>
+    <div class="d-flex gap-2">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('customers_bp.customer_center', page=pagination.prev_num, search=search, sort=sort_by, filter=active_filter) }}" class="btn btn-ghost btn-sm">&laquo; Prev</a>
+      {% endif %}
+      {% if pagination.has_next %}
+      <a href="{{ url_for('customers_bp.customer_center', page=pagination.next_num, search=search, sort=sort_by, filter=active_filter) }}" class="btn btn-ghost btn-sm">Next &raquo;</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-people"></i>
+    <p>
+      {% if search %}No customers found for "{{ search }}"
+      {% elif active_filter == 'has_balance' %}No customers with outstanding balance
+      {% elif active_filter == 'no_purchases' %}All customers have made a purchase
+      {% elif active_filter == 'recent' %}No customers purchased in the last 30 days
+      {% else %}No customers yet{% endif %}
+    </p>
+    {% if not search and active_filter == 'all' %}
+    <a href="{{ url_for('customers_bp.add_customer', next='customer_center') }}" class="btn btn-primary btn-sm">Add First Customer</a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

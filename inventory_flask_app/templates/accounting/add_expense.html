@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if expense else 'Add' }} Expense{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">{{ 'Edit' if expense else 'Add' }} Expense</h1>
+    <p class="page-subtitle">Record a business expense</p>
+  </div>
+</div>
+
+<div class="card animate-fade-up" style="max-width: 640px;">
+  <div class="card-body">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="mb-3">
+        <label class="form-label">Description <span class="text-danger">*</span></label>
+        <input type="text" name="description" class="form-control"
+               value="{{ expense.description if expense else '' }}"
+               placeholder="e.g. Office rent for March" required>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Amount ({{ currency }}) <span class="text-danger">*</span></label>
+          <input type="number" name="amount" class="form-control" step="0.01" min="0"
+                 value="{{ expense.amount if expense else '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Date <span class="text-danger">*</span></label>
+          <input type="date" name="expense_date" class="form-control"
+                 value="{{ expense.expense_date.isoformat() if expense else today }}" required>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="form-select">
+            <option value="">— Select —</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}"
+              {% if expense and expense.category_id == cat.id %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Payment Method</label>
+          <select name="payment_method" class="form-select">
+            {% for val, label in payment_methods %}
+            <option value="{{ val }}"
+              {% if expense and expense.payment_method == val %}selected
+              {% elif not expense and val == 'cash' %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Vendor</label>
+          <select name="vendor_id" class="form-select">
+            <option value="">— None —</option>
+            {% for v in vendors %}
+            <option value="{{ v.id }}"
+              {% if expense and expense.vendor_id == v.id %}selected{% endif %}>
+              {{ v.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Reference / Receipt No.</label>
+          <input type="text" name="reference" class="form-control"
+                 value="{{ expense.reference or '' if expense else '' }}"
+                 placeholder="e.g. INV-2024-001">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Optional notes">{{ expense.notes or '' if expense else '' }}</textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> {{ 'Update' if expense else 'Save' }} Expense
+        </button>
+        <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('accounting_bp.expenses') }}'" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

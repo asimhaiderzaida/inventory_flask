@@ -1,52 +1,58 @@
-
-
 {% for i in instances %}
   <tr>
     <td><input type="checkbox" class="batch-label-checkbox" name="instance_ids" value="{{ i.id }}"></td>
     {% for key in column_order %}
-      {% set normalized_key = key_map.get(key, key) %}
-      {% if settings['show_column_' ~ key] == 'true' %}
-        {% if normalized_key == 'asset' %}
-          <td>{{ i.asset }}</td>
-        {% elif normalized_key == 'serial' %}
-          <td>{{ i.serial }}</td>
-        {% elif normalized_key == 'model' %}
-          <td>{{ i.product.model if i.product else '' }}</td>
-        {% elif normalized_key == 'product' %}
-          <td>{{ i.product.item_name if i.product else '' }}</td>
-        {% elif normalized_key == 'vendor' %}
-          <td>{{ i.product.vendor.name if i.product and i.product.vendor else '' }}</td>
-        {% elif normalized_key == 'status' %}
-          <td>{{ i.status }}</td>
-        {% elif normalized_key == 'process_stage' %}
-          <td>{{ i.process_stage }}</td>
-        {% elif normalized_key == 'team' %}
-          <td>{{ i.team_assigned }}</td>
-        {% elif normalized_key == 'shelf_bin' %}
-          <td>{{ i.shelf_bin }}</td>
-        {% elif normalized_key == 'screen_size' %}
-          <td>{{ i.product.display if i.product else '' }}</td>
-        {% elif normalized_key == 'resolution' %}
-          <td>{{ i.product.resolution if i.product else '' }}</td>
-        {% elif normalized_key == 'video_card' %}
-          <td>{{ i.product.gpu1 if i.product else '' }}</td>
-        {% elif normalized_key == 'ram' %}
-          <td>{{ i.product.ram if i.product else '' }}</td>
-        {% elif normalized_key == 'processor' %}
-          <td>{{ i.product.cpu if i.product else '' }}</td>
-        {% elif normalized_key == 'storage' %}
-          <td>{{ i.product.disk1size if i.product else '' }}</td>
-        {% elif normalized_key == 'is_sold' %}
-          <td>{{ 'Yes' if i.is_sold else 'No' }}</td>
-        {% elif normalized_key == 'label' %}
-          <td>
-            <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}" class="btn btn-sm btn-outline-dark rounded-pill" target="_blank">🖨️ Print Label</a>
-          </td>
-        {% elif normalized_key == 'action' %}
-          <td>
-            <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}" class="btn btn-sm btn-outline-info rounded-pill">View/Edit</a>
-          </td>
-        {% endif %}
+      {% set show_key = 'show_column_' ~ key %}
+      {% if settings is mapping %}
+        {% set show_val = settings.get(show_key, 'true') %}
+      {% else %}
+        {# If settings is not a dict, default to showing columns to avoid hiding everything #}
+        {% set show_val = 'true' %}
+      {% endif %}
+      {% if (show_val | string | lower) == 'true' %}
+        {% set normalized_key = key_map.get(key, key) %}
+        <td>
+          {% if normalized_key == 'label' %}
+            <a href="{{ url_for('stock_bp.print_label', instance_id=i.id) }}"
+               class="btn btn-ghost btn-sm"
+               title="Print Label" target="_blank"><i class="bi bi-printer"></i></a>
+
+          {% elif normalized_key == 'action' %}
+            <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=i.id) }}"
+               class="btn btn-ghost btn-sm"
+               title="View/Edit">View/Edit</a>
+
+          {% else %}
+            {% set value = '' %}
+            {% if normalized_key in ['asset', 'serial', 'status', 'process_stage', 'team_assigned', 'shelf_bin'] %}
+              {% set value = getattr(i, normalized_key, '') %}
+            {% elif normalized_key == 'model' %}
+              {% set value = i.product.model if i.product else '' %}
+            {% elif normalized_key == 'product' or normalized_key == 'Item Name' %}
+              {% set value = i.product.item_name if i.product else '' %}
+            {% elif normalized_key == 'vendor' %}
+              {% set value = i.product.vendor.name if i.product and i.product.vendor else '' %}
+            {% elif normalized_key in ['screen_size', 'resolution', 'video_card', 'ram', 'processor', 'storage', 'cpu', 'gpu1', 'gpu2', 'display', 'grade', 'make'] %}
+              {% set mapped_key = key_map.get(normalized_key, normalized_key) %}
+              {% set value = getattr(i.product, mapped_key, '') if i.product else '' %}
+            {% elif normalized_key == 'location' %}
+              {% set value = i.location.name if i.location else '' %}
+            {% elif normalized_key == 'is_sold' %}
+              {% set value = 'Yes' if i.is_sold else 'No' %}
+            {% endif %}
+            {% if normalized_key == 'shelf_bin' and value %}
+              {% if i.bin_id %}
+              <a href="{{ url_for('stock_bp.bin_detail', bin_id=i.bin_id) }}"
+                 style="font-family:monospace;font-size:0.82rem;text-decoration:none;">{{ value }}</a>
+              {% else %}
+              <a href="{{ url_for('stock_bp.bin_contents', bin_code=value) }}"
+                 style="font-family:monospace;font-size:0.82rem;text-decoration:none;">{{ value }}</a>
+              {% endif %}
+            {% else %}
+              {{ value | nonan }}
+            {% endif %}
+          {% endif %}
+        </td>
       {% endif %}
     {% endfor %}
   </tr>
