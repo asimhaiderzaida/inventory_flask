@@ -39,7 +39,7 @@ PAYMENT_METHODS = [
 
 
 def _require_accounting():
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'supervisor'):
         abort(403)
 
 
@@ -398,7 +398,7 @@ def record_payment(ar_id):
 def write_off_ar(ar_id):
     _require_accounting()
     tid = _tid()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'supervisor'):
         abort(403)
     ar = AccountReceivable.query.filter_by(id=ar_id, tenant_id=tid).first_or_404()
     ar.status = 'written_off'
@@ -863,7 +863,7 @@ def ar_aging():
 @accounting_bp.route('/categories', methods=['GET', 'POST'])
 @login_required
 def categories():
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'supervisor'):
         abort(403)
     tid = _tid()
     seed_expense_categories(tid)

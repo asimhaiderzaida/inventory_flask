@@ -456,6 +456,12 @@ def create_part_return():
 
     part = Part.query.filter_by(id=part_id, tenant_id=tid).first_or_404()
     sale_item = db.session.get(PartSaleItem, sale_item_id) if sale_item_id else None
+    if sale_item is not None:
+        # Verify sale_item belongs to this tenant via its transaction
+        _si_tid = getattr(getattr(sale_item, 'transaction', None), 'tenant_id', None)
+        if _si_tid is not None and _si_tid != current_user.tenant_id:
+            from flask import abort
+            abort(403)
     locations = Location.query.filter_by(tenant_id=tid).order_by(Location.name).all()
 
     if request.method == 'POST':

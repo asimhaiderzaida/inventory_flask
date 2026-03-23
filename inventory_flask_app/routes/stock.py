@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import qrcode
 from io import BytesIO, StringIO
 import base64
-from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage
+from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage, admin_required, admin_or_supervisor_required
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
 
@@ -2027,6 +2027,7 @@ def unit_detail(instance_id):
 # Delete ProductInstance route
 @stock_bp.route('/instance/<int:instance_id>/delete', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def delete_instance(instance_id):
     # --- Tenant scoping: only allow delete of ProductInstances for current tenant ---
     instance = ProductInstance.query.join(Product).filter(

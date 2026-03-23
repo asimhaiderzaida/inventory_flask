@@ -264,6 +264,16 @@ def create_app():
         except Exception:
             return dict(parts_low_stock_count=0)
 
+    @app.errorhandler(403)
+    def forbidden(e):
+        from flask import render_template
+        return render_template('errors/403.html'), 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        from flask import render_template
+        return render_template('errors/404.html'), 404
+
     @app.context_processor
     def inject_now_utc():
         return {'now_utc': datetime.now(timezone.utc)}

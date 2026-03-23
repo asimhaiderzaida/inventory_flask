@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from ..models import db, Customer
+from inventory_flask_app.utils.utils import admin_or_supervisor_required
 
 logger = logging.getLogger(__name__)
 customers_bp = Blueprint('customers_bp', __name__)
@@ -523,6 +524,7 @@ def edit_customer(customer_id):
 
 @customers_bp.route('/customers/<int:customer_id>/delete', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def delete_customer(customer_id):
     from inventory_flask_app.models import SaleTransaction, AccountReceivable, CustomerOrderTracking
     customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first_or_404()

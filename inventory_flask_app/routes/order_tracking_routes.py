@@ -234,7 +234,10 @@ def reserve_product():
                 db.session.commit()
 
                 # Send confirmation email (wrapped — never breaks the flow)
-                reserved_customer = db.session.get(Customer, customer_id)
+                reserved_customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first()
+                if not reserved_customer:
+                    from flask import abort
+                    abort(404)
                 unit_dicts = [_instance_to_unit_dict(i) for i in reserved_instances]
                 email_sent = send_reservation_confirmation(
                     reserved_customer, unit_dicts, current_user.tenant_id

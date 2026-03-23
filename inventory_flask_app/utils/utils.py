@@ -3,6 +3,56 @@ from inventory_flask_app.models import CustomerOrderTracking, Customer
 from datetime import datetime
 import pytz
 from flask_login import current_user
+from functools import wraps
+from flask import abort
+
+
+def admin_required(f):
+    """Decorator: only admin role may access this route."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if current_user.role != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_or_supervisor_required(f):
+    """Decorator: admin or supervisor role required."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if current_user.role not in ('admin', 'supervisor'):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def sales_required(f):
+    """Decorator: admin, supervisor, or sales role required."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if current_user.role not in ('admin', 'supervisor', 'sales'):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def warehouse_required(f):
+    """Decorator: admin, supervisor, or warehouse role required."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+        if current_user.role not in ('admin', 'supervisor', 'warehouse'):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
 
 
 def is_module_enabled(module_key):

@@ -5,11 +5,13 @@ from flask_login import login_required, current_user
 from inventory_flask_app.models import TenantSettings, ProcessStage, CustomField, CustomFieldValue, db
 from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
+from inventory_flask_app.utils.utils import admin_required
 
 admin_bp = Blueprint('admin_bp', __name__)
 
 @admin_bp.route('/admin/settings', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def admin_settings():
     if not current_user or not current_user.tenant_id:
         flash("Your account is not linked to any tenant. Please contact support.", "danger")
@@ -102,6 +104,7 @@ MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2 MB
 
 @admin_bp.route('/admin/upload_logo', methods=['POST'])
 @login_required
+@admin_required
 def upload_logo():
     """Accept a logo image upload, save it, and store the path in TenantSettings."""
     tenant_id = current_user.tenant_id
@@ -150,6 +153,7 @@ import time
 
 @admin_bp.route('/admin/self_test', methods=['GET'])
 @login_required
+@admin_required
 def admin_self_test():
     """
     Comprehensive health check and smoke test.
@@ -349,6 +353,7 @@ def _seed_default_stages(tenant_id):
 
 @admin_bp.route('/admin/stages')
 @login_required
+@admin_required
 def admin_stages():
     stages = ProcessStage.query.filter_by(tenant_id=current_user.tenant_id).order_by(ProcessStage.order).all()
     if not stages:
@@ -359,6 +364,7 @@ def admin_stages():
 
 @admin_bp.route('/admin/stages/add', methods=['POST'])
 @login_required
+@admin_required
 def add_stage():
     name = (request.form.get('name') or '').strip()
     color = (request.form.get('color') or '#6b7280').strip()
@@ -375,6 +381,7 @@ def add_stage():
 
 @admin_bp.route('/admin/stages/<int:stage_id>/edit', methods=['POST'])
 @login_required
+@admin_required
 def edit_stage(stage_id):
     stage = ProcessStage.query.filter_by(id=stage_id, tenant_id=current_user.tenant_id).first_or_404()
     stage.name      = (request.form.get('name') or stage.name).strip()
@@ -387,6 +394,7 @@ def edit_stage(stage_id):
 
 @admin_bp.route('/admin/stages/<int:stage_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def delete_stage(stage_id):
     stage = ProcessStage.query.filter_by(id=stage_id, tenant_id=current_user.tenant_id).first_or_404()
     name = stage.name
@@ -398,6 +406,7 @@ def delete_stage(stage_id):
 
 @admin_bp.route('/admin/stages/reorder', methods=['POST'])
 @login_required
+@admin_required
 def reorder_stages():
     """Accepts JSON list of {id, order} and updates order values."""
     data = request.get_json(silent=True)
@@ -426,6 +435,7 @@ def _slug(label):
 
 @admin_bp.route('/admin/custom_fields/add', methods=['POST'])
 @login_required
+@admin_required
 def add_custom_field():
     tenant_id = current_user.tenant_id
     label = (request.form.get('field_label') or '').strip()
@@ -467,6 +477,7 @@ def add_custom_field():
 
 @admin_bp.route('/admin/custom_fields/<int:field_id>/edit', methods=['POST'])
 @login_required
+@admin_required
 def edit_custom_field(field_id):
     cf = CustomField.query.filter_by(id=field_id, tenant_id=current_user.tenant_id).first_or_404()
     label = (request.form.get('field_label') or '').strip()
@@ -489,6 +500,7 @@ def edit_custom_field(field_id):
 
 @admin_bp.route('/admin/custom_fields/<int:field_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def delete_custom_field(field_id):
     cf = CustomField.query.filter_by(id=field_id, tenant_id=current_user.tenant_id).first_or_404()
     label = cf.field_label
@@ -500,6 +512,7 @@ def delete_custom_field(field_id):
 
 @admin_bp.route('/admin/custom_fields/reorder', methods=['POST'])
 @login_required
+@admin_required
 def reorder_custom_fields():
     data = request.get_json(silent=True)
     if not data or not isinstance(data, list):

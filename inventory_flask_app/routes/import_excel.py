@@ -9,6 +9,7 @@ from datetime import datetime
 import pandas as pd
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import admin_or_supervisor_required
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def get_location_id(location_name):
 
 @import_excel_bp.route('/template_download')
 @login_required
+@admin_or_supervisor_required
 def template_download():
     from openpyxl import Workbook
     from io import BytesIO
@@ -49,6 +51,7 @@ def template_download():
 
 @import_excel_bp.route('/upload_excel', methods=['GET', 'POST'])
 @login_required
+@admin_or_supervisor_required
 def upload_excel():
     vendors = Vendor.query.filter_by(tenant_id=current_user.tenant_id).all()
     locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()

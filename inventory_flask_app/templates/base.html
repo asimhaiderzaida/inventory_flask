@@ -1511,6 +1511,7 @@
         {% endif %}
 
         <!-- ── INTEGRATIONS ──────────────────────────────────── -->
+        {% if current_user.role in ('admin', 'supervisor') %}
         {% set is_shopify = ep.startswith('shopify_bp') %}
         <div class="nav-group-header {% if is_shopify %}active-group{% endif %}">
           <a href="{{ url_for('shopify_bp.dashboard') }}"
@@ -1543,6 +1544,7 @@
             <span class="sidebar-label">Orders</span>
           </a>
         </div>
+        {% endif %}
 
         <!-- ── ADMIN ───────────────────────────────────────── -->
         {% if current_user.role == 'admin' %}

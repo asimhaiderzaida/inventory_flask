@@ -116,7 +116,7 @@ def add_part():
 
         # If a linked vendor is selected, sync the text field from it
         if vendor_id:
-            v = db.session.get(Vendor, int(vendor_id))
+            v = Vendor.query.filter_by(id=int(vendor_id), tenant_id=current_user.tenant_id).first()
             vendor_text = v.name if v else vendor_text
 
         part = Part(
@@ -178,7 +178,7 @@ def edit_part(part_id):
         vendor_text = request.form.get('vendor', '').strip()
 
         if vendor_id:
-            v = db.session.get(Vendor, int(vendor_id))
+            v = Vendor.query.filter_by(id=int(vendor_id), tenant_id=current_user.tenant_id).first()
             vendor_text = v.name if v else vendor_text
 
         # Barcode: allow clearing (set to None) or updating

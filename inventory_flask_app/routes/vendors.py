@@ -10,6 +10,7 @@ from wtforms import StringField
 from wtforms.validators import DataRequired, Optional
 
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import admin_or_supervisor_required
 
 class VendorForm(FlaskForm):
     name = StringField('Vendor Name', validators=[DataRequired()])
@@ -444,6 +445,7 @@ def edit_vendor(vendor_id):
 
 @vendors_bp.route('/vendors/<int:vendor_id>/delete', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def delete_vendor(vendor_id):
     from flask_login import current_user
     from inventory_flask_app.models import PurchaseOrder, Part

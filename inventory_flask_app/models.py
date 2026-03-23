@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.hybrid import hybrid_property
 from . import db
 class User(db.Model, UserMixin):
+    VALID_ROLES = ('admin', 'supervisor', 'sales', 'staff', 'warehouse', 'technician')
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False, unique=True, index=True)
     full_name = db.Column(db.String(120), nullable=True)
