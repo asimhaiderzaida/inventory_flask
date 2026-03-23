@@ -85,6 +85,10 @@
         <li><button class="dropdown-item" type="button" onclick="openBulkMoveModal()">
           <i class="bi bi-box-arrow-right me-2"></i>Move to Bin
         </button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item" type="button" onclick="openShopifyGroupPublishModal()">
+          <i class="bi bi-shop me-2"></i>Publish to Shopify
+        </button></li>
       </ul>
     </div>
   </div>
@@ -357,6 +361,34 @@
   </div>
 </div>
 
+<!-- Shopify Bulk Publish Modal -->
+<div class="modal fade" id="shopifyPublishModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:520px;">
+    <div class="modal-content" style="border-radius:var(--radius-xl);overflow:hidden;">
+      <div class="modal-header" style="padding:1rem 1.5rem;">
+        <div style="font-weight:700;font-size:0.9rem;"><i class="bi bi-shop me-2"></i>Publish to Shopify</div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+        <p style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:1rem;">
+          Set a price for each spec group. Already-listed and reserved units are skipped automatically.
+        </p>
+        <div id="shopify-spec-groups">
+          <div class="text-center py-3" style="color:var(--text-muted);font-size:0.84rem;">
+            <span class="spinner-border spinner-border-sm me-2"></span>Loading specs…
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:0.85rem 1.5rem;">
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="shopify-confirm-btn" onclick="confirmShopifyPublish()">
+          <i class="bi bi-shop me-1"></i>Publish
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Bulk Move to Bin Modal -->
 <div class="modal fade" id="bulkMoveModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
@@ -541,6 +573,114 @@ function toggleFilterBar() {
     if (body) body.classList.add('filter-open');
   }
 })();
+
+/* ── Shopify Bulk Publish (instance_table) ── */
+let _shopifyInstanceIds = [];
+
+function openShopifyGroupPublishModal() {
+  if (selectedInstances.size === 0) { showToast('Select at least one group first.', 'warning'); return; }
+
+  document.getElementById('shopify-spec-groups').innerHTML =
+    '<div class="text-center py-3" style="color:var(--text-muted);font-size:0.84rem;">' +
+    '<span class="spinner-border spinner-border-sm me-2"></span>Resolving units…</div>';
+  new bootstrap.Modal(document.getElementById('shopifyPublishModal')).show();
+
+  // Step 1: resolve model+cpu groups → instance IDs
+  fetch('/shopify/api/group_instances', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}'},
+    body: JSON.stringify({groups: Array.from(selectedInstances)})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success || !data.instance_ids.length) {
+      renderSpecError('No publishable units found for selected groups.');
+      return;
+    }
+    _shopifyInstanceIds = data.instance_ids;
+    // Step 2: fetch spec groups for those IDs
+    return fetch('/shopify/api/instance_specs?ids=' + _shopifyInstanceIds.join(','))
+      .then(r => r.json())
+      .then(specData => {
+        if (!specData.success) { renderSpecError(specData.message || 'Failed to load specs'); return; }
+        renderSpecGroups(specData.groups);
+      });
+  })
+  .catch(err => renderSpecError('Network error: ' + err));
+}
+
+function renderSpecGroups(groups) {
+  const container = document.getElementById('shopify-spec-groups');
+  if (!groups.length) {
+    container.innerHTML = '<p style="font-size:0.84rem;color:var(--text-muted);">No publishable units found.</p>';
+    return;
+  }
+  let html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+  groups.forEach(g => {
+    const suggested = g.suggested_price ? g.suggested_price.toFixed(2) : '';
+    html += `
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.84rem;">${escHtml(g.label)}</div>
+          <div style="font-size:0.76rem;color:var(--text-muted);">${g.count} unit${g.count !== 1 ? 's' : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <span style="font-size:0.8rem;color:var(--text-muted);">AED</span>
+          <input type="number" class="form-control form-control-sm shopify-price-input"
+                 data-spec-key="${escHtml(g.key)}"
+                 value="${suggested}"
+                 placeholder="Price"
+                 style="width:110px;font-size:0.84rem;">
+        </div>
+      </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderSpecError(msg) {
+  document.getElementById('shopify-spec-groups').innerHTML =
+    `<p style="color:var(--color-danger);font-size:0.84rem;">${escHtml(msg)}</p>`;
+}
+
+function confirmShopifyPublish() {
+  const priceInputs = document.querySelectorAll('.shopify-price-input');
+  const specPrices = {};
+  let hasEmpty = false;
+  priceInputs.forEach(inp => {
+    const val = inp.value.trim();
+    if (!val || isNaN(parseFloat(val))) { hasEmpty = true; inp.classList.add('is-invalid'); }
+    else { inp.classList.remove('is-invalid'); specPrices[inp.dataset.specKey] = val; }
+  });
+  if (hasEmpty) { showToast('Please set a price for all spec groups.', 'warning'); return; }
+
+  const btn = document.getElementById('shopify-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Publishing…';
+
+  fetch('/shopify/bulk_publish', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}'},
+    body: JSON.stringify({instance_ids: _shopifyInstanceIds, spec_prices: specPrices})
+  })
+  .then(r => r.json())
+  .then(data => {
+    bootstrap.Modal.getInstance(document.getElementById('shopifyPublishModal')).hide();
+    const msg = `Published: ${data.published} • Skipped: ${data.skipped} • Failed: ${data.failed}`;
+    showToast(msg, data.failed ? 'warning' : 'success', 6000);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-shop me-1"></i>Publish';
+  })
+  .catch(err => {
+    showToast('Publish failed: ' + err, 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-shop me-1"></i>Publish';
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 /* Infinite scroll */
 let currentPage = 2, loading = false, noMoreData = false;

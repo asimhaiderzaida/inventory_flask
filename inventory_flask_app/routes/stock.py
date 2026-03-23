@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import qrcode
 from io import BytesIO, StringIO
 import base64
-from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification
+from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
 
@@ -1702,6 +1702,7 @@ def view_edit_instance(instance_id):
                 instance.entered_stage_at = now_ts if status == 'under_process' else None
             elif status not in ('under_process',):
                 instance.entered_stage_at = None
+            sync_reservation_stage(instance.id, _final_stage, current_user.username)
 
         # Save custom field values
         from inventory_flask_app.models import CustomField, CustomFieldValue
@@ -1722,6 +1723,7 @@ def view_edit_instance(instance_id):
                         field_id=cf.id,
                         value=raw_val
                     ))
+        instance.asking_price = request.form.get('asking_price', type=float) or None
         db.session.commit()
         flash("Instance updated.", "success")
         return redirect(url_for('stock_bp.view_edit_instance', instance_id=instance.id))
@@ -1736,9 +1738,14 @@ def view_edit_instance(instance_id):
     instance_returns = Return.query.filter_by(
         instance_id=instance.id, tenant_id=current_user.tenant_id
     ).order_by(Return.return_date.desc()).all()
+    from inventory_flask_app.models import CustomerOrderTracking
+    active_reservation = CustomerOrderTracking.query.filter(
+        CustomerOrderTracking.product_instance_id == instance.id,
+        CustomerOrderTracking.status.in_(['reserved', 'delivered']),
+    ).first()
     return render_template('view_edit_instance.html', instance=instance, locations=locations,
                            process_stages=process_stages, custom_fields=custom_fields, cf_values=cf_values,
-                           instance_returns=instance_returns)
+                           instance_returns=instance_returns, active_reservation=active_reservation)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1866,6 +1873,7 @@ def return_from_idle(instance_id):
     instance.assigned_to_user_id = None
     instance.entered_stage_at = None
     instance.updated_at = now_ts
+    sync_reservation_stage(instance.id, None, current_user.username)
 
     db.session.add(ProductProcessLog(
         product_instance_id=instance.id,
@@ -1955,6 +1963,7 @@ def resolve_dispute(instance_id):
     instance.assigned_to_user_id = None
     instance.entered_stage_at = None
     instance.updated_at = now_ts
+    sync_reservation_stage(instance.id, None, current_user.username)
 
     db.session.add(ProductProcessLog(
         product_instance_id=instance.id,
@@ -2197,6 +2206,7 @@ def checkin_checkout():
             instance.assigned_to_user_id = current_user.id
             instance.updated_at = now_ts
             instance.entered_stage_at = now_ts  # clock starts for new stage
+            sync_reservation_stage(instance.id, stage_to_apply, current_user.username)
 
             db.session.add(ProductProcessLog(
                 product_instance_id=instance.id,
@@ -2231,6 +2241,7 @@ def checkin_checkout():
             instance.assigned_to_user_id = None
             instance.entered_stage_at = None  # clear on checkout
             instance.updated_at = now_ts
+            sync_reservation_stage(instance.id, None, current_user.username)
 
             db.session.add(ProductProcessLog(
                 product_instance_id=instance.id,

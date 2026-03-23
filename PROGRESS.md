@@ -1664,3 +1664,263 @@ All changes in `templates/process_stage_update.html` and `routes/stock.py`.
 | GET/POST | `/notifications/<id>/read` | `notifications_bp.mark_read` | Mark one read + redirect |
 | POST | `/notifications/read_all` | `notifications_bp.read_all` | Mark all read (AJAX) |
 | GET | `/notifications/api/unread_count` | `notifications_bp.unread_count` | Polling endpoint |
+
+---
+
+## Session — Shopify Integration (2026-03-18)
+
+### Overview
+Built full Shopify integration for PCMart across 7 phases. Webhooks blocked pending HTTPS setup (next session).
+
+---
+
+### Phase 1 — Configuration & Models ✅
+
+**New config keys in `__init__.py`:**
+- `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_API_VERSION` (2024-01), `SHOPIFY_WEBHOOK_SECRET`, `SHOPIFY_STORE_URL`, `SHOPIFY_REDIRECT_URI`
+
+**New file: `inventory_flask_app/utils/shopify_utils.py`**
+- `ShopifyClient` class — `get()`, `post()`, `put()`, `delete()`, `test_connection()`
+- `get_shopify_client(tenant_id)` — returns configured client or None
+- `is_shopify_enabled(tenant_id)` — checks TenantSettings
+- `_get_setting()` / `_set_setting()` — TenantSettings read/write helpers
+- `verify_webhook(data, hmac_header)` — HMAC-SHA256 verification
+- `build_product_description(instance)` — generates HTML description from instance specs
+- `log_sync(...)` — writes to ShopifySyncLog table
+
+**New models in `models.py`:**
+- `ShopifyProduct` — maps `product_key` (make_model_grade) to Shopify product/variant/inventory item IDs + location ID
+- `ShopifySyncLog` — audit log for every push/pull action (action, direction, status, details, shopify_id)
+- `ShopifyOrder` — incoming orders from Shopify webhooks (status: draft/confirmed/rejected/cancelled)
+- `ProductInstance.shopify_listed` — Boolean column added (server_default false)
+
+**Migration:** `s1h2o3p4i5f6_add_shopify_integration.py` (down_revision = `7217c0936f8e`)
+
+---
+
+### Phase 2 — OAuth Flow ✅ (Partner apps only)
+
+Routes in `shopify_routes.py`:
+- `GET /shopify/install` — builds OAuth URL with scopes, stores state in session
+- `GET /shopify/callback` — verifies state, exchanges code for access token, saves to TenantSettings
+
+**Note:** OAuth flow is for Partner/public apps. PCMart uses a Custom App (see Phase 2b).
+
+### Phase 2b — Custom App Token Entry ✅
+
+- `POST /shopify/connect_token` — accepts manually pasted `shpat_...` token, tests it live against Shopify, saves to TenantSettings on success
+- Dashboard shows token entry form instead of OAuth button when not connected
+- Token tested and confirmed working: store name **"PCMart"** at `pcmartae.myshopify.com`
+
+**Token storage:** `TenantSettings` key `shopify_access_token` (not .env — per-tenant in DB)
+
+---
+
+### Phase 3 — Shopify Dashboard ✅
+
+Template: `templates/shopify/dashboard.html`
+
+- Connection status card (store name, green indicator)
+- Stats: Units Listed / Pending Orders / Total Orders
+- Sync toggle switches: `enable_shopify_sync`, `shopify_push_enabled`, `shopify_pull_enabled`
+- Recent sync log table (last 10 entries)
+- Buttons: Test Connection (AJAX), Register Webhooks, Disconnect
+- `POST /shopify/settings` — saves toggles
+- `POST /shopify/disconnect` — clears access token
+- `GET /shopify/test` — AJAX connection test
+
+---
+
+### Phase 4 — Push Units to Shopify ✅
+
+- `POST /shopify/publish/<instance_id>` — publishes unit; creates new Shopify product OR bumps inventory +1 on existing variant for same make/model/grade
+- `POST /shopify/unpublish/<instance_id>` — decrements inventory; sets product to draft if qty hits 0
+- `POST /shopify/bulk_publish` — accepts `{instance_ids: [...]}` JSON, processes each
+- `product_key` = `make_model_grade` (spaces → underscores) — groups units by spec
+- Shopify fulfilment location auto-fetched from `locations.json` on first use, cached in `ShopifyProduct.shopify_location_id`
+
+**UI changes:**
+- `view_edit_instance.html`: Publish/Unpublish button in page-actions (visible when `enable_shopify_sync=true` + `asking_price` set + not sold). AJAX with toast feedback + page reload on success.
+- `_instance_rows.html`: Shopify badge icon (`bi-bag-check-fill`, green) in extra column when sync enabled
+
+---
+
+### Phase 5 — Webhooks ⚠️ BLOCKED — Needs HTTPS
+
+Webhook routes built but non-functional until SSL is configured:
+- `POST /shopify/webhook/orders_create` — CSRF exempt, HMAC verified
+- `POST /shopify/webhook/orders_cancelled` — CSRF exempt, HMAC verified
+
+**Blocker:** Shopify requires `https://` for all webhook addresses. Sending `http://50.190.164.39/...` returns:
+```
+422: {"errors":{"address":["protocol http:// is not supported"]}}
+```
+
+**Next session fix:** Set up SSL (Let's Encrypt requires a domain name pointing to 50.190.164.39).
+
+`register_webhooks` now shows a clear error message if address is HTTP rather than silently failing.
+Debug route added: `GET /shopify/test_webhook_payload` — shows exact payload that would be sent.
+
+---
+
+### Phase 6 — Shopify Orders Review ✅
+
+Templates: `templates/shopify/orders_list.html`, `templates/shopify/review_order.html`
+
+- `GET /shopify/orders` — tabbed list (Draft / Confirmed / Rejected / All) with counts
+- `GET /shopify/orders/<id>/review` — full order detail, line items from Shopify JSON, shipping address
+- `POST /shopify/orders/<id>/confirm` — creates PCMart `Order` record, marks ShopifyOrder confirmed
+- `POST /shopify/orders/<id>/reject` — marks rejected
+
+---
+
+### Phase 7 — Sidebar Integration ✅
+
+Added **INTEGRATIONS** section to `base.html` sidebar (above ADMIN):
+- `bi-bag-check` icon (Shopify green `#96bf48`)
+- Sub-links: Dashboard → `/shopify/`, Orders → `/shopify/orders`
+- Active state tracking via `ep.startswith('shopify_bp')`
+
+---
+
+### Infrastructure Fixes This Session
+
+| Issue | Fix |
+|---|---|
+| `url_for(_external=True)` generated `http://localhost/...` | Added `ProxyFix` to `wsgi.py` (x_for=1, x_proto=1, x_host=1, x_prefix=1) |
+| OAuth redirect URI mismatch | Added `SHOPIFY_REDIRECT_URI=http://50.190.164.39/shopify/callback` to `.env` |
+| API version 2026-01 webhook 422 | Changed `SHOPIFY_API_VERSION=2024-01`; webhook route hardpins to 2024-01 |
+| Webhook 422 — real cause | Shopify rejects `http://` addresses; needs HTTPS |
+
+---
+
+### New Routes Added (this session)
+
+| Method | URL | Handler | Purpose |
+|---|---|---|---|
+| GET | `/shopify/` | `shopify_bp.dashboard` | Shopify integration dashboard |
+| GET | `/shopify/install` | `shopify_bp.install` | Start OAuth flow (Partner apps) |
+| GET | `/shopify/callback` | `shopify_bp.oauth_callback` | OAuth callback |
+| POST | `/shopify/connect_token` | `shopify_bp.connect_token` | Save custom app access token |
+| POST | `/shopify/settings` | `shopify_bp.save_settings` | Save sync toggles |
+| POST | `/shopify/disconnect` | `shopify_bp.disconnect` | Remove access token |
+| GET | `/shopify/test` | `shopify_bp.test_connection` | AJAX connection test |
+| GET | `/shopify/test_webhook_payload` | `shopify_bp.test_webhook_payload` | Debug: show webhook payload |
+| POST | `/shopify/publish/<id>` | `shopify_bp.publish_instance` | Publish unit to Shopify |
+| POST | `/shopify/unpublish/<id>` | `shopify_bp.unpublish_instance` | Remove unit from Shopify |
+| POST | `/shopify/bulk_publish` | `shopify_bp.bulk_publish` | Bulk publish units |
+| POST | `/shopify/webhook/orders_create` | `shopify_bp.webhook_orders_create` | Receive order webhook (needs HTTPS) |
+| POST | `/shopify/webhook/orders_cancelled` | `shopify_bp.webhook_orders_cancelled` | Receive cancel webhook (needs HTTPS) |
+| POST | `/shopify/register_webhooks` | `shopify_bp.register_webhooks` | Register webhooks with Shopify |
+| GET | `/shopify/orders` | `shopify_bp.orders_list` | List Shopify orders |
+| GET | `/shopify/orders/<id>/review` | `shopify_bp.review_order` | Review order detail |
+| POST | `/shopify/orders/<id>/confirm` | `shopify_bp.confirm_order` | Confirm → create PCMart order |
+| POST | `/shopify/orders/<id>/reject` | `shopify_bp.reject_order` | Reject order |
+
+---
+
+---
+
+## Session — 18 March 2026 (Shopify Listing Quality + Unpublish Fix)
+
+### asking_price Field — Added to Instance Edit Form
+
+**Problem:** `asking_price` was stored on `ProductInstance` but had no input in the edit form, and the POST handler wasn't saving it.
+
+**Fix:**
+- `templates/view_edit_instance.html` — added AED input field (number, step 0.01) before the Custom Fields section
+- `routes/stock.py` `view_edit_instance()` POST handler — added `instance.asking_price = request.form.get('asking_price', type=float) or None` before `db.session.commit()`
+
+---
+
+### Shopify Listing Format — Full Overhaul
+
+#### Problem
+Listings were publishing with duplicate make in title ("Alienware Alienware m18 R1 AMD"), a single plain variant with no structured options, a bullet-list description, and no storage normalization.
+
+#### New Helper Functions (`shopify_utils.py`)
+
+| Function | Purpose |
+|---|---|
+| `build_title(instance)` | Avoids make duplication: if model already starts with make, use model alone. Uses `item_name` if available. Appends ` - Grade X` if set. |
+| `build_tags(instance)` | Grade, make, RAM, storage, + always `Refurbished`, `PCMart` |
+| `build_description(instance)` | HTML `<table>` (Brand/Model/Processor/RAM/Storage/Display/Graphics/Grade/Condition) instead of `<ul>` |
+| `shorten_cpu(cpu)` | Regex extracts `i7-1355U` / `Ryzen 9 7845HX` from verbose CPU strings |
+| `format_storage(storage)` | Normalizes raw numbers: `1024` → `1TB`, `512` → `512GB`; passes through already-formatted strings |
+
+`build_product_description` kept as backward-compatible alias.
+
+#### Product Payload Changes (`shopify_routes.py`)
+
+New products now created with structured `options` + `variants`:
+```
+options: [Memory, Storage, Processor]
+variants: [{option1: RAM, option2: storage, option3: CPU_short, price, sku, inventory_management, requires_shipping}]
+status: 'active'
+```
+
+#### Bug Fix — `grade` Attribute
+`grade` lives on `Product`, not `ProductInstance`. Fixed in `_product_key`, `build_title`, `build_tags`, `build_description`, and all publish route grade references (`getattr(instance, 'grade', None)` → `getattr(p, 'grade', None)`).
+
+#### Multi-Variant Support — `_find_or_add_variant()`
+New helper added to `shopify_routes.py`. When a product group already exists on Shopify:
+- Fetches all variants via `GET /products/{id}.json`
+- Matches by `option1` (RAM) + `option2` (storage) + `option3` (CPU)
+- If found → increments that variant's inventory by 1
+- If not found → `POST /products/{id}/variants.json` with `inventory_quantity: 1`
+- Returns `(inventory_item_id, variant_id, was_existing)` so caller knows whether to increment
+
+#### `_increment_shopify_inventory()` — New Parameter
+Added optional `inventory_item_id` override parameter so multi-variant calls can target a specific item instead of `sp.shopify_inventory_item_id`.
+
+#### New Route — `POST /shopify/delete_listing/<instance_id>`
+Admin-only. Calls `DELETE /products/{id}.json`, removes `ShopifyProduct` DB record, clears `shopify_listed=False` on all instances in the same product group (same product_id + grade). Used to clean up badly-formatted listings before re-publishing.
+
+---
+
+### Bad Listing Cleanup — Live Fix
+
+Identified and corrected the "Alienware Alienware m18 R1 AMD" bad listing directly via Python shell:
+
+| | Before | After |
+|---|---|---|
+| Title | `Alienware Alienware m18 R1 AMD` | `Alienware m18 R1 AMD` |
+| Variants | 1 plain `Grade N/A` variant | Memory: `32 GB` / Storage: `1024 GB` / Processor: `Ryzen 9 7845HX` |
+| Shopify ID | `8111539716235` (deleted) | `8111559180427` (new) |
+| Instance | ID 692, Serial 3ZL2C24 | Re-listed correctly |
+
+---
+
+### Shopify Unpublish — Fixed Inventory Zero
+
+**Problem:** Unpublish was calling `_increment_shopify_inventory(client, sp, -1)` which could leave inventory at wrong levels if qty was already off.
+
+**Fix (`unpublish_instance`):**
+1. `GET /inventory_levels.json?inventory_item_ids={inv_id}` — gets `location_id` and caches on `sp.shopify_location_id`
+2. `POST /inventory_levels/set.json` with `available: 0` — hard zero, not a decrement
+3. Fetches all variant inventory levels for the product; if total = 0 → `PUT /products/{id}.json {"status": "draft"}`
+4. Sets `instance.shopify_listed = False`, commits, logs
+
+**Fix (publish routes):**
+- New products created with `"status": "active"` in payload
+- When publishing to an existing product group (e.g. after unpublish), sends `PUT /products/{id}.json {"status": "active"}` to reactivate (non-fatal if it fails)
+- Applied to both `publish_instance` route and `_publish_one` bulk helper
+
+---
+
+### New Route Added This Session
+
+| Method | URL | Handler | Purpose |
+|---|---|---|---|
+| POST | `/shopify/delete_listing/<id>` | `shopify_bp.delete_listing` | Delete bad listing + clean up DB records |
+
+---
+
+### Next Session TODO
+
+- [ ] Set up SSL/HTTPS on server (needs domain name → Let's Encrypt)
+- [ ] Re-run Register Webhooks once HTTPS is live
+- [ ] Test full order flow: Shopify order → webhook → PCMart draft → confirm → invoice
+- [ ] Add `read_customers`/`write_customers` scope to Shopify custom app (for auto customer creation)
+- [ ] Bulk publish button in group_view.html / instance_table.html
+- [ ] Admin settings page Shopify section

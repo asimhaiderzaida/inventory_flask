@@ -141,6 +141,10 @@
     /* Status pills print cleanly */
     .status-pill { border: 1px solid #ccc !important; }
 
+    /* Hide toasts, alerts, and fixed/absolute overlays */
+    .toast, .toast-container, .alert, .flash-messages { display: none !important; }
+    [style*="position: fixed"], [style*="position:fixed"] { display: none !important; }
+
     /* Don't break inside table rows */
     tr { page-break-inside: avoid; }
 

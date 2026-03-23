@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, url_for
 from flask_login import login_required, current_user
 from inventory_flask_app import csrf
 from inventory_flask_app.models import db, Product, ProductInstance, ProductProcessLog, ProcessStage
-from inventory_flask_app.utils.utils import calc_duration_minutes, create_notification
+from inventory_flask_app.utils.utils import calc_duration_minutes, create_notification, sync_reservation_stage
 from inventory_flask_app.utils import get_now_for_tenant
 
 pipeline_bp = Blueprint('pipeline_bp', __name__, url_prefix='/stock')
@@ -58,6 +58,32 @@ def pipeline():
     for s in stages:
         columns[s.name] = stage_buckets[s.name]
 
+    # SLA health stats
+    from datetime import datetime, timezone
+    from inventory_flask_app.models import User as _UserModel
+    _now_utc = datetime.now(timezone.utc)
+    _sla_map = {s.name: (s.sla_hours or 0) for s in stages}
+    overdue_count = 0
+    at_risk_count = 0
+    on_track_count = 0
+    for _u in under_process:
+        _sla_h = _sla_map.get(_u.process_stage or '', 0)
+        if not _sla_h or not _u.entered_stage_at:
+            continue
+        _entered = _u.entered_stage_at
+        if hasattr(_entered, 'tzinfo') and _entered.tzinfo is None:
+            _entered = _entered.replace(tzinfo=timezone.utc)
+        _mins = (_now_utc - _entered).total_seconds() / 60
+        _sla_mins = _sla_h * 60
+        if _mins > _sla_mins:
+            overdue_count += 1
+        elif _mins > _sla_mins * 0.70:
+            at_risk_count += 1
+        else:
+            on_track_count += 1
+
+    technicians = _UserModel.query.filter_by(tenant_id=current_user.tenant_id).order_by(_UserModel.username).all()
+
     return render_template(
         'pipeline.html',
         stages=stages,
@@ -65,6 +91,10 @@ def pipeline():
         total_in_process=len(under_process),
         total_unprocessed=len(unprocessed),
         unassigned_initial=30,
+        overdue_count=overdue_count,
+        at_risk_count=at_risk_count,
+        on_track_count=on_track_count,
+        technicians=technicians,
     )
 
 
@@ -110,6 +140,7 @@ def pipeline_move():
         instance.entered_stage_at = now_ts
 
     instance.updated_at = now_ts
+    sync_reservation_stage(instance.id, to_stage or None, current_user.username)
 
     db.session.add(ProductProcessLog(
         product_instance_id=instance.id,

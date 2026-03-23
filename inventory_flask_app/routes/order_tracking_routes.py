@@ -1,6 +1,7 @@
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
-from ..models import db, Customer, ProductInstance, CustomerOrderTracking, Product
+from ..models import db, Customer, ProductInstance, CustomerOrderTracking, Product, ProcessStage
 from inventory_flask_app.models import TenantSettings, ProductProcessLog
 from datetime import datetime
 from inventory_flask_app.utils import get_now_for_tenant
@@ -8,6 +9,52 @@ from inventory_flask_app.utils.mail_utils import send_reservation_confirmation, 
 from inventory_flask_app.utils.utils import is_module_enabled
 from sqlalchemy import or_, func
 from inventory_flask_app import csrf
+
+logger = logging.getLogger(__name__)
+
+
+def _auto_shopify_unpublish(instance, tid):
+    """Set Shopify inventory to 0 when a unit is reserved. Non-fatal — errors are logged."""
+    try:
+        from inventory_flask_app.utils.shopify_utils import get_shopify_client, is_shopify_enabled
+        from inventory_flask_app.models import ShopifyProduct
+        if not is_shopify_enabled(tid):
+            return
+        client = get_shopify_client(tid)
+        if not client:
+            return
+        p = instance.product
+        make  = (getattr(p, 'make',  None) or '').strip().replace(' ', '_')
+        model = (getattr(p, 'model', None) or '').strip().replace(' ', '_')
+        grade = (getattr(p, 'grade', None) or '').strip()
+        key   = f"{make}_{model}_{grade}"
+        sp = ShopifyProduct.query.filter_by(tenant_id=tid, product_key=key).first()
+        if not sp or not sp.shopify_inventory_item_id:
+            instance.shopify_listed = False
+            return
+        levels_data = client.get(
+            f"inventory_levels.json?inventory_item_ids={sp.shopify_inventory_item_id}"
+        )
+        levels = levels_data.get('inventory_levels', [])
+        if levels:
+            location_id = str(levels[0]['location_id'])
+            client.post('inventory_levels/set.json', {
+                'location_id': int(location_id),
+                'inventory_item_id': int(sp.shopify_inventory_item_id),
+                'available': 0,
+            })
+        instance.shopify_listed = False
+    except Exception as e:
+        logger.warning(f"Auto-unpublish from Shopify failed for {instance.serial}: {e}")
+
+
+def _auto_shopify_republish(instance, tid):
+    """Re-publish a unit to Shopify after reservation is cancelled. Non-fatal — errors are logged."""
+    try:
+        from inventory_flask_app.routes.shopify_routes import _publish_one
+        _publish_one(tid, instance)
+    except Exception as e:
+        logger.warning(f"Auto-republish to Shopify failed for {instance.serial}: {e}")
 
 order_bp = Blueprint('order_bp', __name__)
 
@@ -56,6 +103,13 @@ def customer_orders():
     if customer_id:
         query = query.filter(CustomerOrderTracking.customer_id == customer_id)
 
+    # Stage filter (for reserved tab only)
+    stage_filter = request.args.get('stage_filter', '')
+    if stage_filter == 'awaiting':
+        query = query.filter(CustomerOrderTracking.current_stage.is_(None))
+    elif stage_filter == 'processing':
+        query = query.filter(CustomerOrderTracking.current_stage.isnot(None))
+
     orders = query.order_by(CustomerOrderTracking.reserved_date.desc()).all()
     customers = Customer.query.filter_by(tenant_id=current_user.tenant_id).all()
 
@@ -72,6 +126,12 @@ def customer_orders():
         'cancelled': base.filter(CustomerOrderTracking.status == 'cancelled').count(),
     }
 
+    # Stage color map for badge rendering
+    stage_colors = {
+        s.name: s.color
+        for s in ProcessStage.query.filter_by(tenant_id=current_user.tenant_id).all()
+    }
+
     return render_template(
         'customer_orders.html',
         orders=orders,
@@ -79,6 +139,8 @@ def customer_orders():
         selected_customer_id=customer_id,
         active_status=status_filter or ('all' if show_completed else 'reserved'),
         status_counts=status_counts,
+        stage_colors=stage_colors,
+        stage_filter=stage_filter,
     )
 
 # --- Pending Orders Route — redirect to customer_orders with reserved filter ---
@@ -154,19 +216,21 @@ def reserve_product():
             if not customer_id or not session['pending_reserve_serials']:
                 flash("Please select a customer and add at least one serial.", "danger")
             else:
-                for serial in session['pending_reserve_serials']:
-                    instance = serial_map.get(serial)
-                    if instance:
-                        order = CustomerOrderTracking(
-                            customer_id=customer_id,
-                            product_instance_id=instance.id,
-                            status='reserved',
-                            process_stage=None,
-                            team_assigned=None,
-                            reserved_by_user_id=current_user.id,
-                        )
-                        db.session.add(order)
                 reserved_instances = [serial_map[s] for s in session['pending_reserve_serials'] if s in serial_map]
+                for instance in reserved_instances:
+                    order = CustomerOrderTracking(
+                        customer_id=customer_id,
+                        product_instance_id=instance.id,
+                        status='reserved',
+                        process_stage=None,
+                        team_assigned=None,
+                        reserved_by_user_id=current_user.id,
+                        was_shopify_listed=bool(instance.shopify_listed),
+                    )
+                    db.session.add(order)
+                    # FIX 5: Auto-unpublish from Shopify if listed
+                    if instance.shopify_listed:
+                        _auto_shopify_unpublish(instance, current_user.tenant_id)
                 db.session.commit()
 
                 # Send confirmation email (wrapped — never breaks the flow)
@@ -358,6 +422,44 @@ def batch_delivered():
     return redirect(url_for('order_bp.customer_orders'))
 
 
+# --- Single Reservation Cancel Route — cancel by order ID ---
+@order_bp.route('/customer_orders/<int:order_id>/cancel', methods=['POST'])
+@login_required
+def cancel_reservation(order_id):
+    """Cancel a single reservation by ID. Returns JSON for AJAX callers."""
+    order = CustomerOrderTracking.query.join(ProductInstance).join(Product).filter(
+        CustomerOrderTracking.id == order_id,
+        Product.tenant_id == current_user.tenant_id,
+    ).first_or_404()
+
+    if order.status != 'reserved':
+        return jsonify(success=False, message='Reservation is not active'), 400
+
+    was_shopify = order.was_shopify_listed
+    now = get_now_for_tenant()
+    order.status = 'cancelled'
+    order.cancelled_at = now
+    order.cancelled_by_user_id = current_user.id
+
+    log_entry = ProductProcessLog(
+        product_instance_id=order.product_instance_id,
+        from_stage=order.process_stage,
+        to_stage=None,
+        from_team=order.team_assigned,
+        to_team=None,
+        moved_by=current_user.id,
+        moved_at=now,
+        action='cancel_reservation'
+    )
+    db.session.add(log_entry)
+    db.session.commit()
+
+    if was_shopify and order.product_instance:
+        _auto_shopify_republish(order.product_instance, current_user.tenant_id)
+
+    return jsonify(success=True, message='Reservation cancelled')
+
+
 # --- Batch Cancel Reservation Route — soft delete ---
 @order_bp.route('/customer_orders/batch_cancel_reservation', methods=['POST'])
 @login_required
@@ -378,6 +480,7 @@ def batch_cancel_reservation():
             Product.tenant_id == current_user.tenant_id
         ).first()
         if order:
+            was_shopify = order.was_shopify_listed
             # Soft delete: mark as cancelled, keep the record
             order.status = 'cancelled'
             order.cancelled_at = now
@@ -395,6 +498,9 @@ def batch_cancel_reservation():
             )
             db.session.add(log_entry)
             canceled += 1
+            # FIX 6: Re-publish to Shopify if unit was listed before reservation
+            if was_shopify and order.product_instance:
+                _auto_shopify_republish(order.product_instance, current_user.tenant_id)
     db.session.commit()
     flash(f"✅ {canceled} reservation(s) cancelled.", "success")
     return redirect(url_for('order_bp.customer_orders'))

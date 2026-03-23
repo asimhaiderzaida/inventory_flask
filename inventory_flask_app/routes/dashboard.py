@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from ..models import (
     Product, ProductInstance, db, CustomerOrderTracking,
     TenantSettings, SaleTransaction, Invoice, Customer, Return,
+    CustomerOrder,
 )
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
@@ -52,9 +53,34 @@ def main_dashboard():
     prev_month_start, prev_month_end = _month_bounds(prev_y, prev_m)
 
     # ── Inventory counts ──────────────────────────────────────────────────────
+    # Reserved instance IDs (excluded from total inventory count)
+    reserved_ids_sq = (
+        db.session.query(CustomerOrderTracking.product_instance_id)
+        .join(ProductInstance, CustomerOrderTracking.product_instance_id == ProductInstance.id)
+        .filter(
+            ProductInstance.tenant_id == tid,
+            CustomerOrderTracking.status.in_(['reserved', 'delivered']),
+        )
+        .scalar_subquery()
+    )
+
+    reserved_count = (
+        db.session.query(CustomerOrderTracking.product_instance_id)
+        .join(ProductInstance, CustomerOrderTracking.product_instance_id == ProductInstance.id)
+        .filter(
+            ProductInstance.tenant_id == tid,
+            CustomerOrderTracking.status == 'reserved',
+        )
+        .count()
+    )
+
     total_inventory = (
         ProductInstance.query.join(Product)
-        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.is_sold == False,
+            ~ProductInstance.id.in_(reserved_ids_sq),
+        )
         .count()
     )
 
@@ -109,6 +135,8 @@ def main_dashboard():
             Product.tenant_id == tid,
         ).count()
     )
+
+    open_orders_count = CustomerOrder.query.filter_by(tenant_id=tid, status='open').count()
 
     # Aged inventory
     _aged_setting = TenantSettings.query.filter_by(tenant_id=tid, key='aged_threshold_days').first()
@@ -364,6 +392,7 @@ def main_dashboard():
     return render_template('main_dashboard.html',
         # Primary KPIs
         total_inventory=total_inventory,
+        reserved_count=reserved_count,
         revenue_this_month=revenue_this_month,
         revenue_last_month=revenue_last_month,
         revenue_trend=revenue_trend,
@@ -384,6 +413,7 @@ def main_dashboard():
         aged_inventory_count=aged_inventory_count,
         idle_units_count=idle_units_count,
         pending_orders=pending_orders,
+        open_orders_count=open_orders_count,
         # Tables
         recent_sales=recent_sales,
         tech_workload=tech_workload,
@@ -425,9 +455,32 @@ def dashboard_stats():
                 ProductInstance.status == 'unprocessed',
                 ProductInstance.is_sold == False).count()
     )
+    reserved_ids_live = (
+        db.session.query(CustomerOrderTracking.product_instance_id)
+        .join(ProductInstance, CustomerOrderTracking.product_instance_id == ProductInstance.id)
+        .filter(
+            ProductInstance.tenant_id == tid,
+            CustomerOrderTracking.status.in_(['reserved', 'delivered']),
+        )
+        .scalar_subquery()
+    )
+    reserved_count = (
+        db.session.query(CustomerOrderTracking.product_instance_id)
+        .join(ProductInstance, CustomerOrderTracking.product_instance_id == ProductInstance.id)
+        .filter(
+            ProductInstance.tenant_id == tid,
+            CustomerOrderTracking.status == 'reserved',
+        )
+        .count()
+    )
     total_inventory = (
         ProductInstance.query.join(Product)
-        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False).count()
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.is_sold == False,
+            ~ProductInstance.id.in_(reserved_ids_live),
+        )
+        .count()
     )
     units_sold_this_month = (
         SaleTransaction.query
@@ -473,6 +526,7 @@ def dashboard_stats():
         'under_process':        under_process,
         'unprocessed':          unprocessed,
         'total_inventory':      total_inventory,
+        'reserved_count':       reserved_count,
         'units_sold_this_month': units_sold_this_month,
         'revenue_this_month':   revenue_this_month,
         'overdue_count':        overdue_count,

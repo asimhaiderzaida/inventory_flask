@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Pipeline{% endblock %}
-{% block page_title %}Pipeline{% endblock %}
+{% block title %}Processing Pipeline{% endblock %}
+{% block page_title %}Processing Pipeline{% endblock %}
 
 {% block content %}
 <style>
-/* ── Layout ── */
+/* ── Pipeline page: dark/management theme ── */
 .pipeline-page {
   display: flex;
   flex-direction: column;
@@ -16,7 +16,6 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0 0 0.5rem;
-  /* Custom scrollbar */
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -53,7 +52,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-top: 3px solid transparent; /* overridden inline */
+  border-top: 3px solid transparent;
 }
 .pipeline-col-title {
   font-size: 0.82rem;
@@ -104,22 +103,14 @@
   user-select: none;
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.15s, transform 0.1s, border-color 0.15s;
-  border-left: 3px solid transparent; /* stage color accent */
+  border-left: 3px solid transparent;
   position: relative;
 }
 .pipeline-card:last-child { margin-bottom: 0; }
-.pipeline-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--border);
-}
+.pipeline-card:hover { box-shadow: var(--shadow-md); border-color: var(--border); }
 .pipeline-card:active { cursor: grabbing; }
-.pipeline-card.is-dragging {
-  opacity: 0.45;
-  transform: rotate(1.5deg);
-  box-shadow: var(--shadow-xl);
-}
+.pipeline-card.is-dragging { opacity: 0.45; transform: rotate(1.5deg); box-shadow: var(--shadow-xl); }
 
-/* Card internals */
 .card-serial {
   font-family: 'Courier New', monospace;
   font-size: 0.76rem;
@@ -182,12 +173,8 @@
   color: #0891b2;
   white-space: nowrap;
 }
-.card-dur.sla-over {
-  background: rgba(239,68,68,0.1);
-  color: var(--color-danger);
-}
+.card-dur.sla-over { background: rgba(239,68,68,0.1); color: var(--color-danger); }
 
-/* ── Empty column drop zone ── */
 .col-empty-hint {
   text-align: center;
   padding: 1.5rem 0.5rem;
@@ -198,47 +185,113 @@
   pointer-events: none;
 }
 
-/* ── Stats strip ── */
-.pipeline-stats {
-  display: flex;
-  gap: 1.5rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+/* ── Pipeline header ── */
+.pipeline-header-bar {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
   margin-bottom: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.pipeline-header-left { display: flex; flex-direction: column; gap: 0.2rem; }
+.pipeline-header-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+.pipeline-header-sub { font-size: 0.8rem; color: rgba(255,255,255,0.65); }
+.pipeline-health-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.health-pill.overdue { background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+.health-pill.at-risk { background: rgba(245,158,11,0.25); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+.health-pill.on-track { background: rgba(16,185,129,0.25); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+.pipeline-header-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
   flex-wrap: wrap;
 }
-.pipeline-stat { display: flex; align-items: center; gap: 0.35rem; }
-.pipeline-stat strong { color: var(--text-primary); font-weight: 700; }
+.pipeline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  transition: background 0.15s;
+}
+.pipeline-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.pipeline-btn.primary { background: rgba(255,255,255,0.95); color: #312e81; border-color: transparent; }
+.pipeline-btn.primary:hover { background: #fff; color: #1e1b4b; }
 
-/* ── Mobile accordion (≤767px) ── */
+/* ── Filter bar ── */
+.pipeline-filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.875rem;
+  padding: 0.65rem 0.875rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.pipeline-search-input {
+  font-size: 0.82rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  width: 180px;
+  transition: border-color 0.15s;
+}
+.pipeline-search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(99,102,241,0.1);
+  color: #4f46e5;
+  border: 1px solid rgba(99,102,241,0.2);
+  cursor: pointer;
+}
+.filter-chip:hover { background: rgba(99,102,241,0.18); }
+
+/* ── Mobile accordion ── */
 @media (max-width: 767px) {
-  .pipeline-page {
-    height: auto;
-    overflow: visible;
-  }
-  .pipeline-scroll-wrap {
-    overflow: visible;
-    padding: 0;
-  }
-  .pipeline-board {
-    flex-direction: column;
-    width: 100%;
-    height: auto;
-    gap: 0.5rem;
-    padding: 0;
-  }
-  .pipeline-col {
-    width: 100%;
-    flex-shrink: 1;
-    max-height: none;
-  }
-  .pipeline-col-header {
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-  }
+  .pipeline-page { height: auto; overflow: visible; }
+  .pipeline-scroll-wrap { overflow: visible; padding: 0; }
+  .pipeline-board { flex-direction: column; width: 100%; height: auto; gap: 0.5rem; padding: 0; }
+  .pipeline-col { width: 100%; flex-shrink: 1; max-height: none; }
+  .pipeline-col-header { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
   .pipeline-col-header::after {
-    content: '\F282'; /* bi-chevron-down */
+    content: '\F282';
     font-family: 'bootstrap-icons';
     font-size: 0.85rem;
     color: var(--text-muted);
@@ -246,44 +299,73 @@
     margin-left: auto;
     flex-shrink: 0;
   }
-  .pipeline-col.mobile-expanded .pipeline-col-header::after {
-    transform: rotate(180deg);
-  }
-  .pipeline-col-body {
-    display: none;
-    max-height: 60vh;
-  }
-  .pipeline-col.mobile-expanded .pipeline-col-body {
-    display: block;
-  }
-  /* hide desktop drag hint */
-  .pipeline-stat:last-child { display: none; }
+  .pipeline-col.mobile-expanded .pipeline-col-header::after { transform: rotate(180deg); }
+  .pipeline-col-body { display: none; max-height: 60vh; }
+  .pipeline-col.mobile-expanded .pipeline-col-body { display: block; }
+  .pipeline-header-bar { padding: 0.875rem 1rem; }
+  .health-pill { font-size: 0.68rem; }
 }
 </style>
 
-<!-- Page header -->
-<div class="page-header animate-fade-up" style="margin-bottom:0.875rem;">
-  <div>
-    <h1 class="page-title">Pipeline</h1>
-    <div class="page-subtitle">Drag cards between stages to move units through the processing workflow</div>
+{# ── Header bar (dark purple, management feel) ── #}
+<div class="pipeline-header-bar animate-fade-up">
+  <div class="pipeline-header-left">
+    <div class="pipeline-header-title">
+      <i class="bi bi-diagram-3-fill" style="margin-right:0.4rem;opacity:0.8;"></i>
+      Processing Pipeline
+    </div>
+    <div class="pipeline-header-sub">
+      {{ total_in_process }} unit{{ 's' if total_in_process != 1 else '' }} across {{ stages|length }} stage{{ 's' if stages|length != 1 else '' }}
+      &middot; {{ total_unprocessed }} unprocessed
+    </div>
+    <div class="pipeline-health-pills">
+      {% if overdue_count > 0 %}
+      <span class="health-pill overdue">
+        <i class="bi bi-exclamation-triangle-fill" style="font-size:0.65rem;"></i>
+        {{ overdue_count }} overdue
+      </span>
+      {% endif %}
+      {% if at_risk_count > 0 %}
+      <span class="health-pill at-risk">
+        <i class="bi bi-clock-history" style="font-size:0.65rem;"></i>
+        {{ at_risk_count }} at risk
+      </span>
+      {% endif %}
+      {% if on_track_count > 0 %}
+      <span class="health-pill on-track">
+        <i class="bi bi-check-circle" style="font-size:0.65rem;"></i>
+        {{ on_track_count }} on track
+      </span>
+      {% endif %}
+    </div>
   </div>
-  <div class="page-actions">
-    <button class="btn btn-ghost" onclick="location.reload()" title="Refresh board">
-      <i class="bi bi-arrow-clockwise"></i>
+  <div class="pipeline-header-actions">
+    <button class="pipeline-btn" onclick="location.reload()" title="Refresh board">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
     </button>
-    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}" class="btn btn-ghost">
+    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}" class="pipeline-btn">
       <i class="bi bi-box-arrow-in-down"></i> Check In
     </a>
-    <a href="{{ url_for('admin_bp.admin_stages') }}" class="btn btn-ghost" title="Configure stages">
-      <i class="bi bi-sliders"></i> Stages
+    {% if current_user.role in ('admin', 'supervisor') %}
+    <a href="{{ url_for('admin_bp.admin_stages') }}" class="pipeline-btn primary">
+      <i class="bi bi-sliders"></i> Manage Stages
     </a>
+    {% endif %}
   </div>
 </div>
 
-<!-- Filter bar -->
-<div class="animate-fade-up" style="display:flex;gap:0.65rem;align-items:center;flex-wrap:wrap;margin-bottom:0.875rem;padding:0.6rem 0.85rem;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);">
+{# ── Filter bar ── #}
+<div class="pipeline-filter-bar animate-fade-up">
   <i class="bi bi-funnel" style="color:var(--text-muted);font-size:0.85rem;flex-shrink:0;"></i>
-  <select id="filter-team" class="form-select form-select-sm" style="max-width:160px;" onchange="applyPipelineFilters()">
+  <input type="text" id="filter-serial" class="pipeline-search-input"
+         placeholder="Search serial..." oninput="applyPipelineFilters()" autocomplete="off">
+  <select id="filter-tech" class="form-select form-select-sm" style="max-width:165px;" onchange="applyPipelineFilters()">
+    <option value="">All Technicians</option>
+    {% for u in technicians %}
+    <option value="{{ u.username }}">{{ u.username }}</option>
+    {% endfor %}
+  </select>
+  <select id="filter-team" class="form-select form-select-sm" style="max-width:155px;" onchange="applyPipelineFilters()">
     <option value="">All Teams</option>
     {% set _teams_raw = settings.get('processing_teams', 'Tech A, Tech B, Paint, QC') %}
     {% for _tname in _teams_raw.split(',') %}
@@ -291,33 +373,18 @@
       {% if _t %}<option value="{{ _t }}">{{ _t }}</option>{% endif %}
     {% endfor %}
   </select>
-  <select id="filter-tech" class="form-select form-select-sm" style="max-width:160px;" onchange="applyPipelineFilters()">
-    <option value="">All Technicians</option>
-  </select>
-  <button type="button" class="btn btn-ghost btn-sm" onclick="clearPipelineFilters()" id="clear-filters-btn" style="display:none;">
-    <i class="bi bi-x-circle"></i> Clear
+  <button type="button" class="btn btn-ghost btn-sm" onclick="clearPipelineFilters()" id="clear-filters-btn" style="display:none;font-size:0.78rem;">
+    <i class="bi bi-x-circle"></i> Clear all
   </button>
   <span id="filter-count-label" style="font-size:0.78rem;color:var(--text-muted);margin-left:auto;"></span>
 </div>
 
-<!-- Stats strip -->
-<div class="pipeline-stats animate-fade-up">
-  <div class="pipeline-stat"><i class="bi bi-hourglass-split" style="color:var(--color-warning);"></i> <strong>{{ total_in_process }}</strong> in processing</div>
-  <div class="pipeline-stat"><i class="bi bi-inbox" style="color:var(--text-muted);"></i> <strong>{{ total_unprocessed }}</strong> unprocessed</div>
-  <div class="pipeline-stat"><i class="bi bi-columns-gap" style="color:var(--primary);"></i> <strong>{{ stages|length }}</strong> stages configured</div>
-  {% if stages %}
-  <div class="pipeline-stat" style="margin-left:auto;font-size:0.75rem;color:var(--text-muted);">
-    <i class="bi bi-grip-vertical"></i> Drag cards between columns to move stage
-  </div>
-  {% endif %}
-</div>
-
-<!-- ── Board ── -->
+{# ── Board ── #}
 <div class="pipeline-page animate-fade-up">
   <div class="pipeline-scroll-wrap">
     <div class="pipeline-board" id="pipelineBoard">
 
-      <!-- Unassigned column -->
+      {# Unassigned column #}
       {% set unassigned_units = columns[''] %}
       {% set ua_total = unassigned_units|length %}
       {% set ua_init = unassigned_initial %}
@@ -347,7 +414,7 @@
         </div>
       </div>
 
-      <!-- One column per configured stage -->
+      {# One column per configured stage #}
       {% for stage in stages %}
       {% set stage_units = columns[stage.name] %}
       {% set col_init = 20 %}
@@ -355,7 +422,7 @@
         <div class="pipeline-col-header" style="border-top-color:{{ stage.color }};">
           <span style="width:8px;height:8px;border-radius:50%;background:{{ stage.color }};flex-shrink:0;"></span>
           <span class="pipeline-col-title" title="{{ stage.name }}">{{ stage.name }}</span>
-          <span class="pipeline-col-count">{{ stage_units|length }}</span>
+          <span class="pipeline-col-count" style="background:{{ stage.color }}18;color:{{ stage.color }};">{{ stage_units|length }}</span>
         </div>
         <div class="pipeline-col-body" data-stage="{{ stage.name }}" data-sla="{{ stage.sla_hours or 0 }}" id="col-{{ loop.index }}">
           {% if not stage_units %}
@@ -378,9 +445,9 @@
       </div>
       {% endfor %}
 
-    </div><!-- /pipeline-board -->
-  </div><!-- /pipeline-scroll-wrap -->
-</div><!-- /pipeline-page -->
+    </div>{# /pipeline-board #}
+  </div>{# /pipeline-scroll-wrap #}
+</div>{# /pipeline-page #}
 
 {% endblock %}
 
@@ -396,6 +463,7 @@
      data-instance-id="{{ unit.id }}"
      data-team="{{ unit.team_assigned or '' }}"
      data-tech="{{ unit.assigned_user.username if unit.assigned_user else '' }}"
+     data-serial="{{ unit.serial or '' }}"
      style="border-left-color:{{ color }};">
   <a href="{{ url_for('stock_bp.unit_history', serial=unit.serial) }}"
      class="card-serial" onclick="event.stopPropagation();">{{ unit.serial }}</a>
@@ -408,7 +476,7 @@
   <div class="card-footer-row">
     <div class="card-assignee">
       {% if unit.assigned_user %}
-      <div class="assignee-avatar" title="{{ unit.assigned_user.username }}">
+      <div class="assignee-avatar" title="{{ unit.assigned_user.username }}" style="background:{{ color }};">
         {{ unit.assigned_user.username[0] }}
       </div>
       <span>{{ unit.assigned_user.username }}</span>
@@ -420,7 +488,7 @@
       {% endif %}
     </div>
     {% if dur %}
-    <span class="card-dur {% if over_sla %}sla-over{% endif %}" title="{% if over_sla %}⚠ Over SLA{% endif %}">
+    <span class="card-dur {% if over_sla %}sla-over{% endif %}" title="{% if over_sla %}Over SLA{% endif %}">
       {% if over_sla %}<i class="bi bi-exclamation-triangle" style="font-size:0.65rem;"></i>{% else %}<i class="bi bi-clock" style="font-size:0.65rem;"></i>{% endif %}
       {{ dur }}
     </span>
@@ -469,7 +537,6 @@ function onColDragOver(e) {
   e.preventDefault();
   this.classList.add('drag-over');
   e.dataTransfer.dropEffect = 'move';
-  // Insertion hint: place card above the element under cursor
   const afterEl = getDragAfterElement(this, e.clientY);
   if (draggingCard) {
     if (!afterEl) this.appendChild(draggingCard);
@@ -486,10 +553,7 @@ function onColDrop(e) {
   this.classList.remove('drag-over');
   const instanceId = parseInt(e.dataTransfer.getData('text/plain'));
   const toStage = this.dataset.stage;
-
   if (!instanceId) return;
-
-  // Remove empty-state hints if any
   const hint = this.querySelector('.col-empty-hint');
   if (hint) hint.remove();
   if (sourceCol) {
@@ -499,11 +563,7 @@ function onColDrop(e) {
       sourceCol.innerHTML = '<div class="col-empty-hint"><i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:0.4rem;"></i>Drop here</div>';
     }
   }
-
-  // Update the count badges
   updateColCounts();
-
-  // AJAX save
   fetch('{{ url_for("pipeline_bp.pipeline_move") }}', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
@@ -513,17 +573,13 @@ function onColDrop(e) {
   .then(data => {
     if (data.ok) {
       const stageName = toStage || 'Unassigned';
-      showToast(`${data.serial} → ${stageName}`, 'success');
-      // Update the card's border-left colour to match new column
+      showToast(`${data.serial} moved to ${stageName}`, 'success');
       if (draggingCard) {
         const newCol = document.querySelector(`.pipeline-col-body[data-stage="${CSS.escape(toStage)}"]`);
         if (newCol) {
           const colHeader = newCol.closest('.pipeline-col').querySelector('.pipeline-col-header');
           const swatch = colHeader ? colHeader.querySelector('span[style*="border-radius"]') : null;
-          if (swatch) {
-            const newColor = swatch.style.background;
-            draggingCard.style.borderLeftColor = newColor;
-          }
+          if (swatch) draggingCard.style.borderLeftColor = swatch.style.background;
         }
       }
     } else {
@@ -531,10 +587,7 @@ function onColDrop(e) {
       setTimeout(() => location.reload(), 1200);
     }
   })
-  .catch(() => {
-    showToast('Network error — reloading…', 'danger');
-    setTimeout(() => location.reload(), 1200);
-  });
+  .catch(() => { showToast('Network error — reloading…', 'danger'); setTimeout(() => location.reload(), 1200); });
 }
 
 function getDragAfterElement(container, y) {
@@ -550,18 +603,13 @@ function updateColCounts() {
   document.querySelectorAll('.pipeline-col').forEach(col => {
     const body = col.querySelector('.pipeline-col-body');
     const badge = col.querySelector('.pipeline-col-count');
-    if (body && badge) {
-      badge.textContent = body.querySelectorAll('.pipeline-card').length;
-    }
+    if (body && badge) badge.textContent = body.querySelectorAll('.pipeline-card').length;
   });
 }
 
 function loadMoreUnassigned() {
   const btn = document.getElementById('ua-load-more');
-  document.querySelectorAll('.ua-hidden').forEach(wrap => {
-    wrap.style.display = '';
-    wrap.classList.remove('ua-hidden');
-  });
+  document.querySelectorAll('.ua-hidden').forEach(wrap => { wrap.style.display = ''; wrap.classList.remove('ua-hidden'); });
   if (btn) btn.remove();
   updateColCounts();
   setupDrag();
@@ -569,39 +617,20 @@ function loadMoreUnassigned() {
 
 function loadMoreStageCards(btn) {
   const col = btn.closest('.pipeline-col-body');
-  col.querySelectorAll('.stage-card-hidden').forEach(wrap => {
-    wrap.style.display = '';
-    wrap.classList.remove('stage-card-hidden');
-  });
+  col.querySelectorAll('.stage-card-hidden').forEach(wrap => { wrap.style.display = ''; wrap.classList.remove('stage-card-hidden'); });
   btn.remove();
   updateColCounts();
   setupDrag();
 }
 
-// ── Client-side filter bar ──
-function buildTechFilter() {
-  const sel = document.getElementById('filter-tech');
-  const techs = new Set();
-  document.querySelectorAll('.pipeline-card[data-tech]').forEach(c => {
-    const t = c.dataset.tech;
-    if (t) techs.add(t);
-  });
-  const current = sel.value;
-  while (sel.options.length > 1) sel.remove(1);
-  [...techs].sort().forEach(t => {
-    const o = document.createElement('option');
-    o.value = t; o.textContent = t;
-    sel.appendChild(o);
-  });
-  if (current) sel.value = current;
-}
-
+// ── Filter bar ──
 function applyPipelineFilters() {
+  const serial = (document.getElementById('filter-serial')?.value || '').toLowerCase().trim();
   const team = (document.getElementById('filter-team').value || '').toLowerCase();
   const tech = (document.getElementById('filter-tech').value || '').toLowerCase();
   const clearBtn = document.getElementById('clear-filters-btn');
   const label = document.getElementById('filter-count-label');
-  const active = team || tech;
+  const active = serial || team || tech;
   if (clearBtn) clearBtn.style.display = active ? '' : 'none';
 
   let visible = 0, total = 0;
@@ -609,17 +638,21 @@ function applyPipelineFilters() {
     total++;
     const cardTeam = (card.dataset.team || '').toLowerCase();
     const cardTech = (card.dataset.tech || '').toLowerCase();
-    const show = (!team || cardTeam === team) && (!tech || cardTech === tech);
-    // card may be inside a stage-card-wrap or ua-card-wrap
+    const cardSerial = (card.dataset.serial || '').toLowerCase();
+    const show = (!serial || cardSerial.includes(serial)) &&
+                 (!team || cardTeam === team) &&
+                 (!tech || cardTech === tech);
     const wrap = card.closest('.stage-card-wrap, .ua-card-wrap') || card;
     wrap.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  if (label) label.textContent = active ? `${visible} of ${total} cards` : '';
+  if (label) label.textContent = active ? `${visible} of ${total} visible` : '';
   updateColCounts();
 }
 
 function clearPipelineFilters() {
+  const si = document.getElementById('filter-serial');
+  if (si) si.value = '';
   document.getElementById('filter-team').value = '';
   document.getElementById('filter-tech').value = '';
   applyPipelineFilters();
@@ -643,14 +676,10 @@ function touchDragMove(e) {
   const t = e.touches[0];
   _touchClone.style.top = (t.clientY - 20) + 'px';
   _touchClone.style.left = (t.clientX - 20) + 'px';
-  // highlight column under finger
   _touchClone.style.pointerEvents = 'none';
   document.querySelectorAll('.pipeline-col-body').forEach(c => c.classList.remove('drag-over'));
   const el = document.elementFromPoint(t.clientX, t.clientY);
-  if (el) {
-    const col = el.closest('.pipeline-col-body');
-    if (col) col.classList.add('drag-over');
-  }
+  if (el) { const col = el.closest('.pipeline-col-body'); if (col) col.classList.add('drag-over'); }
 }
 
 function touchDragEnd(e) {
@@ -669,10 +698,7 @@ function touchDragEnd(e) {
       body: JSON.stringify({ instance_id: instanceId, to_stage: toStage })
     })
     .then(r => r.json())
-    .then(data => {
-      if (data.ok) location.reload();
-      else showToast('Move failed', 'danger');
-    })
+    .then(data => { if (data.ok) location.reload(); else showToast('Move failed', 'danger'); })
     .catch(() => showToast('Network error', 'danger'));
   }
   _touchCard = null;
@@ -691,7 +717,6 @@ function setupTouchDrag() {
 function setupMobileAccordion() {
   if (window.innerWidth > 767) return;
   document.querySelectorAll('.pipeline-col-header').forEach((header, idx) => {
-    // Expand the first column by default
     if (idx === 0) header.closest('.pipeline-col').classList.add('mobile-expanded');
     header.addEventListener('click', function() {
       const col = this.closest('.pipeline-col');
@@ -703,7 +728,6 @@ function setupMobileAccordion() {
 document.addEventListener('DOMContentLoaded', () => {
   setupDrag();
   setupTouchDrag();
-  buildTechFilter();
   setupMobileAccordion();
 });
 </script>

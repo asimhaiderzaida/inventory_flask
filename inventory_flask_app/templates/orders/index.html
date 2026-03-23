@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Orders</h1>
+    <div class="page-subtitle">Track customer purchase requests</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('orders_bp.export_csv') }}{% if tab != 'all' %}?tab={{ tab }}{% endif %}" class="btn btn-ghost">
+      <i class="bi bi-file-earmark-excel"></i> Export CSV
+    </a>
+    <a href="{{ url_for('orders_bp.new_order') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> New Order
+    </a>
+  </div>
+</div>
+
+<!-- Search + Tabs -->
+<div class="table-card animate-fade-up" style="padding:0.85rem 1rem;margin-bottom:0.75rem;">
+  <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+           placeholder="Search customer or model…" style="max-width:280px;">
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Search</button>
+    {% if q %}<a href="{{ url_for('orders_bp.index', tab=tab) }}" class="btn btn-ghost btn-sm">Clear</a>{% endif %}
+  </form>
+</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+  {% for t, label in [('open','Open'), ('closed','Closed'), ('all','All')] %}
+  <a href="{{ url_for('orders_bp.index', tab=t, q=q) }}"
+     class="btn btn-sm {{ 'btn-primary' if tab == t else 'btn-ghost' }}"
+     style="position:relative;">
+    {{ label }}
+    <span class="badge {{ 'bg-light text-dark' if tab == t else 'bg-secondary' }} ms-1" style="font-size:0.7rem;">{{ counts[t] }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" style="min-width:780px;">
+      <thead>
+        <tr>
+          <th style="font-size:0.78rem;">Customer</th>
+          <th style="font-size:0.78rem;">Model / Description</th>
+          <th style="font-size:0.78rem;text-align:center;">Qty</th>
+          <th style="font-size:0.78rem;">Budget</th>
+          <th style="font-size:0.78rem;">Delivery</th>
+          <th style="font-size:0.78rem;">Deposit</th>
+          <th style="font-size:0.78rem;">Payment</th>
+          <th style="font-size:0.78rem;">Status</th>
+          <th style="font-size:0.78rem;">Created</th>
+          <th style="font-size:0.78rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders.items %}
+        <tr style="cursor:pointer;" onclick="window.location='{{ url_for('orders_bp.detail', order_id=o.id) }}'">
+          <td style="font-size:0.84rem;font-weight:600;">{{ o.customer_name }}</td>
+          <td style="font-size:0.84rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ o.model_description }}">
+            {{ o.model_description }}
+          </td>
+          <td style="font-size:0.84rem;text-align:center;">{{ o.quantity }}</td>
+          <td style="font-size:0.84rem;">
+            {% if o.total_budget %}AED {{ "{:,.0f}".format(o.total_budget) }}
+            {% elif o.expected_price %}AED {{ "{:,.0f}".format(o.expected_price) }}/u
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.84rem;">
+            {% if o.delivery_date %}
+              {% set today = namespace(d=none) %}
+              <span style="{% if o.delivery_date < now_utc.date() and o.status == 'open' %}color:var(--color-danger);font-weight:600;{% endif %}">
+                {{ o.delivery_date.strftime('%d %b %Y') }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.84rem;">
+            {% if o.deposit_amount %}
+              AED {{ "{:,.0f}".format(o.deposit_amount) }}
+              {% if o.deposit_paid %}<i class="bi bi-check-circle-fill text-success ms-1"></i>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:0.84rem;">
+            {% if o.payment_status == 'full' %}<span class="status-pill status-processed">Paid</span>
+            {% elif o.payment_status == 'deposit' %}<span class="status-pill status-under_process">Deposit</span>
+            {% else %}<span class="status-pill status-unprocessed">None</span>{% endif %}
+          </td>
+          <td>
+            {% if o.status == 'open' %}<span class="status-pill status-processed">Open</span>
+            {% else %}<span class="status-pill status-idle">Closed</span>{% endif %}
+          </td>
+          <td style="font-size:0.78rem;color:var(--text-muted);">{{ o.created_at.strftime('%d %b') }}</td>
+          <td onclick="event.stopPropagation()">
+            <a href="{{ url_for('orders_bp.detail', order_id=o.id) }}" class="btn btn-ghost btn-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="10">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-clipboard-x"></i>
+              <p>No {{ tab }} orders found</p>
+              <a href="{{ url_for('orders_bp.new_order') }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i> Create First Order
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if orders.pages > 1 %}
+  <div style="padding:0.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--border);">
+    <div style="font-size:0.82rem;color:var(--text-muted);">
+      Showing {{ ((orders.page-1)*orders.per_page)+1 }}–{{ [orders.page*orders.per_page, orders.total]|min }} of {{ orders.total }}
+    </div>
+    <div style="display:flex;gap:0.25rem;">
+      {% if orders.has_prev %}
+      <a href="{{ url_for('orders_bp.index', tab=tab, q=q, page=orders.prev_num) }}" class="btn btn-ghost btn-sm"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      {% for p in orders.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <a href="{{ url_for('orders_bp.index', tab=tab, q=q, page=p) }}" class="btn btn-ghost btn-sm"
+           style="{{ 'color:var(--primary);font-weight:600;' if p == orders.page else '' }}">{{ p }}</a>
+        {% else %}
+        <span style="padding:0.25rem 0.4rem;color:var(--text-muted);">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if orders.has_next %}
+      <a href="{{ url_for('orders_bp.index', tab=tab, q=q, page=orders.next_num) }}" class="btn btn-ghost btn-sm"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

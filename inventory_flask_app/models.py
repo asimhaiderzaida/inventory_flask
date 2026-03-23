@@ -1,7 +1,7 @@
 # Use the ONE shared SQLAlchemy instance for the whole app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.hybrid import hybrid_property
 from . import db
 class User(db.Model, UserMixin):
@@ -209,6 +209,7 @@ class ProductInstance(db.Model):
     po_id = db.Column(db.Integer, db.ForeignKey('purchase_order.id', ondelete='SET NULL'))
     po = db.relationship('PurchaseOrder', backref='instances')
     is_sold = db.Column(db.Boolean, default=False)
+    shopify_listed = db.Column(db.Boolean, default=False, nullable=False)
     asking_price = db.Column(db.Float, nullable=True)
     entered_stage_at = db.Column(db.DateTime, nullable=True)  # timestamp when current stage began
     tenant_id = db.Column(
@@ -391,6 +392,10 @@ class CustomerOrderTracking(db.Model):
     cancelled_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     reserved_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     delivered_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    was_shopify_listed = db.Column(db.Boolean, default=False, nullable=False)
+    current_stage = db.Column(db.String(100), nullable=True)
+    stage_updated_at = db.Column(db.DateTime, nullable=True)
+    stage_history = db.Column(db.Text, nullable=True)  # JSON array of stage changes
     customer = db.relationship('Customer')
     product_instance = db.relationship('ProductInstance')
     cancelled_by = db.relationship('User', foreign_keys=[cancelled_by_user_id])
@@ -933,3 +938,122 @@ class Notification(db.Model):
 
     def __repr__(self):
         return f"<Notification {self.type} user={self.user_id} read={self.is_read}>"
+
+
+# ─────────────────────────────────────────────────────────────
+# SHOPIFY INTEGRATION MODELS
+# ─────────────────────────────────────────────────────────────
+
+class ShopifyProduct(db.Model):
+    """Maps a PCMart product key (make_model_grade) to Shopify IDs."""
+    __tablename__ = 'shopify_product'
+    id                       = db.Column(db.Integer, primary_key=True)
+    tenant_id                = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
+    product_key              = db.Column(db.String(200))        # e.g. Dell_Latitude_5520_A
+    shopify_product_id       = db.Column(db.String(50))
+    shopify_variant_id       = db.Column(db.String(50))
+    shopify_inventory_item_id= db.Column(db.String(50))
+    shopify_location_id      = db.Column(db.String(50))         # Shopify fulfilment location
+    sync_status              = db.Column(db.String(20), default='synced')
+    sync_error               = db.Column(db.Text, nullable=True)
+    last_synced_at           = db.Column(db.DateTime, nullable=True)
+    created_at               = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    tenant = db.relationship('Tenant', backref='shopify_products')
+
+    __table_args__ = (
+        db.Index('ix_shopify_product_tenant_key', 'tenant_id', 'product_key'),
+    )
+
+    def __repr__(self):
+        return f"<ShopifyProduct {self.product_key} pid={self.shopify_product_id}>"
+
+
+class ShopifySyncLog(db.Model):
+    """Audit log for every Shopify push/pull action."""
+    __tablename__ = 'shopify_sync_log'
+    id         = db.Column(db.Integer, primary_key=True)
+    tenant_id  = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
+    action     = db.Column(db.String(50))       # publish | unpublish | webhook_order | etc.
+    direction  = db.Column(db.String(10))       # push | pull
+    status     = db.Column(db.String(20))       # success | error
+    details    = db.Column(db.Text)
+    shopify_id = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    tenant = db.relationship('Tenant', backref='shopify_sync_logs')
+
+    __table_args__ = (
+        db.Index('ix_shopify_sync_log_tenant', 'tenant_id', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<ShopifySyncLog {self.action} {self.status}>"
+
+
+class ShopifyOrder(db.Model):
+    """A Shopify order received via webhook, pending review by staff."""
+    __tablename__ = 'shopify_order'
+    id                   = db.Column(db.Integer, primary_key=True)
+    tenant_id            = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
+    shopify_order_id     = db.Column(db.String(50), unique=True, nullable=False)
+    shopify_order_number = db.Column(db.String(50))
+    customer_id          = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='SET NULL'), nullable=True)
+    # draft | confirmed | rejected | cancelled
+    status               = db.Column(db.String(20), default='draft')
+    total_price          = db.Column(db.Numeric(10, 2))
+    currency             = db.Column(db.String(10))
+    payment_method       = db.Column(db.String(50))
+    shopify_data         = db.Column(db.Text)   # full JSON from Shopify
+    order_id             = db.Column(db.Integer, db.ForeignKey('order.id', ondelete='SET NULL'), nullable=True)
+    created_at           = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    processed_at         = db.Column(db.DateTime, nullable=True)
+    processed_by         = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+
+    tenant     = db.relationship('Tenant',   backref='shopify_orders')
+    customer   = db.relationship('Customer', backref='shopify_orders')
+    order      = db.relationship('Order',    backref='shopify_order', uselist=False)
+    processor  = db.relationship('User',     foreign_keys=[processed_by], backref='shopify_orders_processed')
+
+    __table_args__ = (
+        db.Index('ix_shopify_order_tenant_status', 'tenant_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<ShopifyOrder #{self.shopify_order_number} status={self.status}>"
+
+
+class CustomerOrder(db.Model):
+    """Customer purchase order — tracks what a customer wants to buy."""
+    __tablename__ = 'customer_order'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    tenant_id       = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'),
+                                nullable=False, index=True)
+    customer_id     = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='SET NULL'),
+                                nullable=True)
+    customer_name   = db.Column(db.String(120), nullable=False)
+    model_description = db.Column(db.String(255), nullable=False)
+    quantity        = db.Column(db.Integer, default=1, nullable=False)
+    expected_price  = db.Column(db.Numeric(10, 2), nullable=True)
+    total_budget    = db.Column(db.Numeric(10, 2), nullable=True)
+    delivery_date   = db.Column(db.Date, nullable=True)
+    deposit_amount  = db.Column(db.Numeric(10, 2), nullable=True)
+    deposit_paid    = db.Column(db.Boolean, default=False, nullable=False)
+    payment_status  = db.Column(db.String(20), default='none', nullable=False)
+    status          = db.Column(db.String(20), default='open', nullable=False, index=True)
+    notes           = db.Column(db.Text, nullable=True)
+    created_by      = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'),
+                                nullable=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    closed_at       = db.Column(db.DateTime, nullable=True)
+
+    customer = db.relationship('Customer', backref='purchase_orders', lazy='select')
+    creator  = db.relationship('User',     backref='created_purchase_orders', lazy='select')
+
+    __table_args__ = (
+        db.Index('ix_customer_order_tenant_status', 'tenant_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<CustomerOrder {self.id} {self.customer_name!r} status={self.status}>"

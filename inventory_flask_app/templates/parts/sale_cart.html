@@ -589,6 +589,9 @@ function updateRowTotal(rowIdx) {
   var price = parseFloat((document.getElementById('price-' + rowIdx) || {}).value) || 0;
   var cell  = document.getElementById('rowtotal-' + rowIdx);
   if (cell) cell.textContent = SALE_CURRENCY + ' ' + (qty * price).toFixed(2);
+  /* Clear error highlight once a valid price is entered */
+  var priceInp = document.getElementById('price-' + rowIdx);
+  if (priceInp && price > 0) priceInp.style.borderColor = '';
   updateCartTotals();
 }
 
@@ -698,14 +701,28 @@ document.addEventListener('DOMContentLoaded', function() {
   /* Initial totals */
   updateCartTotals();
 
-  /* Form submit — show spinner */
+  /* Form submit — validate then show spinner */
   var form = document.getElementById('saleForm');
   if (form) {
-    form.addEventListener('submit', function() {
+    form.addEventListener('submit', function(e) {
       var cid = document.getElementById('customerIdInput').value;
-      if (!cid) { showToast('Please select a customer.', 'warning'); return false; }
+      if (!cid) { e.preventDefault(); showToast('Please select a customer.', 'warning'); return; }
       var hasItem = document.querySelectorAll('#partsList tr[data-row-idx]').length > 0;
-      if (!hasItem) { showToast('Add at least one part.', 'warning'); return false; }
+      if (!hasItem) { e.preventDefault(); showToast('Add at least one part.', 'warning'); return; }
+      /* Zero-price check */
+      var badInputs = [];
+      document.querySelectorAll('#partsList .price-input').forEach(function(inp) {
+        if (!(parseFloat(inp.value) > 0)) {
+          inp.style.borderColor = '#ef4444';
+          badInputs.push(inp);
+        }
+      });
+      if (badInputs.length > 0) {
+        e.preventDefault();
+        showToast('Please enter a price for all items.', 'warning');
+        badInputs[0].focus();
+        return;
+      }
       document.getElementById('saleLoadingSpinner').style.display = 'block';
       setButtonLoading(document.getElementById('confirmSaleBtn'), true);
     });

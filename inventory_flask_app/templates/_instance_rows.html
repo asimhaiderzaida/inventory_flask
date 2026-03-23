@@ -55,5 +55,12 @@
         </td>
       {% endif %}
     {% endfor %}
+    {% if settings.enable_shopify_sync == 'true' %}
+    <td class="text-center">
+      {% if i.shopify_listed %}
+        <span title="Listed on Shopify" style="color:#96bf48"><i class="bi bi-bag-check-fill"></i></span>
+      {% endif %}
+    </td>
+    {% endif %}
   </tr>
 {% endfor %}

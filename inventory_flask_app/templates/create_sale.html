@@ -583,6 +583,9 @@ function updateProductTable() {
 /* ── Price update (no full re-render — preserves focus) ── */
 function updatePrice(i, v) {
   products[i].price_at_sale = parseFloat(v) || 0;
+  /* Clear error highlight once a valid price is entered */
+  var inputs = document.querySelectorAll('.unit-price-input');
+  if (inputs[i] && products[i].price_at_sale > 0) inputs[i].style.borderColor = '';
   updateSaleTotals();
 }
 
@@ -795,6 +798,19 @@ document.addEventListener('DOMContentLoaded', function() {
     var customerId = document.getElementById('customerIdInput').value;
     if (!customerId) { showToast('Select a customer.', 'warning'); return; }
     if (products.length === 0) { showToast('Add at least one product.', 'warning'); return; }
+
+    /* Zero-price check: highlight inputs and block submit */
+    var zeroPriceFound = false;
+    document.querySelectorAll('.unit-price-input').forEach(function(inp, idx) {
+      if (!(parseFloat(inp.value) > 0)) {
+        inp.style.borderColor = '#ef4444';
+        zeroPriceFound = true;
+      }
+    });
+    if (zeroPriceFound) {
+      showToast('Please set a price for all units before confirming.', 'warning');
+      return;
+    }
 
     var paymentMethod = document.getElementById('payment_method_input').value || 'cash';
     var vatApplied    = document.getElementById('vatToggle') ? document.getElementById('vatToggle').checked : true;

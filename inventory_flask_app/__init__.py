@@ -57,6 +57,14 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_HTTPONLY'] = True
 
+    # Shopify Integration
+    app.config['SHOPIFY_CLIENT_ID']      = os.environ.get('SHOPIFY_CLIENT_ID', '')
+    app.config['SHOPIFY_CLIENT_SECRET']  = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
+    app.config['SHOPIFY_API_VERSION']    = os.environ.get('SHOPIFY_API_VERSION', '2024-01')
+    app.config['SHOPIFY_WEBHOOK_SECRET'] = os.environ.get('SHOPIFY_WEBHOOK_SECRET', '')
+    app.config['SHOPIFY_STORE_URL']      = os.environ.get('SHOPIFY_STORE_URL', '')
+    app.config['SHOPIFY_REDIRECT_URI']   = os.environ.get('SHOPIFY_REDIRECT_URI', '')
+
     # Flask-Mail
     app.config['MAIL_SERVER']         = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
     app.config['MAIL_PORT']           = int(os.getenv('MAIL_PORT', 587))
@@ -100,7 +108,8 @@ def create_app():
         auth, dashboard, instances, stock, vendors, customers,
         order_tracking_routes, sales, invoices, import_excel,
         exports, parts, returns, reports, admin,
-        pipeline, scanner, accounting, notifications
+        pipeline, scanner, accounting, notifications, shopify_routes,
+        orders,
     )
 
     app.register_blueprint(auth.auth_bp)
@@ -122,6 +131,8 @@ def create_app():
     app.register_blueprint(admin.admin_bp)
     app.register_blueprint(accounting.accounting_bp)
     app.register_blueprint(notifications.notifications_bp)
+    app.register_blueprint(shopify_routes.shopify_bp)
+    app.register_blueprint(orders.orders_bp)
 
     # Jinja globals
     from .utils.utils import get_instance_id, get_now_for_tenant, format_duration, calc_duration_minutes

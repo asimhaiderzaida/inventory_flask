@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block page_title %}Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Order #{{ order.id }}</h1>
+    <div class="page-subtitle">
+      {{ order.customer_name }}
+      {% if order.status == 'open' %}
+        <span class="status-pill status-processed ms-2">Open</span>
+      {% else %}
+        <span class="status-pill status-idle ms-2">Closed</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('orders_bp.index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> All Orders
+    </a>
+    {% if order.status == 'open' %}
+    <form method="post" action="{{ url_for('orders_bp.close_order', order_id=order.id) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost"
+              onclick="return confirm('Close this order?')">
+        <i class="bi bi-check2-circle"></i> Close Order
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('orders_bp.reopen_order', order_id=order.id) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost">
+        <i class="bi bi-arrow-counterclockwise"></i> Reopen
+      </button>
+    </form>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <form method="post" action="{{ url_for('orders_bp.delete_order', order_id=order.id) }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost"
+              style="color:var(--color-danger);"
+              onclick="return confirm('Permanently delete this order?')">
+        <i class="bi bi-trash"></i> Delete
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 animate-fade-up">
+  <!-- Main details -->
+  <div class="col-lg-7">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3" style="font-size:0.84rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">
+        Order Details
+      </h6>
+      <table class="table table-sm mb-0" style="font-size:0.84rem;">
+        <tbody>
+          <tr>
+            <td style="width:38%;color:var(--text-muted);font-weight:600;">Customer</td>
+            <td>{{ order.customer_name }}
+              {% if order.customer %}
+                <a href="{{ url_for('customers_bp.customer_profile', customer_id=order.customer_id) }}"
+                   class="ms-1" style="font-size:0.78rem;">(profile)</a>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Model / Description</td>
+            <td style="font-weight:600;">{{ order.model_description }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Quantity</td>
+            <td>{{ order.quantity }} unit{{ 's' if order.quantity != 1 else '' }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Price per Unit</td>
+            <td>{% if order.expected_price %}AED {{ "{:,.0f}".format(order.expected_price) }}{% else %}—{% endif %}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Total Budget</td>
+            <td style="font-weight:700;color:var(--primary);">
+              {% if order.total_budget %}AED {{ "{:,.0f}".format(order.total_budget) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Delivery Date</td>
+            <td>
+              {% if order.delivery_date %}
+                <span style="{% if order.delivery_date < now_utc.date() and order.status == 'open' %}color:var(--color-danger);font-weight:600;{% endif %}">
+                  {{ order.delivery_date.strftime('%d %B %Y') }}
+                </span>
+                {% if order.delivery_date < now_utc.date() and order.status == 'open' %}
+                  <span style="font-size:0.75rem;color:var(--color-danger);"> ⚠ Overdue</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Payment + Status -->
+  <div class="col-lg-5">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3" style="font-size:0.84rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">
+        Payment
+      </h6>
+      <table class="table table-sm mb-0" style="font-size:0.84rem;">
+        <tbody>
+          <tr>
+            <td style="width:50%;color:var(--text-muted);font-weight:600;">Payment Status</td>
+            <td>
+              {% if order.payment_status == 'full' %}<span class="status-pill status-processed">Fully Paid</span>
+              {% elif order.payment_status == 'deposit' %}<span class="status-pill status-under_process">Deposit Taken</span>
+              {% else %}<span class="status-pill status-unprocessed">None</span>{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Deposit Amount</td>
+            <td>{% if order.deposit_amount %}AED {{ "{:,.0f}".format(order.deposit_amount) }}{% else %}—{% endif %}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Deposit Paid</td>
+            <td>
+              {% if order.deposit_paid %}
+                <i class="bi bi-check-circle-fill text-success"></i> Yes
+              {% else %}
+                <span style="color:var(--text-muted);">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Created</td>
+            <td>{{ order.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          </tr>
+          {% if order.creator %}
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Created By</td>
+            <td>{{ order.creator.username }}</td>
+          </tr>
+          {% endif %}
+          {% if order.closed_at %}
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">Closed At</td>
+            <td>{{ order.closed_at.strftime('%d %b %Y %H:%M') }}</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if order.notes %}
+<div class="table-card p-4 animate-fade-up" style="margin-top:0.75rem;">
+  <h6 class="fw-semibold mb-2" style="font-size:0.84rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Notes</h6>
+  <p style="font-size:0.84rem;white-space:pre-wrap;margin:0;">{{ order.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}

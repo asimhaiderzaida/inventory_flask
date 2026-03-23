@@ -1134,7 +1134,7 @@
             'scanner_bp.scan_unit','scanner_bp.scan_move') %}
       {% set is_processing = ep in ('stock_bp.process_stage_update','pipeline_bp.pipeline','stock_bp.view_edit_instance') %}
       {% set is_returns     = ep.startswith('returns_bp') %}
-      {% set is_sales      = ep.startswith('sales_bp') or ep.startswith('order_bp') or ep.startswith('invoices_bp') %}
+      {% set is_sales      = ep.startswith('sales_bp') or ep.startswith('order_bp') or ep.startswith('invoices_bp') or ep.startswith('orders_bp') %}
       {% set is_people     = ep.startswith('customers_bp') or ep.startswith('vendors_bp') %}
       {% set is_reports    = ep.startswith('reports_bp') %}
       {% set is_admin      = ep.startswith('admin_bp') or ep == 'auth.register_user' or ep == 'stock_bp.bulk_price_editor' %}
@@ -1273,11 +1273,6 @@
             <i class="bi bi-cash-coin nav-icon"></i>
             <span class="sidebar-label">Create Sale</span>
           </a>
-          <a href="{{ url_for('sales_bp.sold_units_view') }}"
-             class="sidebar-link {% if ep == 'sales_bp.sold_units_view' %}active{% endif %}">
-            <i class="bi bi-receipt nav-icon"></i>
-            <span class="sidebar-label">Sold Items</span>
-          </a>
           {% if settings.enable_parts_module != 'false' %}
           <a href="{{ url_for('parts_bp.sales_list') }}"
              class="sidebar-link {% if ep in ['parts_bp.sales_list', 'parts_bp.sell', 'parts_bp.sale_customer', 'parts_bp.sale_invoice_type', 'parts_bp.sale_payment', 'parts_bp.sale_detail'] %}active{% endif %}">
@@ -1285,6 +1280,11 @@
             <span class="sidebar-label">Parts Sales</span>
           </a>
           {% endif %}
+          <a href="{{ url_for('orders_bp.index') }}"
+             class="sidebar-link {% if ep.startswith('orders_bp') %}active{% endif %}">
+            <i class="bi bi-clipboard-check nav-icon"></i>
+            <span class="sidebar-label">Orders</span>
+          </a>
           {% if settings.enable_order_module != 'false' %}
           <a href="{{ url_for('order_bp.reserve_product') }}"
              class="sidebar-link {% if ep == 'order_bp.reserve_product' %}active{% endif %}">
@@ -1294,9 +1294,14 @@
           <a href="{{ url_for('order_bp.customer_orders') }}"
              class="sidebar-link {% if ep == 'order_bp.customer_orders' %}active{% endif %}">
             <i class="bi bi-card-list nav-icon"></i>
-            <span class="sidebar-label">Customer Orders</span>
+            <span class="sidebar-label">Order Tracker</span>
           </a>
           {% endif %}
+          <a href="{{ url_for('sales_bp.sold_units_view') }}"
+             class="sidebar-link {% if ep == 'sales_bp.sold_units_view' %}active{% endif %}">
+            <i class="bi bi-receipt nav-icon"></i>
+            <span class="sidebar-label">Sold Items</span>
+          </a>
         </div>
 
         <!-- ── RETURNS ─────────────────────────────────────── -->
@@ -1504,6 +1509,40 @@
           </a>
         </div>
         {% endif %}
+
+        <!-- ── INTEGRATIONS ──────────────────────────────────── -->
+        {% set is_shopify = ep.startswith('shopify_bp') %}
+        <div class="nav-group-header {% if is_shopify %}active-group{% endif %}">
+          <a href="{{ url_for('shopify_bp.dashboard') }}"
+             class="nav-group-link {% if is_shopify %}active{% endif %}">
+            <i class="bi bi-bag-check nav-group-icon" style="color:#96bf48"></i>
+            <span class="sidebar-label">Shopify</span>
+          </a>
+          <button class="nav-group-toggle"
+                  data-target="shopify-body"
+                  data-auto-expand="{{ 'true' if is_shopify else 'false' }}"
+                  aria-expanded="false"
+                  title="Expand Shopify">
+            <i class="bi bi-chevron-right sidebar-chevron"></i>
+          </button>
+        </div>
+        <div class="collapse-section collapsed" id="shopify-body">
+          <a href="{{ url_for('shopify_bp.dashboard') }}"
+             class="sidebar-link {% if ep == 'shopify_bp.dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2 nav-icon"></i>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+          <a href="{{ url_for('shopify_bp.listings') }}"
+             class="sidebar-link {% if ep == 'shopify_bp.listings' %}active{% endif %}">
+            <i class="bi bi-bag-check nav-icon"></i>
+            <span class="sidebar-label">Listings</span>
+          </a>
+          <a href="{{ url_for('shopify_bp.orders_list') }}"
+             class="sidebar-link {% if ep == 'shopify_bp.orders_list' %}active{% endif %}">
+            <i class="bi bi-list-ul nav-icon"></i>
+            <span class="sidebar-label">Orders</span>
+          </a>
+        </div>
 
         <!-- ── ADMIN ───────────────────────────────────────── -->
         {% if current_user.role == 'admin' %}

@@ -63,6 +63,20 @@
   {% endfor %}
 </div>
 
+<!-- Stage filter (only meaningful for reserved tab) -->
+{% if active_status == 'reserved' %}
+<div class="animate-fade-up" style="margin-bottom:0.75rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+  <span style="font-size:0.78rem;color:var(--text-muted);font-weight:600;margin-right:0.25rem;">Stage:</span>
+  {% for key, label in [('', 'All'), ('awaiting', 'Awaiting Processing'), ('processing', 'In Processing')] %}
+  <a href="{{ url_for('order_bp.customer_orders', status=active_status, customer_id=selected_customer_id or '', stage_filter=key) }}"
+     style="font-size:0.78rem;padding:0.2rem 0.7rem;border-radius:20px;text-decoration:none;font-weight:500;
+            {% if stage_filter == key %}background:var(--primary);color:#fff;{% else %}background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Batch action buttons -->
 <div class="d-flex flex-wrap gap-2 mb-3 animate-fade-up">
   <button id="batch-move-btn" class="btn btn-ghost">
@@ -102,6 +116,7 @@
           <th>Location</th>
           <th>Status</th>
           <th>Stage / Team</th>
+          <th>Current Stage</th>
           <th>Reserved</th>
           <th>Event</th>
           <th>Actions</th>
@@ -159,6 +174,24 @@
             {% if order.process_stage %}<div>{{ order.process_stage }}</div>{% endif %}
             {% if order.team_assigned %}<div style="color:var(--text-muted);font-size:0.75rem;">{{ order.team_assigned }}</div>{% endif %}
             {% if not order.process_stage and not order.team_assigned %}—{% endif %}
+          </td>
+
+          {# Current Stage — synced from technician workflow #}
+          <td style="font-size:0.8rem;">
+            {% if order.current_stage %}
+              {% set sc = stage_colors.get(order.current_stage, '#6b7280') %}
+              <span style="display:inline-block;padding:0.15rem 0.55rem;border-radius:20px;font-size:0.74rem;font-weight:600;
+                           background:{{ sc }}22;color:{{ sc }};border:1px solid {{ sc }}44;">
+                {{ order.current_stage }}
+              </span>
+              {% if order.stage_updated_at %}
+              <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">
+                {{ order.stage_updated_at.strftime('%d %b %H:%M') }}
+              </div>
+              {% endif %}
+            {% else %}
+              <span style="font-size:0.74rem;color:var(--text-muted);font-style:italic;">Awaiting Processing</span>
+            {% endif %}
           </td>
 
           {# Reserved — date + who #}

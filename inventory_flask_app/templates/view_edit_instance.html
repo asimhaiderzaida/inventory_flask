@@ -9,6 +9,27 @@
     <div class="page-subtitle">{{ instance.product.model | nonan if instance.product else 'Unknown' }} &mdash; {{ instance.serial }}</div>
   </div>
   <div class="page-actions">
+    {% if active_reservation %}
+      <span class="badge" style="background:rgba(245,158,11,0.15);color:#d97706;border:1px solid rgba(245,158,11,0.3);">
+        <i class="bi bi-bag-check me-1"></i>Reserved
+        {% if active_reservation.customer %}&mdash; {{ active_reservation.customer.name }}{% endif %}
+      </span>
+    {% elif settings.enable_shopify_sync == 'true' and instance.asking_price and not instance.is_sold %}
+      {% if instance.shopify_listed %}
+        <span class="badge" style="background:rgba(150,191,72,0.15);color:#96bf48;border:1px solid rgba(150,191,72,0.3);">
+          <i class="bi bi-bag-check me-1"></i>Listed on Shopify
+        </span>
+        <button class="btn btn-outline-warning btn-sm" id="btnUnpublish"
+                onclick="shopifyAction('unpublish')">
+          <i class="bi bi-cloud-minus me-1"></i>Unpublish
+        </button>
+      {% else %}
+        <button class="btn btn-sm" style="background:#96bf48;color:#fff;border:none;" id="btnPublish"
+                onclick="shopifyAction('publish')">
+          <i class="bi bi-bag-plus me-1"></i>Publish to Shopify
+        </button>
+      {% endif %}
+    {% endif %}
     <a href="{{ url_for('stock_bp.unit_detail', instance_id=instance.id) }}" class="btn btn-ghost">
       <i class="bi bi-clock-history"></i> View History
     </a>
@@ -111,6 +132,21 @@
               Select a location first to see available bins.
               <a href="#" id="bin-manage-link" style="display:none;">Manage bins</a>
             </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Asking Price (AED)</label>
+            <div class="input-group">
+              <span class="input-group-text">AED</span>
+              <input type="number"
+                     name="asking_price"
+                     class="form-control"
+                     step="0.01"
+                     min="0"
+                     value="{{ instance.asking_price or '' }}"
+                     placeholder="Set selling price...">
+            </div>
+            <div class="form-text">This price will be used when publishing to Shopify</div>
           </div>
 
           {% if custom_fields %}
@@ -364,5 +400,23 @@
   if (currentLocId) loadBins(currentLocId, currentBin);
   locSelect.addEventListener('change', function () { loadBins(this.value, ''); });
 }());
+
+// Shopify publish/unpublish
+function shopifyAction(action) {
+  const btn = document.getElementById(action === 'publish' ? 'btnPublish' : 'btnUnpublish');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  fetch(`/shopify/${action}/{{ instance.id }}`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+  })
+  .then(r => r.json())
+  .then(d => {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) setTimeout(() => location.reload(), 1200);
+    else if (btn) { btn.disabled = false; btn.innerHTML = action === 'publish' ? '<i class="bi bi-bag-plus me-1"></i>Publish to Shopify' : '<i class="bi bi-cloud-minus me-1"></i>Unpublish'; }
+  })
+  .catch(() => { showToast('Request failed', 'danger'); if (btn) btn.disabled = false; });
+}
 </script>
 {% endblock %}

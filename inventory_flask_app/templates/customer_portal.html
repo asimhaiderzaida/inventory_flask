@@ -452,9 +452,15 @@
     {% set pi   = t.product_instance %}
     {% set prod = pi.product if pi else None %}
 
-    {# Stepper: 0=Reserved, 1=Processing, 2=Ready for Pickup, 3=Collected #}
-    {% set step_map = {'reserved': 0, 'pending': 1, 'delivered': 2, 'sold': 3} %}
-    {% set current_step = step_map.get(t.status, 0) %}
+    {# Stepper: 0=Reserved, 1=Processing, 2=Ready for Pickup, 3=Collected
+       Advance to step 1 (Processing) if current_stage is set, even while status=reserved #}
+    {% if t.status == 'delivered' %}
+      {% set current_step = 2 %}
+    {% elif t.current_stage %}
+      {% set current_step = 1 %}
+    {% else %}
+      {% set current_step = 0 %}
+    {% endif %}
 
     <div class="tracking-item">
       <div class="tracking-item-header">
@@ -473,25 +479,26 @@
         <span class="pill pill-success" style="background:#d1fae5;color:#065f46;">
           <i class="bi bi-bag-check-fill"></i> Ready for Pickup
         </span>
-        {% elif t.status == 'reserved' %}
-        <span class="pill pill-reserved">
-          <i class="bi bi-bookmark-fill"></i> Reserved
-        </span>
-        {% elif t.status == 'pending' %}
-        <span class="pill pill-pending">
-          <i class="bi bi-hourglass-split"></i> Pending
+        {% elif t.current_stage %}
+        <span class="pill pill-processing">
+          <i class="bi bi-tools"></i> {{ t.current_stage }}
         </span>
         {% else %}
-        <span class="pill" style="background:var(--surface-2);color:var(--text-muted);">
-          <i class="bi bi-tools"></i> {{ t.status|title }}
+        <span class="pill pill-reserved">
+          <i class="bi bi-bookmark-fill"></i> Reserved
         </span>
         {% endif %}
       </div>
 
       <!-- Progress stepper -->
       <div class="stepper">
-        {% set steps = [('Reserved','bi-bookmark'), ('Processing','bi-tools'), ('Ready','bi-box-seam'), ('Delivered','bi-check2-circle')] %}
-        {% for label, icon in steps %}
+        {% set step_labels = [
+          ('Reserved',        'bi-bookmark'),
+          (t.current_stage or 'Processing', 'bi-tools'),
+          ('Ready for Pickup','bi-box-seam'),
+          ('Delivered',       'bi-check2-circle'),
+        ] %}
+        {% for label, icon in step_labels %}
           {% set idx = loop.index0 %}
           <div class="stepper-step {% if idx < current_step %}done{% elif idx == current_step %}active{% endif %}">
             <div class="stepper-dot">
@@ -502,12 +509,31 @@
         {% endfor %}
       </div>
 
-      <div class="tracking-meta">
-        {% if t.process_stage %}
-        <span class="pill pill-processing">
-          <i class="bi bi-tools"></i> {{ t.process_stage }}
-        </span>
-        {% endif %}
+      <!-- Current stage callout -->
+      {% if t.current_stage %}
+      <div style="margin:0.6rem 1rem 0;padding:0.55rem 0.75rem;background:#f0f7ff;border-radius:8px;border-left:3px solid var(--primary);font-size:0.82rem;color:var(--text-primary);">
+        <i class="bi bi-tools" style="color:var(--primary);margin-right:0.35rem;"></i>
+        Your unit is currently in: <strong>{{ t.current_stage }}</strong>
+      </div>
+      {% endif %}
+
+      <!-- Stage history timeline -->
+      {% if t.stage_history %}
+      {% set history = t.stage_history | tojson | safe %}
+      <div style="margin:0.75rem 1rem 0;">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;">Progress Timeline</div>
+        <div style="border-left:2px solid var(--border);padding-left:0.75rem;display:flex;flex-direction:column;gap:0.35rem;">
+          {% for entry in t.stage_history | fromjson %}
+          <div style="font-size:0.78rem;color:var(--text-secondary);">
+            <span style="color:var(--text-muted);margin-right:0.4rem;">{{ entry.updated_at[:10] }}</span>
+            <span style="font-weight:600;color:var(--text-primary);">{{ entry.stage }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="tracking-meta" style="margin-top:0.6rem;">
         <span class="tracking-date">
           <i class="bi bi-calendar3"></i>
           Since {{ t.reserved_date.strftime('%d %b %Y') if t.reserved_date else '—' }}

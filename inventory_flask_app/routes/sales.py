@@ -118,6 +118,13 @@ def confirm_sale():
         if not instances:
             return jsonify({"error": "Invalid data. Please try again."})
 
+        # Server-side: reject if any unit has price <= 0
+        for item in scanned_sale:
+            serial = item.get("serial", "")
+            price = float(request.form.get(f"price_{serial}", 0) or 0)
+            if price <= 0:
+                return jsonify({"success": False, "error": "All units must have a price greater than 0"})
+
         now = get_now_for_tenant()
         order_number = f"ORD-{now.strftime('%Y%m%d%H%M%S')}"
         new_order = Order(
