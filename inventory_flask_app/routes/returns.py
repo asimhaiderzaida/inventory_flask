@@ -209,7 +209,9 @@ def create_return(instance_id):
 
     # Resolve sale/invoice context from optional query param
     sale_id = request.args.get('sale_id', type=int)
-    sale = SaleTransaction.query.get(sale_id) if sale_id else None
+    sale = db.session.get(SaleTransaction, sale_id) if sale_id else None
+    if sale and sale.tenant_id != current_user.tenant_id:
+        sale = None
     if not sale:
         sale = (
             SaleTransaction.query
@@ -217,7 +219,7 @@ def create_return(instance_id):
             .order_by(SaleTransaction.id.desc())
             .first()
         )
-    invoice = Invoice.query.get(sale.invoice_id) if (sale and sale.invoice_id) else None
+    invoice = db.session.get(Invoice, sale.invoice_id) if (sale and sale.invoice_id) else None
 
     if request.method == 'POST':
         reason = request.form.get('reason', '').strip()
@@ -453,7 +455,7 @@ def create_part_return():
     sale_item_id = request.args.get('sale_item_id', type=int) or request.form.get('sale_item_id', type=int)
 
     part = Part.query.filter_by(id=part_id, tenant_id=tid).first_or_404()
-    sale_item = PartSaleItem.query.get(sale_item_id) if sale_item_id else None
+    sale_item = db.session.get(PartSaleItem, sale_item_id) if sale_item_id else None
     locations = Location.query.filter_by(tenant_id=tid).order_by(Location.name).all()
 
     if request.method == 'POST':

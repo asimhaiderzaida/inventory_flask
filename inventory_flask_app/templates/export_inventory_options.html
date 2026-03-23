@@ -18,7 +18,7 @@
 <div class="animate-fade-up" style="max-width:520px;">
   <div class="card">
     <div class="card-body" style="padding:1.75rem;">
-      <form method="POST" action="/inventory/export_excel">
+      <form method="POST" action="{{ url_for('exports_bp.inventory_export') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
           <label class="form-label">Filter by Model</label>

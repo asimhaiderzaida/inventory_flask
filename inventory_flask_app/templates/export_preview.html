@@ -13,7 +13,7 @@
       <i class="bi bi-arrow-left"></i> Back to Filters
     </a>
     {% if products and products|length > 0 %}
-    <form method="POST" action="/inventory/export" style="display:inline;">
+    <form method="POST" action="{{ url_for('exports_bp.inventory_export') }}" style="display:inline;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="download">
       <input type="hidden" name="model" value="{{ filters.model }}">

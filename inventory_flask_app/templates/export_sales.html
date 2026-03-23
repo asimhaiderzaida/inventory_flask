@@ -21,7 +21,7 @@
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
         Includes Serial, Asset, Product details, and more. Use filters to refine the export.
       </p>
-      <form action="/sales/export" method="GET">
+      <form action="{{ url_for('sales_bp.export_sold_units') }}" method="GET">
         <div class="mb-3">
           <label class="form-label">Filter by Customer</label>
           <select name="customer_id" class="form-select">

@@ -98,7 +98,7 @@
 
         {# Age in stock #}
         {% if instance.created_at %}
-        {% set age_days = ((now_utc() - instance.created_at).days) if now_utc is defined else none %}
+        {% set age_days = ((now_utc - instance.created_at).days) if now_utc is defined else none %}
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;">
           <span style="font-size:0.78rem;color:var(--text-muted);">Received</span>
           <span style="font-size:0.82rem;color:var(--text-secondary);" title="{{ instance.created_at.strftime('%Y-%m-%d %H:%M') }}">

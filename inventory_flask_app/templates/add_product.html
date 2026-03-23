@@ -18,7 +18,7 @@
 <div class="animate-fade-up" style="max-width:640px;">
   <div class="card">
     <div class="card-body" style="padding:1.75rem;">
-      <form method="POST" action="/stock/products/add" class="row g-3">
+      <form method="POST" action="{{ url_for('stock_bp.add_product_page') }}" class="row g-3">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="col-md-6">
           <label class="form-label">Product Name</label>

@@ -381,7 +381,7 @@
                 </td>
                 <td>
                   {% if m.instance %}
-                  <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=m.instance_id) }}"
+                  <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=m.instance_id) }}"
                      style="color:var(--primary);font-family:monospace;font-size:0.78rem;">
                     {{ m.instance.serial or m.instance.asset or m.instance_id }}
                   </a>
@@ -575,7 +575,7 @@
                 </td>
                 <td>
                   {% if u.instance %}
-                  <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=u.instance.id) }}"
+                  <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=u.instance.id) }}"
                      style="color:var(--primary);font-family:monospace;font-size:0.83rem;">
                     {{ u.instance.serial or u.instance.asset or ('ID:' + u.instance.id|string) }}
                   </a>

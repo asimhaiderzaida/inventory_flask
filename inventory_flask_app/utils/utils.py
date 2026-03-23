@@ -14,6 +14,12 @@ def is_module_enabled(module_key):
     Args:
         module_key: e.g. 'enable_parts_module', 'enable_order_module', etc.
     """
+    from flask import g
+    # Use request-cached settings when available (avoids extra DB hit)
+    cached = getattr(g, '_tenant_settings', None)
+    if cached is not None:
+        val = cached.get(module_key)
+        return val is None or val == 'true'
     from inventory_flask_app.models import TenantSettings
     setting = TenantSettings.query.filter_by(
         tenant_id=current_user.tenant_id, key=module_key
@@ -243,6 +249,38 @@ def calc_duration_minutes(since_dt):
         since_naive = since_dt
     delta = now - since_naive
     return max(0, int(delta.total_seconds() / 60))
+
+
+def sync_reservation_stage(instance_id, new_stage, username):
+    """Update CustomerOrderTracking stage fields when a unit's process_stage changes.
+
+    Call this after setting instance.process_stage but before db.session.commit().
+    new_stage should be None when a unit is checked out / reset to unprocessed.
+    """
+    import json
+    from datetime import datetime, timezone
+    from inventory_flask_app.models import CustomerOrderTracking, db
+    try:
+        reservation = (
+            CustomerOrderTracking.query
+            .filter_by(product_instance_id=instance_id)
+            .filter(CustomerOrderTracking.status.in_(['reserved', 'delivered']))
+            .first()
+        )
+        if not reservation:
+            return
+        now = datetime.now(timezone.utc)
+        reservation.current_stage = new_stage
+        reservation.stage_updated_at = now
+        history = json.loads(reservation.stage_history or '[]')
+        history.append({
+            'stage': new_stage or 'Checkout',
+            'updated_at': now.isoformat(),
+            'updated_by': username,
+        })
+        reservation.stage_history = json.dumps(history)
+    except Exception:
+        pass  # Stage sync is non-critical; never break the main flow
 
 
 # Inventory and order notifications for a tenant

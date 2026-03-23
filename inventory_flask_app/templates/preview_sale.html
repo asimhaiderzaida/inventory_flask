@@ -12,7 +12,7 @@
 </div>
 
 <div class="animate-fade-up">
-  <form method="POST" action="/confirm_sale">
+  <form method="POST" action="{{ url_for('sales_bp.confirm_sale') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="table-card mb-4">
       <div style="overflow-x:auto;">

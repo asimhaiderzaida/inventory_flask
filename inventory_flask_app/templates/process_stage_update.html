@@ -1,55 +1,235 @@
 {% extends "base.html" %}
-{% block title %}Process Stage Management{% endblock %}
-{% block page_title %}Process Stage Management{% endblock %}
+{% block title %}My Work{% endblock %}
+{% block page_title %}My Work{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Stage badge pill */
+.stage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* SLA time badge */
+.sla-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  background: rgba(6,182,212,0.1);
+  color: #0891b2;
+  white-space: nowrap;
+}
+.sla-badge.overdue {
+  background: rgba(239,68,68,0.12);
+  color: var(--color-danger);
+}
+/* Scan card input */
+.scan-card-input {
+  font-size: 1.1rem;
+  font-family: monospace;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.scan-card-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+/* Supervisor badge */
+.badge-supervisor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(99,102,241,0.1);
+  color: #6366f1;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.875rem;
+  border-radius: 20px;
+  font-weight: 600;
+  border: 1px solid rgba(99,102,241,0.2);
+}
+.badge-units {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(37,99,235,0.08);
+  color: #2563eb;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.875rem;
+  border-radius: 20px;
+  font-weight: 600;
+  border: 1px solid rgba(37,99,235,0.18);
+}
+</style>
+{% endblock %}
 
 {% block content %}
+{% set my_count = (my_units | selectattr('assigned_to_user_id', 'equalto', current_user.id) | list | length) if my_units else 0 %}
+{% set display_count = my_units|length if is_supervisor else my_count %}
+
+{# ── Page Header ── #}
 <div class="page-header animate-fade-up">
   <div>
-    <h1 class="page-title">Process Stage Management</h1>
-    <div class="page-subtitle">Batch check-in / check-out and stage assignment</div>
+    <h1 class="page-title">My Work</h1>
+    <p class="page-subtitle">
+      {% set _hour = now_utc.hour %}
+      {% if _hour < 12 %}Good morning{% elif _hour < 17 %}Good afternoon{% else %}Good evening{% endif %},
+      {{ current_user.full_name or current_user.username }}
+      &middot; {{ now_utc.strftime('%A, %d %B') }}
+    </p>
+  </div>
+  <div class="page-actions">
+    {% if is_supervisor %}
+    <span class="badge-supervisor"><i class="bi bi-shield-check"></i> Supervisor View</span>
+    {% endif %}
+    <span class="badge-units"><i class="bi bi-person-badge"></i> {{ display_count }} unit{{ 's' if display_count != 1 else '' }} assigned</span>
   </div>
 </div>
 
-<!-- Tab nav -->
-<div class="animate-fade-up" style="margin-bottom:1.5rem;">
-  <div style="display:flex;gap:0.5rem;border-bottom:1px solid var(--border);padding-bottom:0;">
-    <a href="{{ url_for('stock_bp.process_stage_update', tab='under_process') }}"
-       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
-       {% if tab == 'under_process' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
-      <i class="bi bi-person-badge"></i> My Units
+{# ── Bootstrap Nav Tabs ── #}
+<ul class="nav nav-tabs mb-4 animate-fade-up">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'under_process' %}active{% endif %}"
+       href="{{ url_for('stock_bp.process_stage_update', tab='under_process') }}">
+      <i class="bi bi-person-badge me-1"></i>My Units
+      <span class="badge {% if tab == 'under_process' %}bg-primary{% else %}bg-secondary{% endif %} ms-1" style="font-size:0.68rem;">{{ display_count }}</span>
     </a>
-    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}"
-       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
-       {% if tab == 'check_in' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
-      <i class="bi bi-box-arrow-in-down"></i> Check In
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'check_in' %}active{% endif %}"
+       href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}">
+      <i class="bi bi-box-arrow-in-down me-1"></i>Check In
     </a>
-    <a href="{{ url_for('stock_bp.process_stage_update', tab='check_out') }}"
-       style="padding:0.6rem 1.1rem;font-size:0.88rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;color:var(--text-muted);transition:color 0.15s,border-color 0.15s;
-       {% if tab == 'check_out' %}color:var(--primary);border-bottom-color:var(--primary);{% endif %}">
-      <i class="bi bi-box-arrow-up-right"></i> Check Out
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'check_out' %}active{% endif %}"
+       href="{{ url_for('stock_bp.process_stage_update', tab='check_out') }}">
+      <i class="bi bi-box-arrow-up me-1"></i>Check Out
     </a>
-  </div>
-</div>
+  </li>
+</ul>
 
-<!-- ===== MY UNITS TAB ===== -->
+
+{# ============================================================ #}
+{# MY UNITS TAB                                                 #}
+{# ============================================================ #}
 {% if tab == 'under_process' %}
 <div class="animate-fade-up">
 
-  {% if is_supervisor %}
-  <!-- Supervisor notice -->
-  <div style="display:flex;align-items:center;gap:0.5rem;padding:0.65rem 1rem;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-md);margin-bottom:1rem;font-size:0.83rem;">
-    <i class="bi bi-shield-check" style="color:#6366f1;font-size:1rem;"></i>
-    <span style="color:#4f46e5;font-weight:600;">Supervisor view</span>
-    <span style="color:var(--text-muted);">— showing all {{ my_units|length }} units currently in processing across all technicians.</span>
-  </div>
-  {% endif %}
-
   {% if my_units and my_units|length > 0 %}
-    <div class="table-card">
+
+    {# ── Non-supervisor: table ── #}
+    {% if not is_supervisor %}
+    <div class="table-card mb-4">
       <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:0.85rem;font-weight:600;">
-          <i class="bi bi-person-check" style="margin-right:0.4rem;"></i>
-          {% if is_supervisor %}Processing Overview — All Techs{% else %}My Assigned Units{% endif %}
+        <span style="font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-person-badge" style="color:var(--primary);"></i>
+          Units Assigned to Me
+        </span>
+      </div>
+      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="tab" value="under_process">
+        <div style="overflow-x:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th class="d-none d-md-table-cell">Asset</th>
+                <th>Item</th>
+                <th class="d-none d-md-table-cell">Model / Spec</th>
+                <th>Stage</th>
+                <th class="d-none d-md-table-cell">Time</th>
+                <th>Note</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in my_units %}
+                {% if i.assigned_to_user_id == current_user.id %}
+                  {% set mins_in_stage = calc_duration_minutes(i.entered_stage_at) %}
+                  {% set dur_label = format_duration(mins_in_stage) %}
+                  {% set ns = namespace(sla_h=0, stage_color='#3b82f6') %}
+                  {% for s in process_stages %}
+                    {% if s.name == i.process_stage %}
+                      {% if s.sla_hours %}{% set ns.sla_h = s.sla_hours %}{% endif %}
+                      {% set ns.stage_color = s.color %}
+                    {% endif %}
+                  {% endfor %}
+                  {% set is_overdue = (ns.sla_h > 0 and mins_in_stage is not none and (mins_in_stage / 60) > ns.sla_h) %}
+                  <tr {% if is_overdue %}style="background:rgba(239,68,68,0.04);"{% endif %}>
+                    <td>
+                      <a href="{{ url_for('stock_bp.unit_history', serial=i.serial) }}" style="font-family:monospace;font-size:0.82rem;color:var(--primary);text-decoration:none;font-weight:600;">{{ i.serial }}</a>
+                    </td>
+                    <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
+                    <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
+                    <td class="d-none d-md-table-cell" style="font-size:0.78rem;">
+                      {{ (i.product.model if i.product else None) | nonan }}
+                      {% if i.product and i.product.cpu %}<br><span style="color:var(--text-muted);">{{ i.product.cpu }}{% if i.product.ram %} · {{ i.product.ram }}{% endif %}</span>{% endif %}
+                    </td>
+                    <td>
+                      {% if i.process_stage %}
+                      <span class="stage-pill" style="background:{{ ns.stage_color }}20;color:{{ ns.stage_color }};border:1px solid {{ ns.stage_color }}44;">
+                        <span style="width:6px;height:6px;border-radius:50%;background:{{ ns.stage_color }};display:inline-block;"></span>
+                        {{ i.process_stage }}
+                      </span>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td class="d-none d-md-table-cell">
+                      {% if dur_label %}
+                      <span class="sla-badge {% if is_overdue %}overdue{% endif %}">
+                        <i class="bi bi-{% if is_overdue %}exclamation-triangle{% else %}clock{% endif %}" style="font-size:0.65rem;"></i>
+                        {{ dur_label }}{% if is_overdue %} ⚠{% endif %}
+                      </span>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td>
+                      <input type="text" name="notes[{{ i.id }}]" class="form-control form-control-sm"
+                             placeholder="Add a note…" style="min-width:130px;">
+                    </td>
+                    <td>
+                      <div style="display:flex;gap:0.3rem;flex-wrap:nowrap;">
+                        <button type="button" class="btn btn-ghost btn-sm"
+                                style="color:var(--primary);padding:0.25rem 0.5rem;white-space:nowrap;"
+                                onclick="openQuickStageModal({{ i.id }}, '{{ i.serial|e }}', '{{ (i.process_stage or '')|e }}')">
+                          <i class="bi bi-arrow-right-circle"></i> Stage
+                        </button>
+                        <a href="{{ url_for('stock_bp.process_stage_update', tab='check_out') }}" class="btn btn-ghost btn-sm"
+                           style="padding:0.25rem 0.5rem;white-space:nowrap;">
+                          <i class="bi bi-box-arrow-up-right"></i> Out
+                        </a>
+                        <label class="btn btn-ghost btn-sm" style="cursor:pointer;color:var(--color-danger);padding:0.25rem 0.5rem;white-space:nowrap;" title="Mark unit as idle">
+                          <input type="checkbox" name="mark_idle_ids" value="{{ i.id }}" style="display:none;"
+                                 onchange="if(this.checked&&confirm('Mark {{ i.serial }} as idle?')){}else{this.checked=false;}">
+                          <i class="bi bi-moon"></i> Idle
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+
+    {# ── Supervisor: table ── #}
+    {% else %}
+    <div class="table-card mb-4">
+      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-person-check" style="color:#6366f1;"></i>
+          Processing Overview — All Techs
+          <span style="background:rgba(99,102,241,0.1);color:#6366f1;border-radius:20px;padding:0.1rem 0.55rem;font-size:0.72rem;font-weight:700;">{{ my_units|length }} units</span>
         </span>
       </div>
       <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
@@ -63,158 +243,121 @@
                 <th class="d-none d-md-table-cell">Asset</th>
                 <th>Item</th>
                 <th class="d-none d-md-table-cell">Model</th>
-                <th class="d-none d-md-table-cell">CPU</th>
-                <th class="d-none d-md-table-cell">RAM</th>
+                <th class="d-none d-md-table-cell">CPU / RAM</th>
                 <th>Stage</th>
-                <th class="d-none d-md-table-cell">Time in Stage</th>
-                <th class="d-none d-md-table-cell">Team</th>
-                {% if is_supervisor %}<th>Assignee</th>{% endif %}
-                <th>Updated</th>
-                {% if not is_supervisor %}<th>Note</th><th>Idle</th>{% endif %}
-                <th>{% if not is_supervisor %}<input type="checkbox" id="select-all-inprocess" style="cursor:pointer;">{% else %}Actions{% endif %}</th>
+                <th class="d-none d-md-table-cell">Time / SLA</th>
+                <th>Assignee</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {% for i in my_units %}
                 {% set is_mine = (i.assigned_to_user_id == current_user.id) %}
-                {% if is_supervisor or is_mine %}
-                  {% set mins_in_stage = calc_duration_minutes(i.entered_stage_at) %}
-                  {% set dur_label = format_duration(mins_in_stage) %}
-                  {# Build SLA lookup for this unit's stage #}
-                  {% set ns = namespace(sla_h=0) %}
-                  {% for s in process_stages %}
-                    {% if s.name == i.process_stage and s.sla_hours %}
-                      {% set ns.sla_h = s.sla_hours %}
-                    {% endif %}
-                  {% endfor %}
-                  {% set is_overdue = (ns.sla_h > 0 and mins_in_stage is not none and (mins_in_stage / 60) > ns.sla_h) %}
-                  <tr {% if is_overdue %}style="background:rgba(239,68,68,0.04);"{% elif is_supervisor and not is_mine %}style="opacity:0.85;"{% endif %}>
-                    <td>
-                      <a href="{{ url_for('stock_bp.unit_history', serial=i.serial) }}" style="font-family:monospace;font-size:0.82rem;color:var(--primary);text-decoration:none;">{{ i.serial }}</a>
-                    </td>
-                    <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
-                    <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
-                    <td class="d-none d-md-table-cell">{{ (i.product.model if i.product else None) | nonan }}</td>
-                    <td class="d-none d-md-table-cell">{{ (i.product.cpu if i.product else None) | nonan }}</td>
-                    <td class="d-none d-md-table-cell">{{ (i.product.ram if i.product else None) | nonan }}</td>
-                    <td>
-                      <span class="status-pill status-under_process">{{ i.process_stage or '—' }}</span>
-                      {# Stage progress bar: stage index / total stages #}
-                      {% set ns2 = namespace(stage_idx=0) %}
-                      {% for s in process_stages %}
-                        {% if s.name == i.process_stage %}{% set ns2.stage_idx = loop.index %}{% endif %}
-                      {% endfor %}
-                      {% set total_stages = process_stages|length %}
-                      {% if ns2.stage_idx > 0 and total_stages > 0 %}
-                      {% set pct = ((ns2.stage_idx / total_stages) * 100)|round|int %}
-                      <div title="Stage {{ ns2.stage_idx }} of {{ total_stages }}" style="margin-top:0.3rem;height:4px;background:var(--surface-3);border-radius:4px;overflow:hidden;min-width:60px;">
-                        <div style="height:100%;width:{{ pct }}%;background:var(--primary);border-radius:4px;transition:width 0.3s;"></div>
-                      </div>
-                      <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.1rem;">{{ ns2.stage_idx }}/{{ total_stages }}</div>
-                      {% endif %}
-                    </td>
-                    <td class="d-none d-md-table-cell">
-                      <div style="display:inline-flex;flex-direction:column;gap:0.2rem;align-items:flex-start;">
-                        {% if dur_label %}
-                        <span style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.15rem 0.55rem;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;
-                          background:rgba(6,182,212,0.1);color:#0891b2;">
-                          <i class="bi bi-clock" style="font-size:0.7rem;"></i>{{ dur_label }}
-                        </span>
-                        {% else %}—{% endif %}
-                        {% if is_overdue %}
-                        <span style="display:inline-flex;align-items:center;gap:0.2rem;padding:0.1rem 0.45rem;border-radius:20px;font-size:0.68rem;font-weight:700;white-space:nowrap;
-                          background:rgba(239,68,68,0.15);color:var(--color-danger);">
-                          <i class="bi bi-exclamation-circle" style="font-size:0.65rem;"></i>OVERDUE
-                        </span>
-                        {% endif %}
-                      </div>
-                    </td>
-                    <td class="d-none d-md-table-cell">{{ i.team_assigned or '—' }}</td>
-                    {% if is_supervisor %}
-                    <td>
-                      <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
-                        <span style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;">
-                          {{ (i.assigned_user.username[0]|upper) if i.assigned_user else '?' }}
-                        </span>
-                        {{ i.assigned_user.username if i.assigned_user else '—' }}
-                        {% if is_mine %}<span style="font-size:0.7rem;color:var(--primary);font-weight:600;">(you)</span>{% endif %}
+                {% set mins_in_stage = calc_duration_minutes(i.entered_stage_at) %}
+                {% set dur_label = format_duration(mins_in_stage) %}
+                {% set ns = namespace(sla_h=0, stage_color='#6366f1') %}
+                {% for s in process_stages %}
+                  {% if s.name == i.process_stage and s.sla_hours %}{% set ns.sla_h = s.sla_hours %}{% endif %}
+                  {% if s.name == i.process_stage %}{% set ns.stage_color = s.color %}{% endif %}
+                {% endfor %}
+                {% set is_overdue = (ns.sla_h > 0 and mins_in_stage is not none and (mins_in_stage / 60) > ns.sla_h) %}
+                <tr {% if is_overdue %}style="background:rgba(239,68,68,0.04);"{% endif %}>
+                  <td>
+                    <a href="{{ url_for('stock_bp.unit_history', serial=i.serial) }}" style="font-family:monospace;font-size:0.82rem;color:var(--primary);text-decoration:none;">{{ i.serial }}</a>
+                  </td>
+                  <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
+                  <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
+                  <td class="d-none d-md-table-cell">{{ (i.product.model if i.product else None) | nonan }}</td>
+                  <td class="d-none d-md-table-cell" style="font-size:0.78rem;">
+                    {{ (i.product.cpu if i.product else None) | nonan }}
+                    {% if i.product and i.product.ram %}<br><span style="color:var(--text-muted);">{{ i.product.ram }}</span>{% endif %}
+                  </td>
+                  <td>
+                    <span class="stage-pill" style="background:{{ ns.stage_color }}20;color:{{ ns.stage_color }};border:1px solid {{ ns.stage_color }}44;">
+                      {{ i.process_stage or '—' }}
+                    </span>
+                  </td>
+                  <td class="d-none d-md-table-cell">
+                    {% if dur_label %}
+                    <span class="sla-badge {% if is_overdue %}overdue{% endif %}">
+                      <i class="bi bi-{% if is_overdue %}exclamation-triangle{% else %}clock{% endif %}" style="font-size:0.65rem;"></i>
+                      {{ dur_label }}
+                      {% if is_overdue %}<div style="font-size:0.68rem;font-weight:700;color:var(--color-danger);">OVERDUE</div>{% endif %}
+                    </span>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td>
+                    <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;">
+                      <span style="width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;">
+                        {{ (i.assigned_user.username[0]|upper) if i.assigned_user else '?' }}
                       </span>
-                    </td>
-                    {% endif %}
-                    <td style="font-size:0.82rem;color:var(--text-muted);">{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '—' }}</td>
-                    {% if not is_supervisor %}
-                    <td><input type="text" name="notes[{{ i.id }}]" class="form-control form-control-sm" placeholder="Optional note" style="min-width:120px;"></td>
-                    <td style="text-align:center;"><input type="checkbox" name="mark_idle_ids" value="{{ i.id }}"></td>
-                    {% endif %}
-                    <td>
-                      {% if is_supervisor %}
-                      <div style="display:flex;gap:0.35rem;flex-wrap:nowrap;">
-                        <button type="button" class="btn btn-ghost btn-sm"
-                                style="color:#6366f1;padding:0.25rem 0.5rem;white-space:nowrap;"
-                                onclick="openReassignModal({{ i.id }}, '{{ i.serial }}', '{{ (i.assigned_user.username)|e if i.assigned_user else 'unassigned' }}', {{ (i.assigned_user.id) if i.assigned_user else 'null' }})"
-                                title="Reassign to another technician">
-                          <i class="bi bi-person-fill-gear"></i> Reassign
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-sm"
-                                style="color:#06b6d4;padding:0.25rem 0.5rem;white-space:nowrap;"
-                                onclick="openQuickStageModal({{ i.id }}, '{{ i.serial|e }}', '{{ (i.process_stage or '')|e }}')"
-                                title="Quick stage update">
-                          <i class="bi bi-arrow-right-circle"></i> Stage
-                        </button>
-                        <button type="submit"
-                                formaction="{{ url_for('stock_bp.force_checkout', instance_id=i.id) }}"
-                                formmethod="post"
-                                class="btn btn-ghost btn-sm"
-                                style="color:var(--color-danger);padding:0.25rem 0.5rem;white-space:nowrap;"
-                                onclick="return confirm('Force check-out {{ i.serial }}? It will be marked Processed and released from {{ (i.assigned_user.username)|e if i.assigned_user else 'no one' }}.')"
-                                title="Force check-out this unit">
-                          <i class="bi bi-box-arrow-up-right"></i> Force Out
-                        </button>
-                      </div>
-                      {% else %}
-                      <input type="checkbox" name="instance_ids" value="{{ i.id }}" class="unit-checkbox">
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endif %}
+                      {{ i.assigned_user.username if i.assigned_user else '—' }}
+                      {% if is_mine %}<span style="font-size:0.7rem;color:var(--primary);font-weight:600;">(you)</span>{% endif %}
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:0.35rem;flex-wrap:nowrap;">
+                      <button type="button" class="btn btn-ghost btn-sm"
+                              style="color:#6366f1;padding:0.25rem 0.5rem;white-space:nowrap;"
+                              onclick="openReassignModal({{ i.id }}, '{{ i.serial }}', '{{ (i.assigned_user.username)|e if i.assigned_user else 'unassigned' }}', {{ (i.assigned_user.id) if i.assigned_user else 'null' }})">
+                        <i class="bi bi-person-fill-gear"></i> Reassign
+                      </button>
+                      <button type="button" class="btn btn-ghost btn-sm"
+                              style="color:#06b6d4;padding:0.25rem 0.5rem;white-space:nowrap;"
+                              onclick="openQuickStageModal({{ i.id }}, '{{ i.serial|e }}', '{{ (i.process_stage or '')|e }}')">
+                        <i class="bi bi-arrow-right-circle"></i> Stage
+                      </button>
+                      <button type="submit"
+                              formaction="{{ url_for('stock_bp.force_checkout', instance_id=i.id) }}"
+                              formmethod="post"
+                              class="btn btn-ghost btn-sm"
+                              style="color:var(--color-danger);padding:0.25rem 0.5rem;white-space:nowrap;"
+                              onclick="return confirm('Force check-out {{ i.serial }}?')">
+                        <i class="bi bi-box-arrow-up-right"></i> Force Out
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </form>
     </div>
+    {% endif %}
+
   {% else %}
-    <div class="empty-state">
-      <i class="bi bi-person-badge"></i>
-      <p>{% if is_supervisor %}No units are currently in processing.{% else %}You have no units currently assigned to you for processing.{% endif %}</p>
-      {% if not is_supervisor %}
-      <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-top:0.5rem;">
-        <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}" class="btn btn-primary btn-sm">
-          <i class="bi bi-box-arrow-in-down"></i> Go to Check In
-        </a>
-        {% if unprocessed_count %}
-        <span style="font-size:0.82rem;color:var(--text-muted);">
-          {{ unprocessed_count }} unprocessed unit{{ 's' if unprocessed_count != 1 else '' }} available to check in
-        </span>
-        {% endif %}
-      </div>
+  {# ── Empty state ── #}
+  <div class="empty-state">
+    <i class="bi bi-person-badge"></i>
+    <p>{% if is_supervisor %}No units are currently in processing.{% else %}You have no units currently assigned to you.{% endif %}</p>
+    {% if not is_supervisor %}
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+      <a href="{{ url_for('stock_bp.process_stage_update', tab='check_in') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-box-arrow-in-down"></i> Go to Check In
+      </a>
+      {% if unprocessed_count %}
+      <span style="font-size:0.82rem;color:var(--text-muted);">
+        {{ unprocessed_count }} unprocessed unit{{ 's' if unprocessed_count != 1 else '' }} available to check in
+      </span>
       {% endif %}
     </div>
+    {% endif %}
+  </div>
   {% endif %}
 
-  {% if is_supervisor %}
-  <!-- ── Quick Stage Update Modal ── -->
+  {# ── Quick Stage Modal ── #}
   <div id="quickStageModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
     <div style="background:var(--surface-1);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:100%;max-width:400px;margin:1rem;overflow:hidden;">
       <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
-        <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(6,182,212,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i class="bi bi-arrow-right-circle-fill" style="color:#06b6d4;font-size:1.05rem;"></i>
+        <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(37,99,235,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-arrow-right-circle-fill" style="color:#2563eb;font-size:1.05rem;"></i>
         </div>
         <div>
-          <div style="font-weight:700;font-size:0.95rem;">Quick Stage Update</div>
+          <div style="font-weight:700;font-size:0.95rem;">Update Stage</div>
           <div id="quickStageSerial" style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;"></div>
         </div>
-        <button onclick="closeQuickStageModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">✕</button>
+        <button onclick="closeQuickStageModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">&#x2715;</button>
       </div>
       <form id="quickStageForm" method="POST" action="">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -230,7 +373,7 @@
         </div>
         <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.5rem;">
           <button type="button" class="btn btn-ghost" onclick="closeQuickStageModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" style="background:#06b6d4;border-color:#06b6d4;">
+          <button type="submit" class="btn btn-primary">
             <i class="bi bi-arrow-right-circle"></i> Update Stage
           </button>
         </div>
@@ -238,10 +381,10 @@
     </div>
   </div>
 
-  <!-- ── Reassign Modal ── -->
+  {# ── Reassign Modal (supervisor only) ── #}
+  {% if is_supervisor %}
   <div id="reassignModal" style="display:none;position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
     <div style="background:var(--surface-1);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:100%;max-width:440px;margin:1rem;overflow:hidden;">
-      <!-- Modal header -->
       <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
         <div style="width:36px;height:36px;border-radius:var(--radius-md);background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <i class="bi bi-person-fill-gear" style="color:#6366f1;font-size:1.05rem;"></i>
@@ -250,9 +393,8 @@
           <div style="font-weight:700;font-size:0.95rem;color:var(--text-primary);">Reassign Unit</div>
           <div id="reassignSerial" style="font-size:0.78rem;color:var(--text-muted);font-family:monospace;"></div>
         </div>
-        <button onclick="closeReassignModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">✕</button>
+        <button onclick="closeReassignModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem;line-height:1;padding:0.2rem;">&#x2715;</button>
       </div>
-      <!-- Modal body -->
       <form id="reassignForm" method="POST" action="">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="padding:1.25rem 1.5rem;">
@@ -274,7 +416,6 @@
             <input type="text" name="reassign_note" class="form-control" placeholder="Reason for reassignment…">
           </div>
         </div>
-        <!-- Modal footer -->
         <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.5rem;">
           <button type="button" class="btn btn-ghost" onclick="closeReassignModal()">Cancel</button>
           <button type="submit" class="btn btn-primary" style="background:#6366f1;border-color:#6366f1;">
@@ -288,17 +429,23 @@
 
 </div>
 
-<!-- ===== CHECK IN TAB ===== -->
+
+{# ============================================================ #}
+{# CHECK IN TAB                                                 #}
+{# ============================================================ #}
 {% elif tab == 'check_in' %}
 <div class="animate-fade-up">
 
-  <!-- Stage + team lock -->
-  <div class="card mb-4">
-    <div class="card-body" style="padding:1.25rem;">
-      <div style="font-size:0.85rem;font-weight:600;margin-bottom:1rem;">Lock Stage &amp; Team</div>
+  {# Lock Stage & Team #}
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+      <i class="bi bi-lock-fill text-primary"></i>
+      <strong>Lock Stage &amp; Team</strong>
+    </div>
+    <div class="card-body">
       <form id="checkin-lock-form" class="row g-3" onsubmit="return false;">
         <div class="col-md-5">
-          <label class="form-label">Stage</label>
+          <label class="form-label fw-semibold" style="font-size:0.82rem;">Stage</label>
           <select id="checkin-stage" class="form-select" required>
             <option value="">Choose stage…</option>
             {% for s in process_stages %}
@@ -314,7 +461,7 @@
           </select>
         </div>
         <div class="col-md-5">
-          <label class="form-label">Team</label>
+          <label class="form-label fw-semibold" style="font-size:0.82rem;">Team</label>
           <select id="checkin-team" class="form-select" required>
             <option value="">Choose team…</option>
             {% for team in (teams or []) %}
@@ -326,28 +473,34 @@
           <button type="button" class="btn btn-primary w-100" id="checkin-lock-btn" onclick="lockCheckinStageTeam(event)">
             <i class="bi bi-lock"></i> Lock
           </button>
-          <button type="button" class="btn btn-ghost w-100" id="checkin-unlock-btn" onclick="unlockCheckinStageTeam()" style="display:none;" title="Unlock to change stage/team (keeps scanned list intact)">
-            <i class="bi bi-unlock"></i> Unlock
+          <button type="button" class="btn btn-ghost w-100" id="checkin-unlock-btn" onclick="unlockCheckinStageTeam()" style="display:none;" title="Unlock to change stage/team">
+            <i class="bi bi-unlock"></i>
           </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Scan input -->
-  <div class="card mb-4">
-    <div class="card-body" style="padding:1.25rem;">
-      <label class="form-label">Scan Serial</label>
-      <form onsubmit="return false;">
-        <input type="text" id="checkin-scan-input" class="form-control" placeholder="Scan serial…" autocomplete="off" autofocus
-          onkeydown="if(event.key==='Enter'){ scanCheckinSerial(); return false; }">
+  {# Scan input #}
+  <div class="card mb-3">
+    <div class="card-body py-4 text-center">
+      <p class="text-muted small fw-semibold text-uppercase mb-3" style="letter-spacing:0.06em;">
+        <i class="bi bi-upc-scan me-1"></i>Scan Unit to Check In
+      </p>
+      <div class="input-group mx-auto" style="max-width:420px;">
+        <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+        <input type="text" id="checkin-scan-input" class="form-control form-control-lg scan-card-input"
+               placeholder="Scan serial number…"
+               autocomplete="off" autofocus
+               onkeydown="if(event.key==='Enter'){ scanCheckinSerial(); return false; }">
         <input type="hidden" id="locked-stage" value="">
         <input type="hidden" id="locked-team" value="">
-      </form>
+      </div>
+      <p class="text-muted small mt-2 mb-0">Press Enter or scan barcode to add unit</p>
     </div>
   </div>
 
-  <!-- Scanned units for check-in -->
+  {# Scanned units table #}
   <form method="POST" action="{{ url_for('stock_bp.checkin_checkout') }}" onsubmit="return confirmCheckinHasRows();">
     <input type="hidden" name="action" value="check-in">
     <input type="hidden" name="tab" value="check_in">
@@ -356,7 +509,9 @@
     <input type="hidden" name="team_assigned" id="submit-locked-team" value="">
     <div class="table-card mb-4">
       <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-list-check" style="margin-right:0.4rem;"></i>Scanned Units — Check In</span>
+        <span style="font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-list-check" style="color:var(--primary);"></i> Scanned Units — Check In
+        </span>
         <button type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-check-circle"></i> Confirm Check-In
         </button>
@@ -398,7 +553,7 @@
     </div>
   </form>
 
-  <!-- Results table -->
+  {# Results after check-in #}
   {% if results %}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
     <span style="font-size:0.9rem;font-weight:600;color:var(--color-success);">
@@ -414,10 +569,9 @@
       </button>
     </form>
   </div>
-
   <div class="table-card mb-4">
     <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
-      <select id="filter-stage" class="form-select form-select-sm" style="max-width:220px;" aria-label="Filter by previous stage">
+      <select id="filter-stage" class="form-select form-select-sm" style="max-width:220px;">
         <option value="">Filter by Previous Stage</option>
         {% for s in process_stages %}
         <option value="{{ s.name|lower }}">{{ s.name }}</option>
@@ -431,15 +585,9 @@
             <th>Serial</th>
             <th class="d-none d-md-table-cell">Asset</th>
             <th>Item</th>
-            <th class="d-none d-md-table-cell">Make</th>
             <th class="d-none d-md-table-cell">Model</th>
             <th class="d-none d-md-table-cell">CPU</th>
             <th class="d-none d-md-table-cell">RAM</th>
-            <th class="d-none d-md-table-cell">Grade</th>
-            <th class="d-none d-md-table-cell">Display</th>
-            <th class="d-none d-md-table-cell">GPU 1</th>
-            <th class="d-none d-md-table-cell">GPU 2</th>
-            <th class="d-none d-md-table-cell">Disk</th>
             <th class="d-none d-md-table-cell">Prev Stage</th>
             <th>Result</th>
             <th></th>
@@ -448,18 +596,12 @@
         <tbody>
           {% for row in results %}
           <tr data-prev="{{ (row.prev_stage or '')|lower }}">
-            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial or (row.instance.serial if row.instance else '') }}</span></td>
-            <td class="d-none d-md-table-cell">{{ row.asset or (row.instance.asset if row.instance else '') or '—' }}</td>
+            <td><span style="font-family:monospace;font-size:0.82rem;">{{ row.serial or '' }}</span></td>
+            <td class="d-none d-md-table-cell">{{ row.asset or '—' }}</td>
             <td>{{ row.item_name | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.make | nonan }}</td>
             <td class="d-none d-md-table-cell">{{ row.model | nonan }}</td>
             <td class="d-none d-md-table-cell">{{ row.cpu | nonan }}</td>
             <td class="d-none d-md-table-cell">{{ row.ram | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.grade | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.display | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.gpu1 | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.gpu2 | nonan }}</td>
-            <td class="d-none d-md-table-cell">{{ row.disk1size | nonan }}</td>
             <td class="d-none d-md-table-cell">{{ row.prev_stage or '—' }}</td>
             <td>
               {% if row.status == 'updated' %}
@@ -477,7 +619,7 @@
                 <a href="{{ url_for('stock_bp.print_label', instance_id=row.instance_id) }}" class="btn btn-ghost btn-sm" target="_blank">
                   <i class="bi bi-printer"></i>
                 </a>
-              {% else %}—{% endif %}
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -485,34 +627,44 @@
       </table>
     </div>
   </div>
-
   {% endif %}
 
 </div>
 
-<!-- ===== CHECK OUT TAB ===== -->
+
+{# ============================================================ #}
+{# CHECK OUT TAB                                                #}
+{# ============================================================ #}
 {% elif tab == 'check_out' %}
 <div class="animate-fade-up">
 
-  <!-- Scan input -->
-  <div class="card mb-4">
-    <div class="card-body" style="padding:1.25rem;">
-      <label class="form-label">Scan Serial to Check Out</label>
-      <form onsubmit="scanCheckoutSerial(event)">
-        <input type="text" id="checkout-scan-input" class="form-control" placeholder="Scan serial…" autocomplete="off" autofocus>
-      </form>
+  {# Scan input #}
+  <div class="card mb-3">
+    <div class="card-body py-4 text-center">
+      <p class="text-muted small fw-semibold text-uppercase mb-3" style="letter-spacing:0.06em;">
+        <i class="bi bi-upc-scan me-1"></i>Scan Unit to Check Out
+      </p>
+      <div class="input-group mx-auto" style="max-width:420px;">
+        <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+        <input type="text" id="checkout-scan-input" class="form-control form-control-lg scan-card-input"
+               placeholder="Scan serial number…"
+               autocomplete="off" autofocus>
+      </div>
+      <p class="text-muted small mt-2 mb-0">Press Enter or scan barcode to add unit</p>
     </div>
   </div>
 
-  <!-- Scanned units for check-out -->
+  {# Scanned units table #}
   <form method="POST" action="{{ url_for('stock_bp.checkin_checkout') }}" onsubmit="return confirmCheckoutHasRows();">
     <input type="hidden" name="action" value="check-out">
     <input type="hidden" name="tab" value="check_out">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="table-card mb-4">
       <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-box-arrow-up-right" style="margin-right:0.4rem;"></i>Scanned Units — Check Out</span>
-        <button type="submit" class="btn btn-sm" style="background:var(--color-danger);color:#fff;">
+        <span style="font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-box-arrow-up-right" style="color:var(--color-danger);"></i> Scanned Units — Check Out
+        </span>
+        <button type="submit" class="btn btn-sm" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger);">
           <i class="bi bi-check-circle"></i> Confirm Check-Out
         </button>
       </div>
@@ -533,7 +685,6 @@
                 <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">{{ entry.serial }}</span>
                 {% if entry.asset %}<br><small style="color:var(--text-muted);">Asset: {{ entry.asset }}</small>{% endif %}
                 {% if entry.model %}<br><small style="color:var(--text-muted);">Model: {{ entry.model }}</small>{% endif %}
-                {% if entry.item_name %}<br><small style="color:var(--text-muted);">Item: {{ entry.item_name }}</small>{% endif %}
               </td>
               <td><input type="text" class="form-control form-control-sm" name="notes[{{ entry.serial }}]" value="{{ entry.note or '' }}" placeholder="Optional note" style="min-width:140px;"></td>
               <td>
@@ -550,47 +701,45 @@
     </div>
   </form>
 
-  <!-- My assigned units (reference) -->
+  {# My assigned units reference — simple table #}
   {% if my_units and my_units|length > 0 %}
-    <div class="table-card">
-      <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
-        <span style="font-size:0.85rem;font-weight:600;"><i class="bi bi-person-check" style="margin-right:0.4rem;"></i>My Assigned Units</span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Serial</th>
-              <th class="d-none d-md-table-cell">Asset</th>
-              <th>Item</th>
-              <th class="d-none d-md-table-cell">Model</th>
-              <th class="d-none d-md-table-cell">CPU</th>
-              <th class="d-none d-md-table-cell">RAM</th>
-              <th>Stage</th>
-              <th class="d-none d-md-table-cell">Team</th>
-              <th class="d-none d-md-table-cell">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for i in my_units %}
-              {% if i.assigned_to_user_id == current_user.id %}
-                <tr>
-                  <td><span style="font-family:monospace;font-size:0.82rem;">{{ i.serial }}</span></td>
-                  <td class="d-none d-md-table-cell">{{ i.asset or '—' }}</td>
-                  <td>{{ (i.product.item_name if i.product else None) | nonan }}</td>
-                  <td class="d-none d-md-table-cell">{{ (i.product.model if i.product else None) | nonan }}</td>
-                  <td class="d-none d-md-table-cell">{{ (i.product.cpu if i.product else None) | nonan }}</td>
-                  <td class="d-none d-md-table-cell">{{ (i.product.ram if i.product else None) | nonan }}</td>
-                  <td>{{ i.process_stage or '—' }}</td>
-                  <td class="d-none d-md-table-cell">{{ i.team_assigned or '—' }}</td>
-                  <td class="d-none d-md-table-cell" style="font-size:0.82rem;color:var(--text-muted);">{{ i.updated_at.strftime('%Y-%m-%d %H:%M') if i.updated_at else '—' }}</td>
-                </tr>
-              {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+  <div class="table-card mb-4">
+    <div style="padding:0.875rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.875rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-person-check" style="color:var(--primary);"></i> Your Assigned Units
+      </span>
     </div>
+    <div style="overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Serial</th>
+            <th>Item</th>
+            <th>Stage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in my_units %}
+            {% if i.assigned_to_user_id == current_user.id %}
+              {% set ns_co = namespace(stage_color='#6b7280') %}
+              {% for s in process_stages %}{% if s.name == i.process_stage %}{% set ns_co.stage_color = s.color %}{% endif %}{% endfor %}
+              <tr>
+                <td><span style="font-family:monospace;font-size:0.82rem;font-weight:600;color:var(--primary);">{{ i.serial }}</span></td>
+                <td style="font-size:0.85rem;">{{ (i.product.item_name if i.product else None) | nonan }}</td>
+                <td>
+                  {% if i.process_stage %}
+                  <span class="stage-pill" style="background:{{ ns_co.stage_color }}20;color:{{ ns_co.stage_color }};border:1px solid {{ ns_co.stage_color }}44;">
+                    {{ i.process_stage }}
+                  </span>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
   {% endif %}
 
 </div>
@@ -600,16 +749,7 @@
 
 {% block extra_scripts %}
 <script>
-// Select-all for My Assigned Units
 document.addEventListener('DOMContentLoaded', function() {
-  const selectAll = document.getElementById('select-all-inprocess');
-  if (selectAll) {
-    selectAll.addEventListener('change', function() {
-      document.querySelectorAll('.unit-checkbox').forEach(cb => { cb.checked = selectAll.checked; });
-    });
-  }
-
-  // Results filter
   const filter = document.getElementById('filter-stage');
   if (filter) {
     filter.addEventListener('change', function() {
@@ -624,13 +764,11 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
-// ── Check-out AJAX scanner (fix 5: dedup by serial) ──
 function scanCheckoutSerial(event) {
   event.preventDefault();
   const input = document.getElementById('checkout-scan-input');
   const serial = input.value.trim();
   if (!serial) return;
-
   fetch('/stock/checkout/scan_add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
@@ -641,7 +779,6 @@ function scanCheckoutSerial(event) {
     if (data && data.entry) {
       const tbody = document.getElementById('checkout-body');
       if (tbody) {
-        // fix 5: remove duplicate row before appending
         const existing = tbody.querySelector(`tr[data-serial="${data.entry.serial}"]`);
         if (existing) existing.remove();
         const row = document.createElement('tr');
@@ -652,18 +789,13 @@ function scanCheckoutSerial(event) {
             <span style="font-family:monospace;font-size:0.82rem;font-weight:600;">${data.entry.serial}</span>
             ${data.entry.asset ? `<br><small style="color:var(--text-muted)">Asset: ${data.entry.asset}</small>` : ''}
             ${data.entry.model ? `<br><small style="color:var(--text-muted)">Model: ${data.entry.model}</small>` : ''}
-            ${data.entry.item_name ? `<br><small style="color:var(--text-muted)">Item: ${data.entry.item_name}</small>` : ''}
           </td>
           <td><input type="text" class="form-control form-control-sm" name="notes[${data.entry.serial}]" placeholder="Optional note" style="min-width:140px;"></td>
           <td><button onclick="removeScan('${data.entry.serial}')" class="btn btn-ghost btn-sm" type="button" style="color:var(--color-danger);padding:0.2rem 0.5rem;"><i class="bi bi-x-lg"></i></button></td>
         `;
         tbody.appendChild(row);
-      } else {
-        location.reload();
-      }
-    } else {
-      showToast('Scan response error or duplicate.', 'warning');
-    }
+      } else { location.reload(); }
+    } else { showToast('Scan response error.', 'warning'); }
   })
   .catch(() => showToast('Error scanning serial.', 'danger'));
   input.value = '';
@@ -672,26 +804,19 @@ function scanCheckoutSerial(event) {
 
 function removeScan(serial) {
   fetch(`/stock/remove_checkout_scan/${serial}`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+    method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
   }).then(() => window.location.reload());
 }
 </script>
 
 <script>
-// ── Check-in AJAX scanner ──
 function scanCheckinSerial() {
   const input = document.getElementById('checkin-scan-input');
   const serial = input.value.trim();
   if (!serial) return;
-
   const stage = document.getElementById('locked-stage').value;
   const team = document.getElementById('locked-team').value;
-  if (!stage || !team) {
-    showToast('Please lock a stage and team first.', 'warning');
-    return;
-  }
-
+  if (!stage || !team) { showToast('Please lock a stage and team first.', 'warning'); return; }
   fetch('/stock/checkin/scan_add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
@@ -705,14 +830,10 @@ function scanCheckinSerial() {
       if (existing) existing.remove();
       const row = document.createElement('tr');
       row.setAttribute('data-serial', serial);
-
-      // fix 12: show conflict warning inline if unit already assigned to another tech
       const conflictHtml = data.entry.conflict_user
         ? `<div style="margin-top:0.35rem;display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.55rem;border-radius:20px;font-size:0.73rem;font-weight:700;background:rgba(239,68,68,0.15);color:var(--color-danger);">
             <i class="bi bi-exclamation-circle"></i>Assigned to ${data.entry.conflict_user} — will be skipped
-           </div>`
-        : '';
-
+           </div>` : '';
       row.innerHTML = `
         <td>
           <input type="hidden" name="instance_ids" value="${data.entry.instance_id}">
@@ -726,28 +847,19 @@ function scanCheckinSerial() {
         <td><button type="submit" formaction="/stock/remove_checkin_scan/${encodeURIComponent(serial)}" formmethod="post" class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:0.2rem 0.5rem;"><i class="bi bi-x-lg"></i></button></td>
       `;
       tbody.appendChild(row);
-
-      if (data.entry.conflict_user) {
-        showToast(`⚠ ${serial} is assigned to ${data.entry.conflict_user} and will be skipped at confirm.`, 'warning');
-      }
-    } else {
-      showToast('Scan failed or unit not found.', 'warning');
-    }
+      if (data.entry.conflict_user) showToast(`${serial} is assigned to ${data.entry.conflict_user} and will be skipped at confirm.`, 'warning');
+    } else { showToast('Scan failed or unit not found.', 'warning'); }
   })
   .catch(() => showToast('Scan failed.', 'danger'));
   input.value = '';
   input.focus();
 }
 
-// ── fix 9: Lock/Unlock stage+team ──
 function lockCheckinStageTeam(event) {
   if (event) event.preventDefault();
   const stage = document.getElementById('checkin-stage').value;
   const team = document.getElementById('checkin-team').value;
-  if (!stage || !team) {
-    showToast('Please select both stage and team before locking.', 'warning');
-    return;
-  }
+  if (!stage || !team) { showToast('Please select both stage and team before locking.', 'warning'); return; }
   document.getElementById('locked-stage').value = stage;
   document.getElementById('locked-team').value = team;
   document.getElementById('submit-locked-stage').value = stage;
@@ -756,8 +868,8 @@ function lockCheckinStageTeam(event) {
   document.getElementById('checkin-team').disabled = true;
   const lockBtn = document.getElementById('checkin-lock-btn');
   const unlockBtn = document.getElementById('checkin-unlock-btn');
-  if (lockBtn) { lockBtn.style.display = 'none'; }
-  if (unlockBtn) { unlockBtn.style.display = ''; }
+  if (lockBtn) lockBtn.style.display = 'none';
+  if (unlockBtn) unlockBtn.style.display = '';
   document.getElementById('checkin-scan-input').focus();
 }
 
@@ -770,12 +882,11 @@ function unlockCheckinStageTeam() {
   document.getElementById('submit-locked-team').value = '';
   const lockBtn = document.getElementById('checkin-lock-btn');
   const unlockBtn = document.getElementById('checkin-unlock-btn');
-  if (lockBtn) { lockBtn.style.display = ''; }
-  if (unlockBtn) { unlockBtn.style.display = 'none'; }
+  if (lockBtn) lockBtn.style.display = '';
+  if (unlockBtn) unlockBtn.style.display = 'none';
   document.getElementById('checkin-stage').focus();
 }
 
-// fix 13: auto-restore lock from session if items were already scanned before reload
 {% if locked_stage and locked_team %}
 document.addEventListener('DOMContentLoaded', function() {
   const stageEl = document.getElementById('checkin-stage');
@@ -806,9 +917,7 @@ function confirmCheckoutHasRows() {
 }
 </script>
 
-{% if is_supervisor %}
 <script>
-// ── Quick Stage Update modal ──
 function openQuickStageModal(instanceId, serial, currentStage) {
   document.getElementById('quickStageSerial').textContent = serial;
   document.getElementById('quickStageForm').action = '/stock/instance/' + instanceId + '/view_edit';
@@ -818,44 +927,38 @@ function openQuickStageModal(instanceId, serial, currentStage) {
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
-
 function closeQuickStageModal() {
   document.getElementById('quickStageModal').style.display = 'none';
   document.body.style.overflow = '';
 }
-
-document.getElementById('quickStageModal').addEventListener('click', function(e) {
-  if (e.target === this) closeQuickStageModal();
+document.addEventListener('DOMContentLoaded', function() {
+  const m = document.getElementById('quickStageModal');
+  if (m) m.addEventListener('click', function(e) { if (e.target === this) closeQuickStageModal(); });
 });
+</script>
 
-// ── Reassign modal ──
-function openReassignModal(instanceId, serial, currentUser, currentUserId) {
+{% if is_supervisor %}
+<script>
+function openReassignModal(instanceId, serial, currentUserName, currentUserId) {
   document.getElementById('reassignSerial').textContent = serial;
-  document.getElementById('currentAssignee').textContent = currentUser;
+  document.getElementById('currentAssignee').textContent = currentUserName;
   document.getElementById('reassignForm').action = '/stock/instance/' + instanceId + '/reassign';
-  // Pre-select current assignee in dropdown (so supervisor sees who has it)
   const sel = document.querySelector('#reassignForm select[name="new_user_id"]');
-  if (sel && currentUserId) {
-    sel.value = currentUserId;
-  }
+  if (sel && currentUserId) sel.value = currentUserId;
   const modal = document.getElementById('reassignModal');
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
-
 function closeReassignModal() {
   document.getElementById('reassignModal').style.display = 'none';
   document.body.style.overflow = '';
 }
-
-// Close on backdrop click
-document.getElementById('reassignModal').addEventListener('click', function(e) {
-  if (e.target === this) closeReassignModal();
-});
-
-// Close on Escape
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeReassignModal();
+document.addEventListener('DOMContentLoaded', function() {
+  const m = document.getElementById('reassignModal');
+  if (m) {
+    m.addEventListener('click', function(e) { if (e.target === this) closeReassignModal(); });
+  }
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeReassignModal(); });
 });
 </script>
 {% endif %}

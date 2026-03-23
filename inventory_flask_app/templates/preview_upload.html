@@ -43,7 +43,7 @@
       </div>
     </div>
 
-    <form method="POST" action="/confirm_import">
+    <form method="POST" action="{{ url_for('import_excel_bp.upload_excel') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-primary">
         <i class="bi bi-check2-circle"></i> Confirm Import

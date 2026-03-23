@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Shopify Listings{% endblock %}
+{% block page_title %}Shopify Listings{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title"><i class="bi bi-bag-check me-2" style="color:#96bf48"></i>Shopify Listings</h1>
+    <div class="page-subtitle">{{ instances.total }} unit{{ 's' if instances.total != 1 else '' }} currently listed on Shopify</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('shopify_bp.dashboard') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+  </div>
+</div>
+
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" style="min-width:700px;">
+      <thead>
+        <tr>
+          <th style="font-size:0.78rem;">Make / Model</th>
+          <th style="font-size:0.78rem;">Serial</th>
+          <th style="font-size:0.78rem;">RAM</th>
+          <th style="font-size:0.78rem;">Storage</th>
+          <th style="font-size:0.78rem;">CPU</th>
+          <th style="font-size:0.78rem;">Asking Price</th>
+          <th style="font-size:0.78rem;">Status</th>
+          <th style="font-size:0.78rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inst in instances.items %}
+        {% set p = inst.product %}
+        <tr>
+          <td style="font-size:0.84rem;">
+            <div style="font-weight:600;">{{ p.make or '—' }}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);">{{ p.model or '—' }}</div>
+          </td>
+          <td style="font-size:0.84rem;font-family:monospace;">{{ inst.serial or '—' }}</td>
+          <td style="font-size:0.84rem;">{{ p.ram or '—' }}</td>
+          <td style="font-size:0.84rem;">{{ p.disk1size or '—' }}</td>
+          <td style="font-size:0.84rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ p.cpu or '' }}">{{ p.cpu or '—' }}</td>
+          <td style="font-size:0.84rem;">
+            {% if inst.asking_price is not none %}AED {{ "{:,.0f}".format(inst.asking_price) }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="status-pill status-processed" style="font-size:0.72rem;">Listed</span>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-sm"
+                    onclick="unpublishUnit({{ inst.id }}, this)"
+                    title="Remove from Shopify">
+              <i class="bi bi-cloud-slash"></i> Unpublish
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state" style="padding:2.5rem 0;">
+              <i class="bi bi-bag-x"></i>
+              <p>No units are currently listed on Shopify</p>
+              <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-primary btn-sm">Go to Inventory</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if instances.pages > 1 %}
+  <div style="padding:0.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--border);">
+    <div style="font-size:0.82rem;color:var(--text-muted);">
+      Showing {{ ((instances.page - 1) * instances.per_page) + 1 }}–{{ [instances.page * instances.per_page, instances.total]|min }} of {{ instances.total }}
+    </div>
+    <div style="display:flex;gap:0.25rem;">
+      {% if instances.has_prev %}
+      <a href="{{ url_for('shopify_bp.listings', page=instances.prev_num) }}" class="btn btn-ghost btn-sm"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      {% for p in instances.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <a href="{{ url_for('shopify_bp.listings', page=p) }}" class="btn btn-ghost btn-sm"
+           style="{{ 'color:var(--primary);font-weight:600;' if p == instances.page else '' }}">{{ p }}</a>
+        {% else %}
+        <span style="padding:0.25rem 0.4rem;color:var(--text-muted);">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if instances.has_next %}
+      <a href="{{ url_for('shopify_bp.listings', page=instances.next_num) }}" class="btn btn-ghost btn-sm"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function unpublishUnit(instanceId, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  fetch(`/shopify/unpublish/${instanceId}`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token() }}'},
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      btn.closest('tr').style.opacity = '0.4';
+      showToast('Unit unpublished from Shopify.', 'success');
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-cloud-slash"></i> Unpublish';
+      showToast(data.message || 'Failed to unpublish.', 'danger');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cloud-slash"></i> Unpublish';
+    showToast('Network error.', 'danger');
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Shopify Integration{% endblock %}
+
+{% block extra_head %}
+<style>
+.kpi-card-link { text-decoration: none; display: block; }
+.kpi-card-clickable {
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease);
+}
+.kpi-card-link:hover .kpi-card-clickable {
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.12));
+  border-color: var(--primary);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title"><i class="bi bi-bag-check me-2" style="color:#96bf48"></i>Shopify Integration</h1>
+    <p class="page-subtitle">Connect PCMart to your Shopify store</p>
+  </div>
+  <div class="page-actions">
+    {% if is_connected %}
+      <a href="{{ url_for('shopify_bp.orders_list') }}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-list-ul me-1"></i>Orders
+        {% if pending_count %}<span class="badge bg-danger ms-1">{{ pending_count }}</span>{% endif %}
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not is_connected %}
+<!-- ── NOT CONNECTED ─────────────────────────────────────── -->
+<div class="table-card p-4" style="max-width:600px;margin:0 auto;">
+  <div class="text-center mb-4">
+    <i class="bi bi-bag-check fs-1 d-block mb-2" style="color:#96bf48"></i>
+    <h4>Connect to Shopify</h4>
+    <p class="text-muted">Enter your Shopify Admin API access token to connect PCMart.</p>
+  </div>
+
+  {% if current_user.role == 'admin' %}
+  <form method="POST" action="{{ url_for('shopify_bp.connect_token') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Admin API Access Token</label>
+      <input type="password" name="access_token" class="form-control font-monospace"
+             placeholder="shpat_xxxxxxxxxxxxxxxxxxxx" required autocomplete="off">
+      <div class="form-text">
+        Get it from your Shopify Admin → <strong>Settings → Apps and sales channels → Develop apps</strong>
+        → your app → <strong>API credentials → Admin API access token</strong>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-success w-100">
+      <i class="bi bi-plug me-2"></i>Connect Store
+    </button>
+  </form>
+
+  <hr class="my-4">
+  <p class="text-muted small text-center mb-0">
+    Using a Partner/public app instead?
+    <a href="{{ url_for('shopify_bp.install') }}">Use OAuth flow</a>
+  </p>
+  {% else %}
+  <p class="text-muted text-center">Ask an admin to connect this store.</p>
+  {% endif %}
+</div>
+
+{% else %}
+<!-- ── CONNECTED ─────────────────────────────────────────── -->
+
+<!-- Status bar -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="table-card p-3 text-center">
+      <div class="mb-1"><i class="bi bi-check-circle-fill text-success fs-4"></i></div>
+      <div class="fw-semibold">Connected</div>
+      <small class="text-muted">{{ store_name or 'pcmartae.myshopify.com' }}</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('shopify_bp.listings') }}" class="kpi-card-link">
+      <div class="table-card p-3 text-center kpi-card-clickable">
+        <div class="fs-3 fw-bold text-primary">{{ listed_count }}</div>
+        <small class="text-muted">Units Listed</small>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('shopify_bp.orders_list', status='draft') }}" class="kpi-card-link">
+      <div class="table-card p-3 text-center kpi-card-clickable">
+        <div class="fs-3 fw-bold {{ 'text-danger' if pending_count else '' }}">{{ pending_count }}</div>
+        <small class="text-muted">Pending Orders</small>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-3">
+    <a href="{{ url_for('shopify_bp.orders_list') }}" class="kpi-card-link">
+      <div class="table-card p-3 text-center kpi-card-clickable">
+        <div class="fs-3 fw-bold">{{ order_count }}</div>
+        <small class="text-muted">Total Orders</small>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Settings -->
+  <div class="col-lg-5">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3"><i class="bi bi-toggles me-2"></i>Sync Settings</h6>
+      <form method="POST" action="{{ url_for('shopify_bp.save_settings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" name="enable_shopify_sync" id="sw_sync"
+                 {% if settings.enable_shopify_sync == 'true' %}checked{% endif %}>
+          <label class="form-check-label" for="sw_sync">Enable Shopify Sync</label>
+        </div>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" name="shopify_push_enabled" id="sw_push"
+                 {% if settings.shopify_push_enabled == 'true' %}checked{% endif %}>
+          <label class="form-check-label" for="sw_push">Push to Shopify (publish units)</label>
+        </div>
+        <div class="form-check form-switch mb-4">
+          <input class="form-check-input" type="checkbox" name="shopify_pull_enabled" id="sw_pull"
+                 {% if settings.shopify_pull_enabled == 'true' %}checked{% endif %}>
+          <label class="form-check-label" for="sw_pull">Pull from Shopify (receive orders)</label>
+        </div>
+        {% if current_user.role == 'admin' %}
+        <button type="submit" class="btn btn-primary btn-sm">Save Settings</button>
+        {% endif %}
+      </form>
+
+      <hr>
+
+      {% if current_user.role == 'admin' %}
+      <div class="d-flex gap-2 flex-wrap mt-3">
+        <button class="btn btn-outline-secondary btn-sm" id="btnTest">
+          <i class="bi bi-wifi me-1"></i>Test Connection
+        </button>
+        <form method="POST" action="{{ url_for('shopify_bp.register_webhooks') }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-info btn-sm">
+            <i class="bi bi-arrow-down-up me-1"></i>Register Webhooks
+          </button>
+        </form>
+        <form method="POST" action="{{ url_for('shopify_bp.disconnect') }}"
+              onsubmit="return confirm('Disconnect Shopify?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-x-circle me-1"></i>Disconnect
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent sync log -->
+  <div class="col-lg-7">
+    <div class="table-card">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history me-2"></i>Recent Sync Log</h6>
+        <a href="{{ url_for('shopify_bp.orders_list') }}" class="btn btn-sm btn-outline-primary">
+          View Orders
+        </a>
+      </div>
+      {% if recent_logs %}
+      <table class="table table-sm mb-0">
+        <thead><tr>
+          <th>Action</th><th>Dir</th><th>Status</th><th>Details</th><th>Time</th>
+        </tr></thead>
+        <tbody>
+        {% for log in recent_logs %}
+        <tr>
+          <td><code>{{ log.action }}</code></td>
+          <td><span class="badge bg-{{ 'primary' if log.direction=='push' else 'info' }}">{{ log.direction }}</span></td>
+          <td>
+            {% if log.status == 'success' %}
+              <span class="status-pill status-processed">ok</span>
+            {% else %}
+              <span class="status-pill status-disputed">error</span>
+            {% endif %}
+          </td>
+          <td class="text-truncate" style="max-width:200px">{{ log.details or '—' }}</td>
+          <td class="text-muted small">{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state py-4">
+        <i class="bi bi-journal-x"></i>
+        <p>No sync activity yet</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('btnTest')?.addEventListener('click', function() {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing…';
+  fetch('{{ url_for("shopify_bp.test_connection") }}')
+    .then(r => r.json())
+    .then(d => {
+      showToast(d.success ? `Connected: ${d.message}` : `Failed: ${d.message}`,
+                d.success ? 'success' : 'danger');
+    })
+    .catch(() => showToast('Connection test failed', 'danger'))
+    .finally(() => {
+      this.disabled = false;
+      this.innerHTML = '<i class="bi bi-wifi me-1"></i>Test Connection';
+    });
+});
+</script>
+{% endblock %}

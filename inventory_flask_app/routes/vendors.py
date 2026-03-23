@@ -227,6 +227,7 @@ def vendor_profile(vendor_id):
         VendorNote, Part, Expense
     )
     from collections import defaultdict
+    from sqlalchemy.orm import selectinload
 
     vendor = Vendor.query.filter_by(id=vendor_id, tenant_id=current_user.tenant_id).first_or_404()
     view = request.args.get('view', 'pos')
@@ -235,6 +236,8 @@ def vendor_profile(vendor_id):
     purchase_orders = PurchaseOrder.query.filter_by(
         vendor_id=vendor.id,
         tenant_id=current_user.tenant_id
+    ).options(
+        selectinload(PurchaseOrder.instances).selectinload(ProductInstance.product)
     ).order_by(PurchaseOrder.created_at.desc()).all()
 
     po_list = []

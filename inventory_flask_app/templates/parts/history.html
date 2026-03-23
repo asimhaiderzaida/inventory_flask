@@ -210,7 +210,7 @@
 
             <td style="font-size:0.82rem;">
               {% if m.instance %}
-              <a href="{{ url_for('instances_bp.view_edit_instance', instance_id=m.instance_id) }}"
+              <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=m.instance_id) }}"
                  style="color:var(--primary);font-family:monospace;">
                 {{ m.instance.serial }}
               </a>

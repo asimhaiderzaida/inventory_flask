@@ -222,6 +222,7 @@ def edit_part(part_id):
 @parts_bp.route('/<int:part_id>/delete', methods=['POST'])
 @login_required
 def delete_part(part_id):
+    _require_parts_module()
     part = Part.query.filter_by(
         id=part_id, tenant_id=current_user.tenant_id
     ).first_or_404()
@@ -1164,8 +1165,8 @@ def sell():
             if qty <= 0:
                 errors.append(f'{row_label}: quantity must be at least 1.')
                 continue
-            if price < 0:
-                errors.append(f'{row_label}: unit price cannot be negative.')
+            if price <= 0:
+                errors.append(f'{row_label}: unit price must be greater than 0.')
                 continue
             stock_row = PartStock.query.filter_by(part_id=pid, location_id=lid, bin_id=bid).first()
             available = stock_row.quantity if stock_row else 0

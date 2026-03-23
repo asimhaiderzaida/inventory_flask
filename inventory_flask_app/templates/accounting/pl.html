@@ -32,11 +32,11 @@
       <!-- Quick presets -->
       {% set today = date_to %}
       <div class="col-auto ms-auto d-flex gap-1 flex-wrap">
-        <a href="{{ url_for('accounting_bp.pl') }}?date_from={{ now_month_start }}&date_to={{ today }}"
+        <a href="{{ url_for('accounting_bp.pl') }}?date_from=now_month_start&date_to={{ today }}"
            class="btn btn-xs btn-outline-secondary">This Month</a>
-        <a href="{{ url_for('accounting_bp.pl') }}?date_from={{ last_month_start }}&date_to={{ last_month_end }}"
+        <a href="{{ url_for('accounting_bp.pl') }}?date_from=last_month_start&date_to=last_month_end"
            class="btn btn-xs btn-outline-secondary">Last Month</a>
-        <a href="{{ url_for('accounting_bp.pl') }}?date_from={{ ytd_start }}&date_to={{ today }}"
+        <a href="{{ url_for('accounting_bp.pl') }}?date_from=ytd_start&date_to={{ today }}"
            class="btn btn-xs btn-outline-secondary">YTD</a>
       </div>
     </form>
@@ -151,7 +151,7 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_scripts %}
 <script>
 // Inject preset date helpers
 (function() {

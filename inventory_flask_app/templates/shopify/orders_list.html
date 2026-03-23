@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Shopify Orders{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title"><i class="bi bi-bag-check me-2" style="color:#96bf48"></i>Shopify Orders</h1>
+    <p class="page-subtitle">Review orders received from Shopify</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('shopify_bp.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+  {% for t, label in [('draft','Draft'),('confirmed','Confirmed'),('rejected','Rejected'),('all','All')] %}
+  <li class="nav-item">
+    <a class="nav-link {% if tab == t %}active{% endif %}"
+       href="{{ url_for('shopify_bp.orders_list', tab=t) }}">
+      {{ label }}
+      {% if counts[t] %}<span class="badge bg-{{ 'danger' if t=='draft' else 'secondary' }} ms-1">{{ counts[t] }}</span>{% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="table-card">
+  {% if orders.items %}
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th>Order #</th>
+        <th>Customer</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Status</th>
+        <th>Received</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for so in orders.items %}
+    <tr>
+      <td><strong>#{{ so.shopify_order_number or so.shopify_order_id }}</strong></td>
+      <td>
+        {% if so.customer %}
+          <a href="{{ url_for('customers_bp.customer_profile', customer_id=so.customer_id) }}">
+            {{ so.customer.name }}
+          </a>
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </td>
+      <td>{{ so.currency }} {{ so.total_price or '0.00' }}</td>
+      <td>{{ so.payment_method or '—' }}</td>
+      <td>
+        {% if so.status == 'draft' %}
+          <span class="status-pill status-unprocessed">Draft</span>
+        {% elif so.status == 'confirmed' %}
+          <span class="status-pill status-processed">Confirmed</span>
+        {% elif so.status == 'rejected' %}
+          <span class="status-pill status-disputed">Rejected</span>
+        {% elif so.status == 'cancelled' %}
+          <span class="status-pill status-idle">Cancelled</span>
+        {% else %}
+          <span class="status-pill">{{ so.status }}</span>
+        {% endif %}
+      </td>
+      <td class="text-muted small">{{ so.created_at.strftime('%Y-%m-%d %H:%M') if so.created_at else '—' }}</td>
+      <td>
+        <a href="{{ url_for('shopify_bp.review_order', order_id=so.id) }}"
+           class="btn btn-sm btn-outline-primary">Review</a>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  <div class="table-footer">
+    <div class="text-muted small">
+      Showing {{ orders.items|length }} of {{ orders.total }}
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if orders.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('shopify_bp.orders_list', tab=tab, page=orders.prev_num) }}">‹</a>
+        </li>
+        {% endif %}
+        {% if orders.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('shopify_bp.orders_list', tab=tab, page=orders.next_num) }}">›</a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-bag-x"></i>
+    <p>No {{ tab }} orders</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

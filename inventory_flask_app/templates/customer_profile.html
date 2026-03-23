@@ -3,6 +3,7 @@
 {% block page_title %}Customer Profile{% endblock %}
 
 {% block content %}
+{% set curr = settings.get('currency', '$') %}
 <div class="page-header animate-fade-up">
   <div>
     <h1 class="page-title">{{ customer.name }}</h1>
@@ -50,12 +51,12 @@
   </div>
   <div class="card" style="padding:1rem 1.25rem;">
     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.25rem;">Total Spent</div>
-    <div style="font-size:1.5rem;font-weight:800;color:var(--color-success);line-height:1;">${{ '%.0f'|format(stats.total_spent) }}</div>
+    <div style="font-size:1.5rem;font-weight:800;color:var(--color-success);line-height:1;">{{ curr }}{{ '%.0f'|format(stats.total_spent) }}</div>
     <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">lifetime value</div>
   </div>
   <div class="card" style="padding:1rem 1.25rem;">
     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.25rem;">Avg Order</div>
-    <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1;">${{ '%.0f'|format(stats.avg_order_value) }}</div>
+    <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1;">{{ curr }}{{ '%.0f'|format(stats.avg_order_value) }}</div>
     <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">per order</div>
   </div>
   <div class="card" style="padding:1rem 1.25rem;">
@@ -71,7 +72,7 @@
   <div class="card" style="padding:1rem 1.25rem;{% if stats.outstanding > 0 %}border-color:#fca5a5;background:#fef2f2;{% endif %}">
     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:{% if stats.outstanding > 0 %}var(--color-danger){% else %}var(--text-muted){% endif %};margin-bottom:0.25rem;">Outstanding</div>
     <div style="font-size:1.5rem;font-weight:800;color:{% if stats.outstanding > 0 %}var(--color-danger){% else %}var(--color-success){% endif %};line-height:1;">
-      {% if stats.outstanding > 0 %}-${{ '%.2f'|format(stats.outstanding) }}{% else %}$0{% endif %}
+      {% if stats.outstanding > 0 %}-{{ curr }}{{ '%.2f'|format(stats.outstanding) }}{% else %}{{ curr }}0{% endif %}
     </div>
     <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">balance</div>
   </div>
@@ -79,7 +80,7 @@
   <div class="card" style="padding:1rem 1.25rem;border-color:#a5b4fc;background:#eef2ff;">
     <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#4338ca;margin-bottom:0.25rem;">Credit Balance</div>
     <div style="font-size:1.5rem;font-weight:800;color:#3730a3;line-height:1;">
-      +${{ '%.2f'|format(stats.credit_note_balance) }}
+      +{{ curr }}{{ '%.2f'|format(stats.credit_note_balance) }}
     </div>
     <div style="font-size:0.76rem;margin-top:0.15rem;">
       <a href="{{ url_for('returns_bp.credit_notes', customer_id=customer.id, status='unapplied') }}"
@@ -144,7 +145,7 @@
           <td style="font-weight:600;font-size:0.875rem;">{{ order.order_number }}</td>
           <td style="font-size:0.84rem;">{{ order.order_date.strftime('%Y-%m-%d') if order.order_date else '—' }}</td>
           <td style="font-size:0.84rem;">{{ order.total_units }}</td>
-          <td style="font-weight:600;color:var(--color-success);">${{ "%.2f"|format(order.total_amount) if order.total_amount else "0.00" }}</td>
+          <td style="font-weight:600;color:var(--color-success);">{{ curr }}{{ "%.2f"|format(order.total_amount) if order.total_amount else "0.00" }}</td>
           <td>
             <div class="d-flex gap-1 flex-wrap">
               <a href="{{ url_for('exports_bp.export_order_excel', order_number=order.order_number) }}" class="btn btn-ghost btn-sm">
@@ -184,7 +185,7 @@
                     <td>{{ unit.grade }}</td><td>{{ unit.ram }}</td><td>{{ unit.cpu }}</td>
                     <td>{{ unit.disk1size }}</td>
                     <td><span class="status-pill status-{{ unit.status }}">{{ unit.status }}</span></td>
-                    <td>${{ "%.2f"|format(unit.price_at_sale) if unit.price_at_sale else '—' }}</td>
+                    <td>{{ curr }}{{ "%.2f"|format(unit.price_at_sale) if unit.price_at_sale else '—' }}</td>
                   </tr>
                   {% endfor %}
                 </tbody>
@@ -210,7 +211,7 @@
     <div style="font-size:0.84rem;color:var(--text-secondary);">
       <strong>{{ orders_list|length }}</strong> orders &nbsp;&middot;&nbsp;
       <strong>{{ orders_list|sum(attribute='total_units') }}</strong> units &nbsp;&middot;&nbsp;
-      <strong>${{ "%.2f"|format(orders_list|sum(attribute='total_amount')) }}</strong>
+      <strong>{{ curr }}{{ "%.2f"|format(orders_list|sum(attribute='total_amount')) }}</strong>
     </div>
   </div>
   {% endif %}
@@ -251,7 +252,7 @@
           <td style="font-size:0.82rem;color:var(--text-secondary);">{{ sale.cpu }}</td>
           <td style="font-size:0.82rem;">{{ sale.disk1size }}</td>
           <td><span class="status-pill status-{{ sale.status }}">{{ sale.status }}</span></td>
-          <td style="font-weight:600;color:var(--color-success);">${{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else '—' }}</td>
+          <td style="font-weight:600;color:var(--color-success);">{{ curr }}{{ "%.2f"|format(sale.price_at_sale) if sale.price_at_sale else '—' }}</td>
         </tr>
         {% else %}
         <tr><td colspan="10">
@@ -267,7 +268,7 @@
   <div class="table-footer">
     <div style="font-size:0.84rem;color:var(--text-secondary);">
       <strong>{{ sales_data|length }}</strong> units &nbsp;&middot;&nbsp;
-      <strong>${{ "%.2f"|format(sales_data|sum(attribute='price_at_sale')) }}</strong>
+      <strong>{{ curr }}{{ "%.2f"|format(sales_data|sum(attribute='price_at_sale')) }}</strong>
     </div>
   </div>
   {% endif %}
@@ -382,7 +383,7 @@
             </td>
             <td style="font-size:0.84rem;">{{ r.action or '—' }}</td>
             <td style="font-size:0.84rem;">
-              {% if r.refund_amount %}<span style="color:var(--color-danger);font-weight:600;">-${{ '%.2f'|format(r.refund_amount) }}</span>{% else %}—{% endif %}
+              {% if r.refund_amount %}<span style="color:var(--color-danger);font-weight:600;">-{{ curr }}{{ '%.2f'|format(r.refund_amount) }}</span>{% else %}—{% endif %}
             </td>
             <td>
               {% if r.refund_status == 'issued' %}<span class="status-pill status-processed">Issued</span>
@@ -520,7 +521,7 @@
         {% if total_ar_balance > 0 %}
         <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--radius-md);padding:0.4rem 0.85rem;font-size:0.85rem;color:#b91c1c;">
           <i class="bi bi-exclamation-circle me-1"></i>
-          Total outstanding: <strong>${{ '%.2f'|format(total_ar_balance) }}</strong>
+          Total outstanding: <strong>{{ curr }}{{ '%.2f'|format(total_ar_balance) }}</strong>
         </div>
         {% endif %}
       </div>
@@ -542,11 +543,11 @@
                 <span style="font-family:monospace;font-weight:700;">{{ ar.invoice.invoice_number or '—' }}</span>
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
-              <td style="font-weight:600;">${{ '%.2f'|format(ar.amount_due) }}</td>
+              <td style="font-weight:600;">{{ curr }}{{ '%.2f'|format(ar.amount_due) }}</td>
               <td style="color:var(--color-success);">
-                {% if ar.amount_paid > 0 %}${{ '%.2f'|format(ar.amount_paid) }}{% else %}—{% endif %}
+                {% if ar.amount_paid > 0 %}{{ curr }}{{ '%.2f'|format(ar.amount_paid) }}{% else %}—{% endif %}
               </td>
-              <td style="font-weight:700;color:var(--color-danger);">${{ '%.2f'|format(ar.balance) }}</td>
+              <td style="font-weight:700;color:var(--color-danger);">{{ curr }}{{ '%.2f'|format(ar.balance) }}</td>
               <td>
                 {% if ar.due_date %}
                   <span {% if ar.is_overdue %}style="color:var(--color-danger);font-weight:600;"{% endif %}>
@@ -601,7 +602,7 @@
         {% if customer.parts_balance and customer.parts_balance > 0 %}
         <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--radius-md);padding:0.4rem 0.85rem;font-size:0.85rem;color:#92400e;">
           <i class="bi bi-exclamation-triangle me-1"></i>
-          Outstanding: <strong>${{ '%.2f'|format(customer.parts_balance) }}</strong>
+          Outstanding: <strong>{{ curr }}{{ '%.2f'|format(customer.parts_balance) }}</strong>
         </div>
         {% endif %}
       </div>
@@ -625,7 +626,7 @@
               </td>
               <td style="white-space:nowrap;">{{ txn.sold_at.strftime('%d %b %Y') if txn.sold_at else '—' }}</td>
               <td style="text-align:center;">{{ txn.line_items | length }}</td>
-              <td style="text-align:right;font-weight:600;">${{ '%.2f'|format(txn.total_amount) }}</td>
+              <td style="text-align:right;font-weight:600;">{{ curr }}{{ '%.2f'|format(txn.total_amount) }}</td>
               <td>{{ txn.payment_method.title() }}</td>
               <td>
                 {% if txn.payment_status == 'paid' %}

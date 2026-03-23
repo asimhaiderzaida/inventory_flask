@@ -55,7 +55,7 @@
         </td>
         <td class="small">
           {% if ar.invoice %}
-          <a href="{{ url_for('invoices_bp.invoice_view', invoice_id=ar.invoice_id) }}"
+          <a href="{{ url_for('invoices_bp.view_invoice', invoice_id=ar.invoice_id) }}"
              class="text-decoration-none text-muted">
             #{{ ar.invoice.invoice_number or ar.invoice_id }}
           </a>

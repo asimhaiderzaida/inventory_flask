@@ -21,7 +21,7 @@
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.25rem;">
         The exported file includes all visible columns including Asset Tag and respects current filters.
       </p>
-      <form action="/export/instances" method="GET">
+      <form action="{{ url_for('stock_bp.export_instances') }}" method="GET">
         <div class="mb-3">
           <label class="form-label">Filter by Model (optional)</label>
           <input type="text" class="form-control" name="model" placeholder="e.g. Latitude 7490">

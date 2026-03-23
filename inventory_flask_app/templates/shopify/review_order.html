@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Review Shopify Order #{{ so.shopify_order_number }}{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-bag-check me-2" style="color:#96bf48"></i>
+      Order #{{ so.shopify_order_number or so.shopify_order_id }}
+    </h1>
+    <p class="page-subtitle">
+      Received {{ so.created_at.strftime('%Y-%m-%d %H:%M') if so.created_at else '' }}
+      &nbsp;|&nbsp;
+      {% if so.status == 'draft' %}<span class="status-pill status-unprocessed">Draft</span>
+      {% elif so.status == 'confirmed' %}<span class="status-pill status-processed">Confirmed</span>
+      {% elif so.status == 'rejected' %}<span class="status-pill status-disputed">Rejected</span>
+      {% else %}<span class="status-pill">{{ so.status }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('shopify_bp.orders_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Order details -->
+  <div class="col-lg-6">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3">Order Details</h6>
+      <table class="table table-sm table-borderless mb-0">
+        <tr><th class="text-muted fw-normal">Shopify ID</th><td>{{ so.shopify_order_id }}</td></tr>
+        <tr><th class="text-muted fw-normal">Total</th><td>{{ so.currency }} {{ so.total_price or '0.00' }}</td></tr>
+        <tr><th class="text-muted fw-normal">Payment</th><td>{{ so.payment_method or '—' }}</td></tr>
+        <tr><th class="text-muted fw-normal">Customer</th>
+          <td>
+            {% if so.customer %}
+              <a href="{{ url_for('customers_bp.customer_profile', customer_id=so.customer_id) }}">
+                {{ so.customer.name }}
+              </a>
+              {% if so.customer.email %}<br><small class="text-muted">{{ so.customer.email }}</small>{% endif %}
+            {% else %}
+              <span class="text-muted">No customer linked</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if so.order_id %}
+        <tr><th class="text-muted fw-normal">PCMart Order</th>
+          <td><a href="{{ url_for('order_bp.customer_orders') }}">View Order</a></td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  <!-- Line items from Shopify JSON -->
+  <div class="col-lg-6">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3">Line Items</h6>
+      {% if order_data.get('line_items') %}
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead>
+        <tbody>
+        {% for item in order_data.line_items %}
+        <tr>
+          <td>{{ item.title or '—' }}<br><small class="text-muted">{{ item.variant_title or '' }}</small></td>
+          <td><code>{{ item.sku or '—' }}</code></td>
+          <td>{{ item.quantity }}</td>
+          <td>{{ item.price }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted small">No line item data available.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Shipping address -->
+  {% if order_data.get('shipping_address') %}
+  <div class="col-lg-6">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3">Shipping Address</h6>
+      {% set addr = order_data.shipping_address %}
+      <p class="mb-1">{{ addr.get('name','') }}</p>
+      <p class="mb-1 text-muted">{{ addr.get('address1','') }} {{ addr.get('address2','') }}</p>
+      <p class="mb-1 text-muted">{{ addr.get('city','') }}, {{ addr.get('country','') }}</p>
+      <p class="mb-0 text-muted">{{ addr.get('phone','') }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  {% if so.status == 'draft' %}
+  <div class="col-12">
+    <div class="table-card p-4">
+      <h6 class="fw-semibold mb-3">Actions</h6>
+      <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('shopify_bp.confirm_order', order_id=so.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-success">
+            <i class="bi bi-check-circle me-1"></i>Confirm Order
+          </button>
+        </form>
+        <form method="POST" action="{{ url_for('shopify_bp.reject_order', order_id=so.id) }}"
+              onsubmit="return confirm('Reject this order?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger">
+            <i class="bi bi-x-circle me-1"></i>Reject Order
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

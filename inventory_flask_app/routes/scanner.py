@@ -552,7 +552,7 @@ def scan_move():
                     duration = calc_duration_minutes(instance.entered_stage_at)
                     now_ts = get_now_for_tenant()
                     # Only update fields when a real value was selected/entered
-                    if status in ['unprocessed', 'under_process', 'processed', 'sold', 'idle', 'disputed']:
+                    if status in ['unprocessed', 'under_process', 'processed', 'idle', 'disputed']:
                         instance.status = status
                     if process_stage:
                         instance.process_stage = process_stage
