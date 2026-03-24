@@ -1,8 +1,25 @@
+import csv
+import io
 import logging
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+import zipfile
+from datetime import datetime
+from io import BytesIO
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file
 from flask_login import login_required, current_user
-from inventory_flask_app.models import TenantSettings, ProcessStage, CustomField, CustomFieldValue, db, UserPermission, MODULES
+from inventory_flask_app.models import (
+    TenantSettings, ProcessStage, CustomField, CustomFieldValue,
+    db, UserPermission, MODULES,
+    ProductInstance, Product,
+    SaleTransaction, SaleItem, Invoice, Order,
+    Customer, CustomerOrderTracking,
+    Vendor,
+    Part, PartUsage, PartSale, PartSaleTransaction, PartSaleItem,
+    PurchaseOrder,
+    Expense, AccountReceivable, ARPayment, OtherIncome, CreditNote,
+    ProductProcessLog, Return, User,
+)
 from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
 from inventory_flask_app.utils.utils import admin_required
@@ -592,3 +609,284 @@ def user_permissions(user_id):
         MODULES=MODULES,
         module_descriptions=MODULE_DESCRIPTIONS,
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# Backup & Factory Reset
+# ─────────────────────────────────────────────────────────────
+
+@admin_bp.route('/admin/backup/download')
+@login_required
+@admin_required
+def download_backup():
+    tid = current_user.tenant_id
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+
+        # 1. inventory_units.csv
+        rows = (db.session.query(ProductInstance, Product)
+                .join(Product, ProductInstance.product_id == Product.id)
+                .filter(ProductInstance.tenant_id == tid).all())
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Serial', 'Asset Tag', 'Make', 'Model', 'Item Name',
+                    'CPU', 'RAM', 'Disk', 'Display', 'GPU1', 'Grade',
+                    'Status', 'Location', 'Asking Price', 'Is Sold',
+                    'Created At', 'PO Number'])
+        for inst, prod in rows:
+            w.writerow([
+                inst.serial, inst.asset, prod.make, prod.model,
+                prod.item_name, prod.cpu, prod.ram, prod.disk1size,
+                prod.display, prod.gpu1, prod.grade, inst.status,
+                inst.location.name if inst.location else '',
+                inst.asking_price, inst.is_sold,
+                inst.created_at.strftime('%Y-%m-%d') if inst.created_at else '',
+                inst.po.po_number if inst.po else '',
+            ])
+        zf.writestr('inventory_units.csv', buf.getvalue())
+
+        # 2. sales_invoices.csv
+        sales = (SaleTransaction.query
+                 .join(Invoice, SaleTransaction.invoice_id == Invoice.id)
+                 .filter(Invoice.tenant_id == tid).all())
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Invoice #', 'Date', 'Customer', 'Serial', 'Model',
+                    'Sale Price', 'Payment Method', 'Status'])
+        for s in sales:
+            w.writerow([
+                s.invoice.invoice_number if s.invoice else '',
+                s.date_sold.strftime('%Y-%m-%d') if s.date_sold else '',
+                s.customer.name if s.customer else '',
+                s.product_instance.serial if s.product_instance else '',
+                (s.product_instance.product.model
+                 if s.product_instance and s.product_instance.product else ''),
+                s.price_at_sale, s.payment_method, s.payment_status,
+            ])
+        zf.writestr('sales_invoices.csv', buf.getvalue())
+
+        # 3. customers.csv
+        customers = Customer.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Name', 'Email', 'Phone', 'Company', 'Address',
+                    'City', 'Country', 'Created At'])
+        for c in customers:
+            w.writerow([c.name, c.email, c.phone, c.company,
+                        c.address, c.city, c.country,
+                        c.created_at.strftime('%Y-%m-%d') if c.created_at else ''])
+        zf.writestr('customers.csv', buf.getvalue())
+
+        # 4. vendors.csv
+        vendors = Vendor.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Name', 'Email', 'Phone', 'Website', 'City',
+                    'Country', 'Payment Terms', 'Notes'])
+        for v in vendors:
+            w.writerow([v.name, v.email, v.phone, v.website,
+                        v.city, v.country, v.payment_terms, v.notes])
+        zf.writestr('vendors.csv', buf.getvalue())
+
+        # 5. parts.csv
+        parts = Part.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Part Number', 'Name', 'Type', 'Vendor',
+                    'Description', 'Total Stock', 'Min Stock', 'Price', 'Barcode'])
+        for p in parts:
+            stock_total = sum(s.quantity for s in p.stocks)
+            w.writerow([p.part_number, p.name, p.part_type, p.vendor,
+                        p.description, stock_total, p.min_stock,
+                        p.price, p.barcode])
+        zf.writestr('parts.csv', buf.getvalue())
+
+        # 6. purchase_orders.csv
+        pos = PurchaseOrder.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['PO Number', 'Vendor', 'Status', 'Location',
+                    'Units Expected', 'Units Received', 'Created At', 'Notes'])
+        for po in pos:
+            total    = po.items.count()
+            received = po.items.filter_by(status='received').count()
+            w.writerow([
+                po.po_number,
+                po.vendor.name if po.vendor else '',
+                po.status,
+                po.location.name if po.location else '',
+                total, received,
+                po.created_at.strftime('%Y-%m-%d') if po.created_at else '',
+                po.notes,
+            ])
+        zf.writestr('purchase_orders.csv', buf.getvalue())
+
+        # 7. accounting_expenses.csv
+        expenses = Expense.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Date', 'Category', 'Description', 'Amount',
+                    'Payment Method', 'Reference'])
+        for e in expenses:
+            w.writerow([
+                e.expense_date.strftime('%Y-%m-%d') if e.expense_date else '',
+                e.category.name if e.category else '',
+                e.description, e.amount,
+                e.payment_method, e.reference,
+            ])
+        zf.writestr('accounting_expenses.csv', buf.getvalue())
+
+        # 8. accounting_ar.csv
+        ars = AccountReceivable.query.filter_by(tenant_id=tid).all()
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(['Customer', 'Invoice #', 'Amount Due', 'Amount Paid',
+                    'Balance', 'Due Date', 'Status'])
+        for ar in ars:
+            w.writerow([
+                ar.customer.name if ar.customer else '',
+                ar.invoice.invoice_number if ar.invoice else '',
+                ar.amount_due, ar.amount_paid, ar.balance,
+                ar.due_date.strftime('%Y-%m-%d') if ar.due_date else '',
+                ar.status,
+            ])
+        zf.writestr('accounting_ar.csv', buf.getvalue())
+
+        # 9. backup_info.txt
+        zf.writestr('backup_info.txt', (
+            f"Backup\n"
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Tenant: {current_user.tenant.name}\n\n"
+            f"Record Counts:\n"
+            f"- Inventory Units: {len(rows)}\n"
+            f"- Sales: {len(sales)}\n"
+            f"- Customers: {len(customers)}\n"
+            f"- Vendors: {len(vendors)}\n"
+            f"- Parts: {len(parts)}\n"
+            f"- Purchase Orders: {len(pos)}\n"
+            f"- Expenses: {len(expenses)}\n"
+            f"- AR Records: {len(ars)}\n"
+        ))
+
+    zip_buffer.seek(0)
+    filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    return send_file(zip_buffer, mimetype='application/zip',
+                     as_attachment=True, download_name=filename)
+
+
+@admin_bp.route('/admin/reset/confirm', methods=['POST'])
+@login_required
+@admin_required
+def confirm_reset():
+    if request.form.get('confirm_text', '').strip() != 'RESET':
+        flash('You must type RESET exactly to confirm.', 'danger')
+        return redirect(url_for('admin_bp.admin_settings') + '#sec-data')
+
+    sel = {
+        'inventory':  'reset_inventory'  in request.form,
+        'sales':      'reset_sales'      in request.form,
+        'customers':  'reset_customers'  in request.form,
+        'vendors':    'reset_vendors'    in request.form,
+        'parts':      'reset_parts'      in request.form,
+        'pos':        'reset_pos'        in request.form,
+        'accounting': 'reset_accounting' in request.form,
+        'processing': 'reset_processing' in request.form,
+        'users':      'reset_users'      in request.form,
+        'settings':   'reset_settings'   in request.form,
+    }
+
+    if not any(sel.values()):
+        flash('Select at least one category to reset.', 'warning')
+        return redirect(url_for('admin_bp.admin_settings') + '#sec-data')
+
+    try:
+        _execute_reset(current_user.tenant_id, current_user.id, sel)
+        labels = [k.replace('_', ' ').title() for k, v in sel.items() if v]
+        flash(f'Factory reset complete. Cleared: {", ".join(labels)}.', 'success')
+        logger.warning(
+            'Factory reset by user %s (tenant %s): %s',
+            current_user.username, current_user.tenant_id, ', '.join(labels)
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error('Factory reset error tenant %s: %s', current_user.tenant_id, e)
+        flash(f'Reset failed: {e}', 'danger')
+
+    return redirect(url_for('dashboard_bp.main_dashboard'))
+
+
+def _execute_reset(tid, uid, sel):
+    """Delete tenant data in FK-safe order based on selections."""
+
+    # ── 1. Accounting leaf nodes (must precede AccountReceivable/Return) ──
+    if sel['accounting']:
+        ARPayment.query.filter_by(tenant_id=tid).delete()
+        CreditNote.query.filter_by(tenant_id=tid).delete()
+
+    # ── 2. Return records (cross-referenced by inventory / sales / parts) ─
+    if sel['inventory'] or sel['sales'] or sel['parts']:
+        Return.query.filter_by(tenant_id=tid).delete()
+
+    # ── 3. Processing history ─────────────────────────────────────────────
+    if sel['processing']:
+        pi_sq = db.session.query(ProductInstance.id).filter_by(tenant_id=tid).subquery()
+        ProductProcessLog.query.filter(
+            ProductProcessLog.product_instance_id.in_(pi_sq)
+        ).delete(synchronize_session=False)
+
+    # ── 4. Accounting parent records ──────────────────────────────────────
+    if sel['accounting']:
+        AccountReceivable.query.filter_by(tenant_id=tid).delete()
+        Expense.query.filter_by(tenant_id=tid).delete()
+        OtherIncome.query.filter_by(tenant_id=tid).delete()
+
+    # ── 5. Parts (PartSaleTransaction cascade → PartSaleItem) ────────────
+    if sel['parts']:
+        PartSaleTransaction.query.filter_by(tenant_id=tid).delete()   # cascades PartSaleItem
+        PartUsage.query.filter_by(tenant_id=tid).delete()
+        PartSale.query.filter_by(tenant_id=tid).delete()
+        Part.query.filter_by(tenant_id=tid).delete()                  # cascades PartMovement, PartStock
+
+    # ── 6. Sales (SaleTransaction cascade → SaleItem) ────────────────────
+    if sel['sales']:
+        pi_sq = db.session.query(ProductInstance.id).filter_by(tenant_id=tid).subquery()
+        SaleTransaction.query.filter(
+            SaleTransaction.product_instance_id.in_(pi_sq)
+        ).delete(synchronize_session=False)                            # cascades SaleItem
+        Invoice.query.filter_by(tenant_id=tid).delete()
+        Order.query.filter_by(tenant_id=tid).delete()
+
+    # ── 7. Purchase Orders (cascade → PurchaseOrderItem, POImportLog) ────
+    if sel['pos']:
+        PurchaseOrder.query.filter_by(tenant_id=tid).delete()
+
+    # ── 8. Inventory (cascade → SaleTransaction, ProductProcessLog,
+    #                  CustomerOrderTracking, CustomFieldValue) ───────────
+    if sel['inventory']:
+        ProductInstance.query.filter_by(tenant_id=tid).delete()
+        Product.query.filter_by(tenant_id=tid).delete()
+
+    # ── 9. Customers (cascade → CustomerNote, CustomerCommunication,
+    #                  CustomerOrderTracking) ────────────────────────────
+    if sel['customers']:
+        Customer.query.filter_by(tenant_id=tid).delete()
+
+    # ── 10. Vendors (cascade → VendorNote) ───────────────────────────────
+    if sel['vendors']:
+        Vendor.query.filter_by(tenant_id=tid).delete()
+
+    # ── 11. Users (except current admin) ─────────────────────────────────
+    if sel['users']:
+        UserPermission.query.filter_by(tenant_id=tid).delete()
+        User.query.filter(
+            User.tenant_id == tid, User.id != uid
+        ).delete(synchronize_session=False)
+
+    # ── 12. Settings ──────────────────────────────────────────────────────
+    if sel['settings']:
+        TenantSettings.query.filter_by(tenant_id=tid).delete()
+        ProcessStage.query.filter_by(tenant_id=tid).delete()
+        CustomField.query.filter_by(tenant_id=tid).delete()           # cascade → CustomFieldValue
+
+    db.session.commit()
