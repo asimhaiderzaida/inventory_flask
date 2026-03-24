@@ -19,7 +19,7 @@
 <div class="card mb-3 animate-fade-up">
   <div class="card-body py-3">
     <form method="GET" class="row g-2 align-items-end">
-      <div class="col-sm-3">
+      <div class="col-sm-2">
         <label class="form-label small">PO</label>
         <select name="po_id" class="form-select form-select-sm">
           <option value="">All POs</option>
@@ -39,14 +39,31 @@
         </select>
       </div>
       <div class="col-sm-2">
+        <label class="form-label small">Location</label>
+        <select name="location" class="form-select form-select-sm">
+          <option value="">Any location</option>
+          {% for loc in locations %}
+          <option value="{{ loc.name }}" {% if filters.location == loc.name %}selected{% endif %}>{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-1">
+        <label class="form-label small">Priced</label>
+        <select name="priced" class="form-select form-select-sm">
+          <option value="">Any</option>
+          <option value="yes" {% if filters.priced == 'yes' %}selected{% endif %}>Yes</option>
+          <option value="no"  {% if filters.priced == 'no'  %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="col-sm-2">
         <label class="form-label small">Make</label>
         <input type="text" name="make" class="form-control form-control-sm" placeholder="e.g. Dell" value="{{ filters.make }}">
       </div>
-      <div class="col-sm-2">
+      <div class="col-sm-1">
         <label class="form-label small">Model</label>
         <input type="text" name="model" class="form-control form-control-sm" placeholder="e.g. Latitude" value="{{ filters.model }}">
       </div>
-      <div class="col-sm-3 d-flex gap-2">
+      <div class="col-sm-2 d-flex gap-2">
         <button type="submit" class="btn btn-primary btn-sm flex-fill">
           <i class="bi bi-search"></i> Filter
         </button>

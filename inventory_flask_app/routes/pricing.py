@@ -6,7 +6,7 @@ from flask_login import login_required, current_user
 
 from inventory_flask_app.models import (
     db, PurchaseOrder, ProductInstance, Product,
-    UnitCost, POCostSettings,
+    UnitCost, POCostSettings, Location,
 )
 from inventory_flask_app.utils.utils import module_required
 
@@ -247,10 +247,12 @@ def bulk_pricing():
     tid = current_user.tenant_id
 
     # Filters
-    po_id    = request.args.get('po_id', type=int)
-    status   = request.args.get('status', '')
-    make     = request.args.get('make', '').strip()
-    model    = request.args.get('model', '').strip()
+    po_id       = request.args.get('po_id', type=int)
+    status      = request.args.get('status', '')
+    make        = request.args.get('make', '').strip()
+    model       = request.args.get('model', '').strip()
+    location    = request.args.get('location', '').strip()
+    priced      = request.args.get('priced', '')  # 'yes' | 'no' | ''
 
     q = (
         ProductInstance.query
@@ -265,19 +267,32 @@ def bulk_pricing():
         q = q.filter(Product.make.ilike(f'%{make}%'))
     if model:
         q = q.filter(Product.model.ilike(f'%{model}%'))
+    if location:
+        q = q.join(Location, ProductInstance.location_id == Location.id).filter(
+            Location.name == location
+        )
+    if priced == 'yes':
+        q = q.filter(ProductInstance.asking_price != None)
+    elif priced == 'no':
+        q = q.filter(ProductInstance.asking_price == None)
 
     instances = q.order_by(Product.make, Product.model).limit(200).all()
 
-    # PO list for filter dropdown
+    # Sidebar data for filter dropdowns
     pos = PurchaseOrder.query.filter_by(tenant_id=tid).order_by(
         PurchaseOrder.created_at.desc()
     ).limit(50).all()
+    locations = Location.query.filter_by(tenant_id=tid).order_by(Location.name).all()
 
     return render_template(
         'pricing/bulk_pricing.html',
         instances=instances,
         pos=pos,
-        filters={'po_id': po_id, 'status': status, 'make': make, 'model': model},
+        locations=locations,
+        filters={
+            'po_id': po_id, 'status': status, 'make': make,
+            'model': model, 'location': location, 'priced': priced,
+        },
     )
 
 

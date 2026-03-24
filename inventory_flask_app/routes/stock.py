@@ -158,6 +158,7 @@ def remove_checkout_scan(serial):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/bulk_price')
 @login_required
+@admin_or_supervisor_required
 def bulk_price_editor():
     status_filter   = request.args.get('status', 'processed')
     model_filter    = request.args.get('model', '').strip()
@@ -195,6 +196,7 @@ def bulk_price_editor():
 
 @stock_bp.route('/bulk_price/save', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def bulk_price_save():
     data = request.get_json()
     if not data:

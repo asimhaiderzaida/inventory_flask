@@ -1137,7 +1137,7 @@
       {% set is_sales      = ep.startswith('sales_bp') or ep.startswith('order_bp') or ep.startswith('invoices_bp') or ep.startswith('orders_bp') %}
       {% set is_people     = ep.startswith('customers_bp') or ep.startswith('vendors_bp') %}
       {% set is_reports    = ep.startswith('reports_bp') %}
-      {% set is_admin      = ep.startswith('admin_bp') or ep == 'auth.register_user' or ep == 'stock_bp.bulk_price_editor' %}
+      {% set is_admin      = ep.startswith('admin_bp') or ep == 'auth.register_user' %}
       {% set is_accounting = ep.startswith('accounting_bp') or ep.startswith('pricing_bp') %}
 
       {% if current_user.role == 'technician' %}
@@ -1223,6 +1223,14 @@
           <i class="bi bi-qr-code-scan nav-icon"></i>
           <span class="sidebar-label">Scanner</span>
         </a>
+
+        {% if current_user.can_access('accounting') %}
+        <a href="{{ url_for('stock_bp.bulk_price_editor') }}"
+           class="sidebar-link {% if ep == 'stock_bp.bulk_price_editor' %}active{% endif %}">
+          <i class="bi bi-tag nav-icon"></i>
+          <span class="sidebar-label">Quick Price Editor</span>
+        </a>
+        {% endif %}
 
         {% if settings.enable_parts_module == 'true' %}
         <a href="{{ url_for('parts_bp.parts_list') }}"
@@ -1586,11 +1594,6 @@
              class="sidebar-link {% if ep == 'admin_bp.admin_stages' %}active{% endif %}">
             <i class="bi bi-list-columns nav-icon"></i>
             <span class="sidebar-label">Stages</span>
-          </a>
-          <a href="{{ url_for('stock_bp.bulk_price_editor') }}"
-             class="sidebar-link {% if ep == 'stock_bp.bulk_price_editor' %}active{% endif %}">
-            <i class="bi bi-tag nav-icon"></i>
-            <span class="sidebar-label">Bulk Price</span>
           </a>
           <a href="{{ url_for('admin_bp.admin_self_test') }}"
              class="sidebar-link {% if ep == 'admin_bp.admin_self_test' %}active{% endif %}">
