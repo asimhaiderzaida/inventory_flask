@@ -105,7 +105,7 @@
       <tbody>
         {% for inst in instances %}
         {% set uc = inst.unit_cost %}
-        <tr data-id="{{ inst.id }}" data-suggested="{{ float(uc.suggested_price) if uc else 0 }}">
+        <tr data-id="{{ inst.id }}" data-suggested="{{ uc.suggested_price|float if uc else 0 }}">
           <td>
             <input class="form-check-input row-check" type="checkbox" value="{{ inst.id }}">
           </td>
@@ -114,14 +114,14 @@
           <td><span class="status-pill status-{{ inst.status }}">{{ inst.status.replace('_', ' ') }}</span></td>
           <td>
             {% if uc and uc.total_cost %}
-              ${{ "%.2f"|format(float(uc.total_cost)) }}
+              ${{ "%.2f"|format(uc.total_cost|float) }}
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>
             {% if uc and uc.suggested_price %}
-              <span class="text-success fw-medium">${{ "%.2f"|format(float(uc.suggested_price)) }}</span>
+              <span class="text-success fw-medium">${{ "%.2f"|format(uc.suggested_price|float) }}</span>
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
@@ -132,13 +132,13 @@
               <input type="number" step="0.01" min="0"
                      class="form-control asking-input"
                      data-instance="{{ inst.id }}"
-                     data-original="{{ "%.2f"|format(float(inst.asking_price or 0)) }}"
-                     value="{{ "%.2f"|format(float(inst.asking_price or 0)) }}">
+                     data-original="{{ "%.2f"|format((inst.asking_price or 0)|float) }}"
+                     value="{{ "%.2f"|format((inst.asking_price or 0)|float) }}">
             </div>
           </td>
           <td class="small" id="marginCell{{ inst.id }}">
-            {% if uc and uc.total_cost and float(uc.total_cost) > 0 and inst.asking_price %}
-              {% set m = (float(inst.asking_price) - float(uc.total_cost)) / float(uc.total_cost) * 100 %}
+            {% if uc and uc.total_cost and uc.total_cost|float > 0 and inst.asking_price %}
+              {% set m = (inst.asking_price|float - uc.total_cost|float) / uc.total_cost|float * 100 %}
               <span class="{{ 'text-success' if m >= 0 else 'text-danger' }}">{{ "%.1f"|format(m) }}%</span>
             {% else %}
               <span class="text-muted">—</span>

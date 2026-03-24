@@ -39,7 +39,7 @@
                  value="{{ settings.total_shipping or 0 }}" placeholder="0.00">
           {% if unit_count > 0 %}
           <div class="form-text" id="shippingPerUnitPreview">
-            ≈ ${{ "%.2f"|format(float(settings.total_shipping or 0) / unit_count) }} per unit
+            ≈ ${{ "%.2f"|format((settings.total_shipping or 0)|float / unit_count) }} per unit
           </div>
           {% endif %}
         </div>

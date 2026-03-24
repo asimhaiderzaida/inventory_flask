@@ -47,7 +47,7 @@
               <span class="input-group-text">$</span>
               <input type="number" name="{{ name }}" step="0.01" min="0"
                      class="form-control cost-field"
-                     value="{{ "%.2f"|format(float(val or 0)) }}"
+                     value="{{ "%.2f"|format((val or 0)|float) }}"
                      data-field="{{ name }}">
             </div>
           </div>
@@ -66,7 +66,7 @@
             <input type="number" name="margin_percent" step="0.5" min="0" max="500"
                    class="form-control form-control-sm"
                    id="marginInput"
-                   value="{{ "%.1f"|format(float(uc.margin_percent or 25)) }}"
+                   value="{{ "%.1f"|format((uc.margin_percent or 25)|float) }}"
                    style="max-width:100px;">
           </div>
 
@@ -96,27 +96,27 @@
 
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Total Cost</span>
-          <span class="fw-bold" id="previewTotalCost">${{ "%.2f"|format(float(uc.total_cost or 0)) }}</span>
+          <span class="fw-bold" id="previewTotalCost">${{ "%.2f"|format((uc.total_cost or 0)|float) }}</span>
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Margin</span>
-          <span id="previewMargin">{{ "%.1f"|format(float(uc.margin_percent or 25)) }}%</span>
+          <span id="previewMargin">{{ "%.1f"|format((uc.margin_percent or 25)|float) }}%</span>
         </div>
         <div class="d-flex justify-content-between mb-3">
           <span class="text-muted fw-medium">Suggested Price</span>
-          <span class="fw-bold text-success fs-5" id="previewSuggested">${{ "%.2f"|format(float(uc.suggested_price or 0)) }}</span>
+          <span class="fw-bold text-success fs-5" id="previewSuggested">${{ "%.2f"|format((uc.suggested_price or 0)|float) }}</span>
         </div>
 
         <hr>
 
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Current Asking Price</span>
-          <span id="currentAsking">${{ "%.2f"|format(float(inst.asking_price or 0)) }}</span>
+          <span id="currentAsking">${{ "%.2f"|format((inst.asking_price or 0)|float) }}</span>
         </div>
-        {% if inst.asking_price and float(inst.asking_price) > 0 and float(uc.suggested_price or 0) > 0 %}
+        {% if inst.asking_price and inst.asking_price|float > 0 and (uc.suggested_price or 0)|float > 0 %}
         <div class="d-flex justify-content-between">
           <span class="text-muted">vs Suggested</span>
-          {% set diff = float(inst.asking_price) - float(uc.suggested_price) %}
+          {% set diff = inst.asking_price|float - uc.suggested_price|float %}
           <span class="{% if diff >= 0 %}text-success{% else %}text-danger{% endif %}">
             {{ '+' if diff >= 0 else '' }}${{ "%.2f"|format(diff) }}
           </span>
