@@ -109,7 +109,7 @@
           <td>
             <input class="form-check-input row-check" type="checkbox" value="{{ inst.id }}">
           </td>
-          <td class="fw-medium">{{ get_instance_id(inst) }}</td>
+          <td class="fw-medium">{{ inst.serial or inst.id }}</td>
           <td class="text-muted small">{{ inst.product.make }} {{ inst.product.model }}</td>
           <td><span class="status-pill status-{{ inst.status }}">{{ inst.status.replace('_', ' ') }}</span></td>
           <td>

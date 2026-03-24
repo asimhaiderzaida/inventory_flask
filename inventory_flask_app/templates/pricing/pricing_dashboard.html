@@ -70,7 +70,7 @@
         <tbody>
           {% for r in at_risk %}
           <tr>
-            <td><a href="{{ url_for('instances_bp.view_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ get_instance_id(r.instance) }}</a></td>
+            <td><a href="{{ url_for('instances_bp.view_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ r.instance.serial or r.instance.id }}</a></td>
             <td class="text-muted">{{ r.instance.product.make }} {{ r.instance.product.model }}</td>
             <td>${{ "%.2f"|format(float(r.unit_cost.total_cost or 0)) }}</td>
             <td class="text-success fw-medium">${{ "%.2f"|format(r.suggested) }}</td>

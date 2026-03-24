@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Unit Cost — {{ get_instance_id(inst) }}{% endblock %}
+{% block title %}Unit Cost — {{ inst.serial or inst.id }}{% endblock %}
 {% block page_title %}Unit Cost Editor{% endblock %}
 
 {% block content %}
 <div class="page-header animate-fade-up">
   <div>
     <h1 class="page-title">Unit Cost Editor</h1>
-    <div class="page-subtitle">{{ get_instance_id(inst) }} · {{ inst.product.make }} {{ inst.product.model }}</div>
+    <div class="page-subtitle">{{ inst.serial or inst.id }} · {{ inst.product.make }} {{ inst.product.model }}</div>
   </div>
   <div class="page-actions">
     <a href="{{ url_for('instances_bp.view_instance', instance_id=inst.id) }}" class="btn btn-ghost">
