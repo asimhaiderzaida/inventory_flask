@@ -21,7 +21,7 @@ from inventory_flask_app.utils.shopify_utils import (
     verify_webhook, build_description, build_title, build_tags,
     shorten_cpu, format_storage, log_sync, _get_setting, _set_setting,
 )
-from inventory_flask_app.utils.utils import admin_required
+from inventory_flask_app.utils.utils import admin_required, admin_or_supervisor_required
 
 logger = logging.getLogger(__name__)
 shopify_bp = Blueprint('shopify_bp', __name__, url_prefix='/shopify')
@@ -214,7 +214,7 @@ def oauth_callback():
 
 @shopify_bp.route('/')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def dashboard():
     """Shopify integration dashboard."""
     tid = current_user.tenant_id
@@ -269,7 +269,7 @@ def dashboard():
 
 @shopify_bp.route('/settings', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def save_settings():
     """Save Shopify toggle settings."""
     _require_admin()
@@ -282,7 +282,7 @@ def save_settings():
 
 @shopify_bp.route('/disconnect', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def disconnect():
     """Remove stored access token to disconnect Shopify."""
     _require_admin()
@@ -295,7 +295,7 @@ def disconnect():
 
 @shopify_bp.route('/test_webhook_payload')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def test_webhook_payload():
     """Show exactly what would be sent to Shopify for webhook registration."""
     store_url   = current_app.config.get('SHOPIFY_STORE_URL', '')
@@ -321,7 +321,7 @@ def test_webhook_payload():
 
 @shopify_bp.route('/test')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def test_connection():
     """AJAX endpoint: test Shopify API connectivity."""
     client = get_shopify_client(current_user.tenant_id)
@@ -337,7 +337,7 @@ def test_connection():
 
 @shopify_bp.route('/publish/<int:instance_id>', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def publish_instance(instance_id):
     """Publish a single unit to Shopify (create product or add inventory)."""
     tid = current_user.tenant_id
@@ -472,7 +472,7 @@ def publish_instance(instance_id):
 
 @shopify_bp.route('/unpublish/<int:instance_id>', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def unpublish_instance(instance_id):
     """Set inventory to 0 for a unit on Shopify and draft the product if all variants are empty."""
     tid = current_user.tenant_id
@@ -613,7 +613,7 @@ def _increment_shopify_inventory(client, inventory_item_id, delta=1):
 
 @shopify_bp.route('/delete_listing/<int:instance_id>', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def delete_listing(instance_id):
     """Permanently delete a Shopify product listing and clean up all local records.
 
@@ -664,7 +664,7 @@ def delete_listing(instance_id):
 
 @shopify_bp.route('/bulk_publish', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def bulk_publish():
     """Publish multiple units to Shopify.
 
@@ -751,7 +751,7 @@ def bulk_publish():
 
 @shopify_bp.route('/api/instance_specs')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def api_instance_specs():
     """Return spec groups (RAM/Storage/CPU) for given instance IDs.
 
@@ -814,7 +814,7 @@ def api_instance_specs():
 
 @shopify_bp.route('/api/group_instances', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def api_group_instances():
     """Resolve model+cpu group strings (from instance_table checkboxes) to instance IDs.
 
@@ -1061,7 +1061,7 @@ def _handle_cancelled_order(order_data):
 
 @shopify_bp.route('/register_webhooks', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def register_webhooks():
     """Register orders/create and orders/cancelled webhooks with Shopify.
 
@@ -1142,7 +1142,7 @@ def register_webhooks():
 
 @shopify_bp.route('/listings')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def listings():
     """Show all ProductInstances currently listed on Shopify."""
     from inventory_flask_app.models import Product
@@ -1165,7 +1165,7 @@ def listings():
 
 @shopify_bp.route('/orders')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def orders_list():
     """List all Shopify orders with tab filtering."""
     tid    = current_user.tenant_id
@@ -1189,7 +1189,7 @@ def orders_list():
 
 @shopify_bp.route('/orders/<int:order_id>/review')
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def review_order(order_id):
     """Review a Shopify order and optionally match to PCMart units."""
     tid = current_user.tenant_id
@@ -1205,7 +1205,7 @@ def review_order(order_id):
 
 @shopify_bp.route('/orders/<int:order_id>/confirm', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def confirm_order(order_id):
     """Confirm a Shopify order — create PCMart Order + SaleTransaction."""
     tid = current_user.tenant_id
@@ -1254,7 +1254,7 @@ def confirm_order(order_id):
 
 @shopify_bp.route('/orders/<int:order_id>/reject', methods=['POST'])
 @login_required
-@admin_required
+@admin_or_supervisor_required
 def reject_order(order_id):
     """Reject a Shopify order."""
     tid = current_user.tenant_id
