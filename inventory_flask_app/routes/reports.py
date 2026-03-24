@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Tenant-aware time utility
 from inventory_flask_app.utils import get_now_for_tenant
-from inventory_flask_app.utils.utils import is_module_enabled, admin_or_supervisor_required
+from inventory_flask_app.utils.utils import is_module_enabled, admin_or_supervisor_required, module_required
 
 import io
 import csv
@@ -31,7 +31,7 @@ def _require_reports_module():
 # Landing page for /reports
 @reports_bp.route('/reports')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def reports_index():
     _require_reports_module()
     return render_template('reports_index.html')
@@ -40,7 +40,7 @@ def reports_index():
 # Technician productivity report route
 @reports_bp.route('/tech_productivity', methods=['GET'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def tech_productivity():
     _require_reports_module()
 
@@ -99,7 +99,7 @@ def tech_productivity():
 # Technician profile route
 @reports_bp.route('/tech_profile/<username>', methods=['GET', 'POST'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def tech_profile(username):
     _require_reports_module()
 
@@ -205,7 +205,7 @@ def tech_profile(username):
 # Export technician profile with filters as CSV
 @reports_bp.route('/tech_profile_export/<username>', methods=['GET'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def tech_profile_export(username):
     _require_reports_module()
 
@@ -291,7 +291,7 @@ def tech_profile_export(username):
 # ?threshold=1 narrows to units idle longer than the tenant-configured idle_threshold_days
 @reports_bp.route('/idle_units', methods=['GET'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def idle_units():
     _require_reports_module()
 
@@ -375,7 +375,7 @@ def idle_units():
 
 @reports_bp.route('/update_idle_reason', methods=['POST'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def update_idle_reason():
 
     serial = request.form.get('serial')
@@ -402,7 +402,7 @@ def update_idle_reason():
 # Route to show technicians with slow processing units based on tenant-configured delay threshold
 @reports_bp.route('/report/slow_technicians')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def slow_technicians():
     _require_reports_module()
     from inventory_flask_app.models import TenantSettings, ProductInstance, Product
@@ -432,7 +432,7 @@ def slow_technicians():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/stage_times')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def stage_times():
     _require_reports_module()
     """Average time spent per processing stage, based on ProductProcessLog.duration_minutes."""
@@ -507,7 +507,7 @@ def stage_times():
 
 @reports_bp.route('/stage_times/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def stage_times_export():
     _require_reports_module()
     from inventory_flask_app.models import ProcessStage
@@ -565,7 +565,7 @@ def stage_times_export():
 
 @reports_bp.route('/idle_units/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def idle_units_export():
     _require_reports_module()
     from inventory_flask_app.models import ProductInstance, Product
@@ -604,7 +604,7 @@ def idle_units_export():
 
 @reports_bp.route('/tech_productivity/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def tech_productivity_export():
     _require_reports_module()
 
@@ -655,7 +655,7 @@ def tech_productivity_export():
 
 @reports_bp.route('/report/slow_technicians/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def slow_technicians_export():
     _require_reports_module()
     from inventory_flask_app.models import TenantSettings, ProductInstance, Product
@@ -701,7 +701,7 @@ def slow_technicians_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/aged_inventory')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def aged_inventory():
     _require_reports_module()
     from inventory_flask_app.models import ProductInstance, Product, TenantSettings
@@ -744,7 +744,7 @@ def aged_inventory():
 
 @reports_bp.route('/reports/aged_inventory/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def aged_inventory_export():
     _require_reports_module()
     from inventory_flask_app.models import ProductInstance, Product, TenantSettings
@@ -824,7 +824,7 @@ def _get_currency(tenant_id):
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/revenue')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def revenue_report():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product
@@ -878,7 +878,7 @@ def revenue_report():
 
 @reports_bp.route('/reports/revenue/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def revenue_export():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product
@@ -927,7 +927,7 @@ def revenue_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/sales_by_model')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def sales_by_model():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product
@@ -984,7 +984,7 @@ def sales_by_model():
 
 @reports_bp.route('/reports/sales_by_model/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def sales_by_model_export():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product
@@ -1032,7 +1032,7 @@ def sales_by_model_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/sales_by_customer')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def sales_by_customer():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product, Customer
@@ -1094,7 +1094,7 @@ def sales_by_customer():
 
 @reports_bp.route('/reports/sales_by_customer/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def sales_by_customer_export():
     _require_reports_module()
     from inventory_flask_app.models import SaleTransaction, ProductInstance, Product, Customer
@@ -1145,7 +1145,7 @@ def sales_by_customer_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/purchase_orders')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def purchase_orders_report():
     _require_reports_module()
     from inventory_flask_app.models import PurchaseOrder, PurchaseOrderItem
@@ -1193,7 +1193,7 @@ def purchase_orders_report():
 
 @reports_bp.route('/reports/purchase_orders/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def purchase_orders_export():
     _require_reports_module()
     from inventory_flask_app.models import PurchaseOrder, PurchaseOrderItem
@@ -1242,7 +1242,7 @@ def purchase_orders_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/returns')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def returns_report():
     _require_reports_module()
     from inventory_flask_app.models import Return, ProductInstance, Product
@@ -1288,7 +1288,7 @@ def returns_report():
 
 @reports_bp.route('/reports/returns/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def returns_export():
     _require_reports_module()
     from inventory_flask_app.models import Return, ProductInstance, Product
@@ -1340,7 +1340,7 @@ def returns_export():
 # ─────────────────────────────────────────────────────────────
 @reports_bp.route('/reports/parts_sales')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def parts_sales_report():
     _require_reports_module()
     from inventory_flask_app.models import PartSaleTransaction, PartSaleItem, Part, Customer
@@ -1391,7 +1391,7 @@ def parts_sales_report():
 
 @reports_bp.route('/reports/parts_sales/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def parts_sales_export():
     _require_reports_module()
     from inventory_flask_app.models import PartSaleTransaction
@@ -1440,7 +1440,7 @@ def parts_sales_export():
 
 @reports_bp.route('/reports/parts_usage')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def parts_usage_report():
     _require_reports_module()
     from inventory_flask_app.models import PartUsage, Part
@@ -1494,7 +1494,7 @@ def parts_usage_report():
 
 @reports_bp.route('/reports/parts_usage/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'view')
 def parts_usage_export():
     _require_reports_module()
     from inventory_flask_app.models import PartUsage, Part

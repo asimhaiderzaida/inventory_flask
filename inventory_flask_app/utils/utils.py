@@ -55,6 +55,24 @@ def warehouse_required(f):
     return decorated
 
 
+def module_required(module, level='view'):
+    """Decorator to check module permission.
+    level: 'view' (any access) or 'full' (edit/write access).
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+            if level == 'full' and not current_user.can_edit(module):
+                abort(403)
+            elif level == 'view' and not current_user.can_access(module):
+                abort(403)
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+
 def is_module_enabled(module_key):
     """Return True if the given module is enabled for the current tenant.
 

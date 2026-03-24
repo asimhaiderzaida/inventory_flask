@@ -39,7 +39,7 @@ PAYMENT_METHODS = [
 
 
 def _require_accounting():
-    if current_user.role not in ('admin', 'supervisor'):
+    if not current_user.can_access('accounting'):
         abort(403)
 
 

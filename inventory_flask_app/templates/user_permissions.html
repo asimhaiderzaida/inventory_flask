@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Permissions — {{ user.full_name or user.username }}{% endblock %}
+{% block page_title %}User Permissions{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Permissions — {{ user.full_name or user.username }}</h1>
+    <div class="page-subtitle">
+      Role: <strong>{{ user.role | title }}</strong>
+      &nbsp;·&nbsp; Customize module access below (overrides role defaults)
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="btn btn-ghost">
+      <i class="bi bi-pencil"></i> Edit Profile
+    </a>
+    <a href="{{ url_for('admin_bp.admin_settings') }}#sec-users" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Users
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up">
+  <form method="POST" id="permForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="table-card">
+      <table class="table" style="table-layout:fixed;">
+        <colgroup>
+          <col style="width:38%">
+          <col style="width:20%">
+          <col style="width:20%">
+          <col style="width:22%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th class="text-center">No Access</th>
+            <th class="text-center">View Only</th>
+            <th class="text-center">Full Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for module_key, module_name in MODULES %}
+          {% set current_level = user.get_permission(module_key) %}
+          <tr>
+            <td>
+              <strong>{{ module_name }}</strong>
+              <small class="d-block" style="color:var(--text-muted);font-size:0.78rem;">
+                {{ module_descriptions.get(module_key, '') }}
+              </small>
+            </td>
+            <td class="text-center" style="vertical-align:middle;">
+              <input type="radio" name="perm_{{ module_key }}" value="none"
+                     class="form-check-input"
+                     {% if current_level == 'none' %}checked{% endif %}
+                     {% if module_key == 'admin' and user.role == 'admin' %}disabled{% endif %}>
+            </td>
+            <td class="text-center" style="vertical-align:middle;">
+              <input type="radio" name="perm_{{ module_key }}" value="view"
+                     class="form-check-input"
+                     {% if current_level == 'view' %}checked{% endif %}
+                     {% if module_key == 'admin' and user.role == 'admin' %}disabled{% endif %}>
+            </td>
+            <td class="text-center" style="vertical-align:middle;">
+              <input type="radio" name="perm_{{ module_key }}" value="full"
+                     class="form-check-input"
+                     {% if current_level == 'full' %}checked{% endif %}
+                     {% if module_key == 'admin' and user.role == 'admin' %}disabled{% endif %}>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if user.role == 'admin' %}
+    <div class="alert alert-info mt-3" role="alert" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.85rem 1rem;">
+      <i class="bi bi-shield-fill-check" style="color:var(--color-success);"></i>
+      Admin users always have <strong>Full Access</strong> to all modules. Custom permissions are not applied.
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-primary" {% if user.role == 'admin' %}disabled{% endif %}>
+        <i class="bi bi-save"></i> Save Permissions
+      </button>
+      <button type="submit" name="action" value="reset" class="btn btn-ghost"
+              {% if user.role == 'admin' %}disabled{% endif %}
+              onclick="return confirm('Reset to role defaults? All custom permissions will be cleared.')">
+        <i class="bi bi-arrow-counterclockwise"></i> Reset to Role Defaults
+      </button>
+      <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@ import logging
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
-from inventory_flask_app.models import TenantSettings, ProcessStage, CustomField, CustomFieldValue, db
+from inventory_flask_app.models import TenantSettings, ProcessStage, CustomField, CustomFieldValue, db, UserPermission, MODULES
 from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
 from inventory_flask_app.utils.utils import admin_required
@@ -523,3 +523,72 @@ def reorder_custom_fields():
             cf.sort_order = int(item.get('order', 0))
     db.session.commit()
     return jsonify({'ok': True})
+
+
+# ─────────────────────────────────────────────────────────────
+# Per-User Permission Editor
+# ─────────────────────────────────────────────────────────────
+
+MODULE_DESCRIPTIONS = {
+    'dashboard':    'Overview, KPIs, and sales charts',
+    'sales':        'Create sales, view sold items, invoices',
+    'parts':        'Parts inventory, stock levels, sales',
+    'stock':        'Intake, scanning, bin locations',
+    'processing':   'Process pipeline, stage assignments',
+    'customers':    'Customer records and profiles',
+    'vendors':      'Vendor records and profiles',
+    'accounting':   'Expenses, receivables, P&L, cash flow',
+    'reports':      'All reports and data exports',
+    'returns':      'Return processing and credit notes',
+    'locations':    'Warehouse locations and bin management',
+    'orders':       'Customer orders and tracking',
+    'reservations': 'Unit reservations and delivery',
+    'shopify':      'Shopify listings, sync, and orders',
+    'admin':        'Tenant settings and user management',
+}
+
+
+@admin_bp.route('/admin/users/<int:user_id>/permissions', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def user_permissions(user_id):
+    from inventory_flask_app.models import User
+    user = User.query.filter_by(id=user_id, tenant_id=current_user.tenant_id).first_or_404()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'reset':
+            # Clear all custom permissions — revert to role defaults
+            UserPermission.query.filter_by(
+                user_id=user.id, tenant_id=current_user.tenant_id
+            ).delete()
+            db.session.commit()
+            flash(f'Permissions for {user.username} reset to role defaults.', 'success')
+        else:
+            # Save each module's access level
+            for module_key, _ in MODULES:
+                level = request.form.get(f'perm_{module_key}', 'none')
+                if level not in ('none', 'view', 'full'):
+                    level = 'none'
+                perm = UserPermission.query.filter_by(
+                    user_id=user.id, module=module_key
+                ).first()
+                if perm:
+                    perm.access_level = level
+                else:
+                    db.session.add(UserPermission(
+                        user_id=user.id,
+                        tenant_id=current_user.tenant_id,
+                        module=module_key,
+                        access_level=level,
+                    ))
+            db.session.commit()
+            flash(f'Permissions saved for {user.username}.', 'success')
+        return redirect(url_for('admin_bp.user_permissions', user_id=user.id))
+
+    return render_template(
+        'user_permissions.html',
+        user=user,
+        MODULES=MODULES,
+        module_descriptions=MODULE_DESCRIPTIONS,
+    )

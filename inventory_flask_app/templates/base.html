@@ -1371,7 +1371,7 @@
         </div>
 
         <!-- ── REPORTS ─────────────────────────────────────── -->
-        {% if current_user.role in ('admin', 'supervisor') and settings.enable_reports_module != 'false' %}
+        {% if current_user.can_access('reports') and settings.enable_reports_module != 'false' %}
         <div class="nav-group-header {% if is_reports %}active-group{% endif %}">
           <a href="{{ url_for('reports_bp.reports_index') }}"
              class="nav-group-link {% if ep == 'reports_bp.reports_index' %}active{% endif %}">
@@ -1456,7 +1456,7 @@
         {% endif %}
 
         <!-- ── ACCOUNTING ─────────────────────────────────── -->
-        {% if current_user.role in ('admin', 'supervisor') %}
+        {% if current_user.can_access('accounting') %}
         <div class="nav-group-header {% if is_accounting %}active-group{% endif %}">
           <a href="{{ url_for('accounting_bp.index') }}"
              class="nav-group-link {% if ep == 'accounting_bp.index' %}active{% endif %}">
@@ -1511,7 +1511,7 @@
         {% endif %}
 
         <!-- ── INTEGRATIONS ──────────────────────────────────── -->
-        {% if current_user.role in ('admin', 'supervisor') %}
+        {% if current_user.can_access('shopify') %}
         {% set is_shopify = ep.startswith('shopify_bp') %}
         <div class="nav-group-header {% if is_shopify %}active-group{% endif %}">
           <a href="{{ url_for('shopify_bp.dashboard') }}"
@@ -1547,7 +1547,7 @@
         {% endif %}
 
         <!-- ── ADMIN ───────────────────────────────────────── -->
-        {% if current_user.role == 'admin' %}
+        {% if current_user.can_access('admin') %}
         <div class="nav-group-header {% if is_admin %}active-group{% endif %}">
           <a href="{{ url_for('admin_bp.admin_settings') }}"
              class="nav-group-link {% if ep == 'admin_bp.admin_settings' %}active{% endif %}">
@@ -1611,7 +1611,7 @@
         <i class="bi bi-three-dots-vertical sidebar-label" style="color:var(--sidebar-text);font-size:0.8rem;"></i>
       </div>
       <ul class="dropdown-menu dropdown-menu-up mb-1" style="min-width:200px;">
-        {% if current_user.role == 'admin' %}
+        {% if current_user.can_access('admin') %}
         <li>
           <a class="dropdown-item" href="{{ url_for('admin_bp.admin_settings') }}">
             <i class="bi bi-sliders me-2"></i>Settings
@@ -1726,7 +1726,7 @@
           <div style="font-size:0.72rem;color:var(--text-muted);">{{ current_user.role | title }}</div>
         </li>
         <li><hr class="dropdown-divider"></li>
-        {% if current_user.role == 'admin' %}
+        {% if current_user.can_access('admin') %}
         <li>
           <a class="dropdown-item" href="{{ url_for('admin_bp.admin_settings') }}">
             <i class="bi bi-sliders me-2"></i>Settings

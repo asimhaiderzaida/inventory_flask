@@ -25,6 +25,65 @@ class User(db.Model, UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    def get_permission(self, module):
+        """Returns 'none', 'view', or 'full' for a module."""
+        if self.role == 'admin':
+            return 'full'
+        perm = UserPermission.query.filter_by(user_id=self.id, module=module).first()
+        if perm:
+            return perm.access_level
+        return self._default_permission(module)
+
+    def _default_permission(self, module):
+        """Default permissions based on role."""
+        defaults = {
+            'supervisor': {
+                'dashboard': 'full', 'sales': 'full', 'parts': 'full',
+                'stock': 'full', 'processing': 'full', 'customers': 'full',
+                'vendors': 'full', 'accounting': 'full', 'reports': 'full',
+                'returns': 'full', 'locations': 'full', 'orders': 'full',
+                'reservations': 'full', 'shopify': 'full', 'admin': 'none',
+            },
+            'sales': {
+                'dashboard': 'view', 'sales': 'full', 'parts': 'view',
+                'stock': 'view', 'processing': 'none', 'customers': 'full',
+                'vendors': 'none', 'accounting': 'none', 'reports': 'none',
+                'returns': 'full', 'locations': 'none', 'orders': 'full',
+                'reservations': 'full', 'shopify': 'none', 'admin': 'none',
+            },
+            'warehouse': {
+                'dashboard': 'view', 'sales': 'none', 'parts': 'view',
+                'stock': 'full', 'processing': 'none', 'customers': 'none',
+                'vendors': 'view', 'accounting': 'none', 'reports': 'none',
+                'returns': 'none', 'locations': 'full', 'orders': 'none',
+                'reservations': 'none', 'shopify': 'none', 'admin': 'none',
+            },
+            'technician': {
+                'dashboard': 'view', 'sales': 'none', 'parts': 'none',
+                'stock': 'none', 'processing': 'full', 'customers': 'none',
+                'vendors': 'none', 'accounting': 'none', 'reports': 'none',
+                'returns': 'none', 'locations': 'none', 'orders': 'none',
+                'reservations': 'none', 'shopify': 'none', 'admin': 'none',
+            },
+            'staff': {
+                'dashboard': 'view', 'sales': 'none', 'parts': 'none',
+                'stock': 'none', 'processing': 'full', 'customers': 'none',
+                'vendors': 'none', 'accounting': 'none', 'reports': 'none',
+                'returns': 'none', 'locations': 'none', 'orders': 'none',
+                'reservations': 'none', 'shopify': 'none', 'admin': 'none',
+            },
+        }
+        role_defaults = defaults.get(self.role, {})
+        return role_defaults.get(module, 'none')
+
+    def can_access(self, module):
+        """Returns True if user has any access to module."""
+        return self.get_permission(module) != 'none'
+
+    def can_edit(self, module):
+        """Returns True if user has full access to module."""
+        return self.get_permission(module) == 'full'
+
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -35,6 +94,43 @@ class Tenant(db.Model):
 
     def __repr__(self):
         return f"<Tenant {self.name}>"
+
+
+MODULES = [
+    ('dashboard',    'Dashboard'),
+    ('sales',        'Sales'),
+    ('parts',        'Parts'),
+    ('stock',        'Stock & Inventory'),
+    ('processing',   'Processing & Pipeline'),
+    ('customers',    'Customers'),
+    ('vendors',      'Vendors'),
+    ('accounting',   'Accounting'),
+    ('reports',      'Reports & Exports'),
+    ('returns',      'Returns'),
+    ('locations',    'Locations & Bins'),
+    ('orders',       'Orders'),
+    ('reservations', 'Reservations'),
+    ('shopify',      'Shopify Integration'),
+    ('admin',        'Admin Settings'),
+]
+
+
+class UserPermission(db.Model):
+    __tablename__ = 'user_permission'
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    tenant_id   = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
+    module      = db.Column(db.String(50), nullable=False)
+    access_level = db.Column(db.String(20), default='none')
+    # access_level: 'none' | 'view' | 'full'
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'module', name='uq_user_permission'),
+    )
+
+    user   = db.relationship('User',   backref='permissions',       foreign_keys=[user_id])
+    tenant = db.relationship('Tenant', backref='user_permissions')
+
 
 class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)

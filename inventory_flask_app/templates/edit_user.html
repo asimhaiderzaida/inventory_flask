@@ -15,7 +15,21 @@
   </div>
 </div>
 
-<div class="animate-fade-up" style="max-width:480px;">
+<div class="animate-fade-up" style="max-width:560px;">
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="userEditTabs">
+    <li class="nav-item">
+      <a class="nav-link active" id="profile-tab" data-bs-toggle="tab" href="#tab-profile">
+        <i class="bi bi-person"></i> Profile
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" id="perms-tab" href="{{ url_for('admin_bp.user_permissions', user_id=user.id) }}">
+        <i class="bi bi-shield-lock"></i> Permissions
+      </a>
+    </li>
+  </ul>
+
   <div class="card">
     <div class="card-body" style="padding:1.75rem;">
       <form method="POST">
@@ -36,9 +50,10 @@
           <label class="form-label">Role</label>
           <select name="role" class="form-select">
             <option value="admin"       {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-            <option value="technician"  {% if user.role == 'technician' %}selected{% endif %}>Technician</option>
-            <option value="sales"       {% if user.role == 'sales' %}selected{% endif %}>Sales</option>
             <option value="supervisor"  {% if user.role == 'supervisor' %}selected{% endif %}>Supervisor</option>
+            <option value="sales"       {% if user.role == 'sales' %}selected{% endif %}>Sales</option>
+            <option value="warehouse"   {% if user.role == 'warehouse' %}selected{% endif %}>Warehouse</option>
+            <option value="technician"  {% if user.role == 'technician' %}selected{% endif %}>Technician</option>
             <option value="staff"       {% if user.role == 'staff' %}selected{% endif %}>Staff</option>
           </select>
         </div>
@@ -53,6 +68,9 @@
           <button type="submit" class="btn btn-primary flex-fill">
             <i class="bi bi-save"></i> Save Changes
           </button>
+          <a href="{{ url_for('admin_bp.user_permissions', user_id=user.id) }}" class="btn btn-ghost">
+            <i class="bi bi-shield-lock"></i> Permissions
+          </a>
           <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('admin_bp.admin_settings') }}'" class="btn btn-ghost">Cancel</a>
         </div>
       </form>

@@ -7,7 +7,7 @@ import pandas as pd
 import csv
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
-from inventory_flask_app.utils.utils import admin_or_supervisor_required
+from inventory_flask_app.utils.utils import admin_or_supervisor_required, module_required
 
 # Additional imports for aged inventory export
 from flask import Response
@@ -20,7 +20,7 @@ exports_bp = Blueprint('exports_bp', __name__)
 
 @exports_bp.route('/export-products', methods=['GET'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'full')
 def export_products():
     from inventory_flask_app.models import ProductInstance
     from flask_login import current_user
@@ -86,7 +86,7 @@ def export_products():
 
 @exports_bp.route('/customer_orders/export')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'full')
 def export_customer_orders():
     from flask_login import current_user
 
@@ -202,7 +202,7 @@ def export_customer_orders():
 
 @exports_bp.route('/inventory/export', methods=['GET', 'POST'])
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'full')
 def inventory_export():
     from flask_login import current_user
 
@@ -295,7 +295,7 @@ def inventory_export():
 
 @exports_bp.route('/orders/export_excel/<order_number>')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'full')
 def export_order_excel(order_number):
     from inventory_flask_app.models import Order, SaleTransaction, ProductInstance, Product
     from flask_login import current_user
@@ -338,7 +338,7 @@ def export_order_excel(order_number):
 # Export aged inventory as CSV
 @exports_bp.route('/export/aged_inventory')
 @login_required
-@admin_or_supervisor_required
+@module_required('reports', 'full')
 def export_aged_inventory():
     threshold_days = 60  # default fallback
     try:
