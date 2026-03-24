@@ -1155,3 +1155,71 @@ class CustomerOrder(db.Model):
 
     def __repr__(self):
         return f"<CustomerOrder {self.id} {self.customer_name!r} status={self.status}>"
+
+
+# ---------------------------------------------------------------------------
+# Smart Pricing
+# ---------------------------------------------------------------------------
+
+class UnitCost(db.Model):
+    """Per-unit cost breakdown and suggested price."""
+    __tablename__ = 'unit_cost'
+
+    id               = db.Column(db.Integer, primary_key=True)
+    instance_id      = db.Column(db.Integer, db.ForeignKey('product_instance.id', ondelete='CASCADE'),
+                                 nullable=False, unique=True)
+    tenant_id        = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'),
+                                 nullable=False, index=True)
+    purchase_cost    = db.Column(db.Numeric(10, 2), default=0)
+    shipping_cost    = db.Column(db.Numeric(10, 2), default=0)
+    duty_amount      = db.Column(db.Numeric(10, 2), default=0)
+    repair_cost      = db.Column(db.Numeric(10, 2), default=0)
+    ram_upgrade_cost = db.Column(db.Numeric(10, 2), default=0)
+    ssd_upgrade_cost = db.Column(db.Numeric(10, 2), default=0)
+    other_cost       = db.Column(db.Numeric(10, 2), default=0)
+    other_cost_note  = db.Column(db.String(200), nullable=True)
+    margin_percent   = db.Column(db.Numeric(5, 2), default=25)
+    total_cost       = db.Column(db.Numeric(10, 2), default=0)
+    suggested_price  = db.Column(db.Numeric(10, 2), default=0)
+    updated_at       = db.Column(db.DateTime,
+                                 default=lambda: datetime.now(timezone.utc),
+                                 onupdate=lambda: datetime.now(timezone.utc))
+
+    instance = db.relationship('ProductInstance', backref=db.backref('unit_cost', uselist=False))
+    tenant   = db.relationship('Tenant', backref='unit_costs')
+
+    def calculate(self):
+        self.total_cost = sum(float(x or 0) for x in [
+            self.purchase_cost, self.shipping_cost, self.duty_amount,
+            self.repair_cost, self.ram_upgrade_cost, self.ssd_upgrade_cost, self.other_cost
+        ])
+        margin = float(self.margin_percent or 25) / 100
+        self.suggested_price = round(float(self.total_cost) * (1 + margin), 2)
+        return self.suggested_price
+
+    def __repr__(self):
+        return f"<UnitCost instance={self.instance_id} total={self.total_cost}>"
+
+
+class POCostSettings(db.Model):
+    """PO-level cost settings (shipping, duty, margin) applied to all units in a PO."""
+    __tablename__ = 'po_cost_settings'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    po_id           = db.Column(db.Integer, db.ForeignKey('purchase_order.id', ondelete='CASCADE'),
+                                nullable=False, unique=True)
+    tenant_id       = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'),
+                                nullable=False, index=True)
+    total_shipping  = db.Column(db.Numeric(10, 2), default=0)
+    shipping_per_unit = db.Column(db.Numeric(10, 2), default=0)
+    shipping_mode   = db.Column(db.String(10), default='shared')   # shared | per_unit
+    duty_type       = db.Column(db.String(10), default='percent')  # percent | fixed
+    duty_value      = db.Column(db.Numeric(10, 2), default=0)
+    default_margin  = db.Column(db.Numeric(5, 2), default=25)
+    updated_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    po     = db.relationship('PurchaseOrder', backref=db.backref('cost_settings', uselist=False))
+    tenant = db.relationship('Tenant', backref='po_cost_settings')
+
+    def __repr__(self):
+        return f"<POCostSettings po={self.po_id} margin={self.default_margin}%>"

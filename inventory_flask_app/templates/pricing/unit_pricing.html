@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Unit Cost — {{ get_instance_id(inst) }}{% endblock %}
+{% block page_title %}Unit Cost Editor{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Unit Cost Editor</h1>
+    <div class="page-subtitle">{{ get_instance_id(inst) }} · {{ inst.product.make }} {{ inst.product.model }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('instances_bp.view_instance', instance_id=inst.id) }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Unit
+    </a>
+    {% if inst.po_id %}
+    <a href="{{ url_for('pricing_bp.po_pricing', po_id=inst.po_id) }}" class="btn btn-ghost">
+      <i class="bi bi-box-seam"></i> PO Pricing
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 animate-fade-up" style="max-width:900px;">
+  <!-- Cost Form -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-body" style="padding:1.75rem;">
+        <form method="POST" id="unitCostForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <h6 class="fw-semibold mb-3">Cost Breakdown</h6>
+
+          {% set fields = [
+            ('purchase_cost',    'Purchase Cost',       uc.purchase_cost),
+            ('shipping_cost',    'Shipping',            uc.shipping_cost),
+            ('duty_amount',      'Duty / Import Tax',   uc.duty_amount),
+            ('repair_cost',      'Repair / Refurb',     uc.repair_cost),
+            ('ram_upgrade_cost', 'RAM Upgrade',         uc.ram_upgrade_cost),
+            ('ssd_upgrade_cost', 'SSD/Storage Upgrade', uc.ssd_upgrade_cost),
+            ('other_cost',       'Other',               uc.other_cost),
+          ] %}
+
+          {% for name, label, val in fields %}
+          <div class="mb-2 d-flex align-items-center gap-2">
+            <label class="form-label mb-0" style="min-width:170px;font-size:.875rem;">{{ label }}</label>
+            <div class="input-group input-group-sm" style="max-width:160px;">
+              <span class="input-group-text">$</span>
+              <input type="number" name="{{ name }}" step="0.01" min="0"
+                     class="form-control cost-field"
+                     value="{{ "%.2f"|format(float(val or 0)) }}"
+                     data-field="{{ name }}">
+            </div>
+          </div>
+          {% endfor %}
+
+          <div class="mb-3 mt-1">
+            <input type="text" name="other_cost_note" class="form-control form-control-sm"
+                   placeholder="Note for other cost (optional)"
+                   value="{{ uc.other_cost_note or '' }}" style="max-width:340px;">
+          </div>
+
+          <hr class="my-3">
+
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <label class="form-label mb-0" style="min-width:170px;font-size:.875rem;">Target Margin (%)</label>
+            <input type="number" name="margin_percent" step="0.5" min="0" max="500"
+                   class="form-control form-control-sm"
+                   id="marginInput"
+                   value="{{ "%.1f"|format(float(uc.margin_percent or 25)) }}"
+                   style="max-width:100px;">
+          </div>
+
+          <div class="mb-4 d-flex align-items-center gap-2">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="apply_to_asking"
+                     id="applyToAsking" value="1">
+              <label class="form-check-label" for="applyToAsking" style="font-size:.875rem;">
+                Update asking price to suggested price on save
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> Save
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Preview -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-body" style="padding:1.5rem;">
+        <h6 class="fw-semibold mb-3">Live Preview</h6>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Total Cost</span>
+          <span class="fw-bold" id="previewTotalCost">${{ "%.2f"|format(float(uc.total_cost or 0)) }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Margin</span>
+          <span id="previewMargin">{{ "%.1f"|format(float(uc.margin_percent or 25)) }}%</span>
+        </div>
+        <div class="d-flex justify-content-between mb-3">
+          <span class="text-muted fw-medium">Suggested Price</span>
+          <span class="fw-bold text-success fs-5" id="previewSuggested">${{ "%.2f"|format(float(uc.suggested_price or 0)) }}</span>
+        </div>
+
+        <hr>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Current Asking Price</span>
+          <span id="currentAsking">${{ "%.2f"|format(float(inst.asking_price or 0)) }}</span>
+        </div>
+        {% if inst.asking_price and float(inst.asking_price) > 0 and float(uc.suggested_price or 0) > 0 %}
+        <div class="d-flex justify-content-between">
+          <span class="text-muted">vs Suggested</span>
+          {% set diff = float(inst.asking_price) - float(uc.suggested_price) %}
+          <span class="{% if diff >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ '+' if diff >= 0 else '' }}${{ "%.2f"|format(diff) }}
+          </span>
+        </div>
+        {% endif %}
+
+        {% if inst.po_id %}
+        <hr>
+        <div class="small text-muted">
+          <i class="bi bi-box-seam me-1"></i>
+          PO: <a href="{{ url_for('stock_bp.view_purchase_order', po_id=inst.po_id) }}">{{ inst.po.po_number }}</a>
+          <a href="{{ url_for('pricing_bp.po_pricing', po_id=inst.po_id) }}" class="ms-2">
+            <i class="bi bi-gear-fill"></i> PO Pricing
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const COST_FIELDS = [
+    'purchase_cost','shipping_cost','duty_amount','repair_cost',
+    'ram_upgrade_cost','ssd_upgrade_cost','other_cost'
+  ];
+  const marginInput = document.getElementById('marginInput');
+  const previewTotal = document.getElementById('previewTotalCost');
+  const previewSuggested = document.getElementById('previewSuggested');
+  const previewMarginEl = document.getElementById('previewMargin');
+
+  function recalc() {
+    const data = {};
+    let total = 0;
+    COST_FIELDS.forEach(f => {
+      const el = document.querySelector(`[name="${f}"]`);
+      const val = parseFloat(el ? el.value : 0) || 0;
+      data[f] = val;
+      total += val;
+    });
+    const margin = parseFloat(marginInput.value) || 25;
+    data.margin_percent = margin;
+    const suggested = Math.round(total * (1 + margin / 100) * 100) / 100;
+    previewTotal.textContent    = '$' + total.toFixed(2);
+    previewSuggested.textContent = '$' + suggested.toFixed(2);
+    if (previewMarginEl) previewMarginEl.textContent = margin.toFixed(1) + '%';
+  }
+
+  document.querySelectorAll('.cost-field').forEach(el => el.addEventListener('input', recalc));
+  if (marginInput) marginInput.addEventListener('input', recalc);
+})();
+</script>
+{% endblock %}

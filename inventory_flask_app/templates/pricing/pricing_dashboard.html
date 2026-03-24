@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Pricing Dashboard{% endblock %}
+{% block page_title %}Pricing Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Smart Pricing</h1>
+    <div class="page-subtitle">Cost tracking and margin management</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('pricing_bp.bulk_pricing') }}" class="btn btn-primary">
+      <i class="bi bi-sliders"></i> Bulk Pricing Editor
+    </a>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4 animate-fade-up">
+  <div class="col-sm-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Units With Cost Data</div>
+        <div class="fs-3 fw-bold">{{ total_units_priced }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Total Cost Value</div>
+        <div class="fs-3 fw-bold">${{ "%.2f"|format(total_cost_value) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Total Suggested Revenue</div>
+        <div class="fs-3 fw-bold">${{ "%.2f"|format(total_suggested) }}</div>
+        {% if total_cost_value > 0 %}
+        <div class="text-muted small">{{ "%.1f"|format((total_suggested - total_cost_value) / total_cost_value * 100) }}% blended margin</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- At-Risk Units -->
+{% if at_risk %}
+<div class="animate-fade-up mb-4">
+  <div class="table-card">
+    <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+      <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>At-Risk Units (asking &lt; suggested)</h6>
+      <span class="badge bg-warning text-dark">{{ at_risk|length }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Unit</th>
+            <th>Product</th>
+            <th>Total Cost</th>
+            <th>Suggested</th>
+            <th>Asking</th>
+            <th>Gap</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in at_risk %}
+          <tr>
+            <td><a href="{{ url_for('instances_bp.view_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ get_instance_id(r.instance) }}</a></td>
+            <td class="text-muted">{{ r.instance.product.make }} {{ r.instance.product.model }}</td>
+            <td>${{ "%.2f"|format(float(r.unit_cost.total_cost or 0)) }}</td>
+            <td class="text-success fw-medium">${{ "%.2f"|format(r.suggested) }}</td>
+            <td class="{% if r.asking == 0 %}text-muted{% else %}text-danger{% endif %}">
+              {% if r.asking == 0 %}—{% else %}${{ "%.2f"|format(r.asking) }}{% endif %}
+            </td>
+            <td class="text-danger">-${{ "%.2f"|format(r.gap) }}</td>
+            <td>
+              <a href="{{ url_for('pricing_bp.unit_pricing', instance_id=r.instance.id) }}" class="btn btn-sm btn-ghost">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="animate-fade-up mb-4">
+  <div class="empty-state">
+    <i class="bi bi-check-circle text-success" style="font-size:2rem;"></i>
+    <p class="mt-2 mb-0">No at-risk units — all priced units meet or exceed suggested price.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- POs with cost settings -->
+{% if pos_with_settings %}
+<div class="animate-fade-up">
+  <div class="table-card">
+    <div class="px-3 pt-3 pb-2">
+      <h6 class="mb-0"><i class="bi bi-box-seam me-2"></i>POs with Cost Settings</h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>PO #</th>
+            <th>Vendor</th>
+            <th>Shipping Mode</th>
+            <th>Duty</th>
+            <th>Margin</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for po in pos_with_settings %}
+          {% set cs = po.cost_settings %}
+          <tr>
+            <td><a href="{{ url_for('stock_bp.view_purchase_order', po_id=po.id) }}" class="fw-medium">{{ po.po_number }}</a></td>
+            <td class="text-muted">{{ po.vendor.name if po.vendor else '—' }}</td>
+            <td>
+              {% if cs.shipping_mode == 'shared' %}
+                Shared (${{ "%.2f"|format(float(cs.total_shipping or 0)) }} total)
+              {% else %}
+                Per unit (${{ "%.2f"|format(float(cs.shipping_per_unit or 0)) }})
+              {% endif %}
+            </td>
+            <td>
+              {% if cs.duty_type == 'percent' %}{{ cs.duty_value }}%{% else %}${{ cs.duty_value }} fixed{% endif %}
+            </td>
+            <td>{{ cs.default_margin }}%</td>
+            <td>
+              <a href="{{ url_for('pricing_bp.po_pricing', po_id=po.id) }}" class="btn btn-sm btn-ghost">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

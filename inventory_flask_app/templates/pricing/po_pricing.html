@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}PO Pricing — {{ po.po_number }}{% endblock %}
+{% block page_title %}PO Pricing{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">PO Cost Settings</h1>
+    <div class="page-subtitle">{{ po.po_number }}{% if po.vendor %} · {{ po.vendor.name }}{% endif %} · {{ unit_count }} unit{{ 's' if unit_count != 1 }}</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('stock_bp.view_purchase_order', po_id=po.id) }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to PO
+    </a>
+    <a href="{{ url_for('pricing_bp.pricing_dashboard') }}" class="btn btn-ghost">
+      <i class="bi bi-speedometer2"></i> Pricing Dashboard
+    </a>
+  </div>
+</div>
+
+<div class="animate-fade-up" style="max-width:620px;">
+  <div class="card">
+    <div class="card-body" style="padding:1.75rem;">
+      <form method="POST" id="poPricingForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Shipping -->
+        <h6 class="fw-semibold mb-3"><i class="bi bi-truck me-2"></i>Shipping</h6>
+        <div class="mb-3">
+          <label class="form-label">Shipping Mode</label>
+          <select name="shipping_mode" class="form-select" id="shippingMode">
+            <option value="shared" {% if settings.shipping_mode == 'shared' %}selected{% endif %}>Shared — split total across all units</option>
+            <option value="per_unit" {% if settings.shipping_mode == 'per_unit' %}selected{% endif %}>Per Unit — fixed amount per unit</option>
+          </select>
+        </div>
+        <div class="mb-3" id="totalShippingRow">
+          <label class="form-label">Total Shipping Cost ($)</label>
+          <input type="number" name="total_shipping" step="0.01" min="0" class="form-control"
+                 value="{{ settings.total_shipping or 0 }}" placeholder="0.00">
+          {% if unit_count > 0 %}
+          <div class="form-text" id="shippingPerUnitPreview">
+            ≈ ${{ "%.2f"|format(float(settings.total_shipping or 0) / unit_count) }} per unit
+          </div>
+          {% endif %}
+        </div>
+        <div class="mb-4" id="perUnitShippingRow" style="display:none;">
+          <label class="form-label">Shipping Per Unit ($)</label>
+          <input type="number" name="shipping_per_unit" step="0.01" min="0" class="form-control"
+                 value="{{ settings.shipping_per_unit or 0 }}" placeholder="0.00">
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Duty -->
+        <h6 class="fw-semibold mb-3"><i class="bi bi-receipt me-2"></i>Duty / Import Tax</h6>
+        <div class="mb-3">
+          <label class="form-label">Duty Type</label>
+          <select name="duty_type" class="form-select">
+            <option value="percent" {% if settings.duty_type == 'percent' %}selected{% endif %}>Percentage of purchase cost</option>
+            <option value="fixed" {% if settings.duty_type == 'fixed' %}selected{% endif %}>Fixed total amount (split across units)</option>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label" id="dutyValueLabel">
+            {% if settings.duty_type == 'percent' %}Duty Rate (%){% else %}Total Duty ($){% endif %}
+          </label>
+          <input type="number" name="duty_value" step="0.01" min="0" class="form-control"
+                 value="{{ settings.duty_value or 0 }}" placeholder="0">
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Margin -->
+        <h6 class="fw-semibold mb-3"><i class="bi bi-graph-up-arrow me-2"></i>Default Margin</h6>
+        <div class="mb-4">
+          <label class="form-label">Target Margin (%)</label>
+          <input type="number" name="default_margin" step="0.5" min="0" max="500" class="form-control"
+                 value="{{ settings.default_margin or 25 }}" placeholder="25">
+          <div class="form-text">Applied to suggested price = total cost × (1 + margin%)</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="submit" name="action" value="save" class="btn btn-ghost">
+            <i class="bi bi-save"></i> Save Settings
+          </button>
+          <button type="submit" name="action" value="apply" class="btn btn-primary">
+            <i class="bi bi-lightning-charge"></i> Save & Apply to All {{ unit_count }} Units
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const modeSelect = document.getElementById('shippingMode');
+  const totalRow   = document.getElementById('totalShippingRow');
+  const perRow     = document.getElementById('perUnitShippingRow');
+
+  function updateShippingUI() {
+    if (modeSelect.value === 'shared') {
+      totalRow.style.display = '';
+      perRow.style.display   = 'none';
+    } else {
+      totalRow.style.display = 'none';
+      perRow.style.display   = '';
+    }
+  }
+
+  modeSelect.addEventListener('change', updateShippingUI);
+  updateShippingUI();
+
+  // Duty label update
+  const dutyType  = document.querySelector('[name="duty_type"]');
+  const dutyLabel = document.getElementById('dutyValueLabel');
+  if (dutyType && dutyLabel) {
+    dutyType.addEventListener('change', function() {
+      dutyLabel.textContent = this.value === 'percent' ? 'Duty Rate (%)' : 'Total Duty ($)';
+    });
+  }
+})();
+</script>
+{% endblock %}

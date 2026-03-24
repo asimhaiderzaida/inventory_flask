@@ -1138,7 +1138,7 @@
       {% set is_people     = ep.startswith('customers_bp') or ep.startswith('vendors_bp') %}
       {% set is_reports    = ep.startswith('reports_bp') %}
       {% set is_admin      = ep.startswith('admin_bp') or ep == 'auth.register_user' or ep == 'stock_bp.bulk_price_editor' %}
-      {% set is_accounting = ep.startswith('accounting_bp') %}
+      {% set is_accounting = ep.startswith('accounting_bp') or ep.startswith('pricing_bp') %}
 
       {% if current_user.role == 'technician' %}
       {# ══ TECHNICIAN: focused view ══ #}
@@ -1453,6 +1453,15 @@
             <span class="sidebar-label">Returns</span>
           </a>
         </div>
+        {% endif %}
+
+        <!-- ── PRICING ───────────────────────────────────── -->
+        {% if current_user.can_access('accounting') %}
+        <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
+           class="sidebar-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
+          <i class="bi bi-tags nav-icon"></i>
+          <span class="sidebar-label">Smart Pricing</span>
+        </a>
         {% endif %}
 
         <!-- ── ACCOUNTING ─────────────────────────────────── -->

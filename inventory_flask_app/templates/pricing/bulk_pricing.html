@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Bulk Pricing Editor{% endblock %}
+{% block page_title %}Bulk Pricing Editor{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Bulk Pricing Editor</h1>
+    <div class="page-subtitle">Update asking prices for multiple units at once</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('pricing_bp.pricing_dashboard') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3 animate-fade-up">
+  <div class="card-body py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-sm-3">
+        <label class="form-label small">PO</label>
+        <select name="po_id" class="form-select form-select-sm">
+          <option value="">All POs</option>
+          {% for po in pos %}
+          <option value="{{ po.id }}" {% if filters.po_id == po.id %}selected{% endif %}>{{ po.po_number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Any</option>
+          <option value="unprocessed" {% if filters.status == 'unprocessed' %}selected{% endif %}>Unprocessed</option>
+          <option value="under_process" {% if filters.status == 'under_process' %}selected{% endif %}>Under Process</option>
+          <option value="processed" {% if filters.status == 'processed' %}selected{% endif %}>Processed</option>
+          <option value="idle" {% if filters.status == 'idle' %}selected{% endif %}>Idle</option>
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small">Make</label>
+        <input type="text" name="make" class="form-control form-control-sm" placeholder="e.g. Dell" value="{{ filters.make }}">
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small">Model</label>
+        <input type="text" name="model" class="form-control form-control-sm" placeholder="e.g. Latitude" value="{{ filters.model }}">
+      </div>
+      <div class="col-sm-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill">
+          <i class="bi bi-search"></i> Filter
+        </button>
+        <a href="{{ url_for('pricing_bp.bulk_pricing') }}" class="btn btn-ghost btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Bulk Action Bar -->
+<div class="d-flex gap-2 align-items-center mb-3 animate-fade-up" id="bulkBar" style="display:none!important;">
+  <span class="text-muted small" id="selCount">0 selected</span>
+  <button class="btn btn-sm btn-primary" id="btnApplySuggested" disabled>
+    <i class="bi bi-lightning-charge"></i> Apply Suggested to Selected
+  </button>
+  <button class="btn btn-sm btn-ghost" id="btnSaveAll">
+    <i class="bi bi-save"></i> Save Asking Prices
+  </button>
+</div>
+
+<!-- Table -->
+{% if instances %}
+<div class="table-card animate-fade-up">
+  <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-1">
+    <div class="d-flex align-items-center gap-3">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="selectAll">
+        <label class="form-check-label small" for="selectAll">Select All</label>
+      </div>
+      <span class="text-muted small">{{ instances|length }} unit{{ 's' if instances|length != 1 }}</span>
+    </div>
+    <div class="d-flex gap-2" id="selActions" style="display:none!important;">
+      <button class="btn btn-sm btn-primary" id="btnApplySuggested2" disabled>
+        <i class="bi bi-lightning-charge"></i> Apply Suggested to Selected
+      </button>
+      <button class="btn btn-sm btn-success" id="btnSaveAll2">
+        <i class="bi bi-save"></i> Save All Changes
+      </button>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" id="bulkTable">
+      <thead>
+        <tr>
+          <th style="width:36px;"></th>
+          <th>Unit ID</th>
+          <th>Product</th>
+          <th>Status</th>
+          <th>Total Cost</th>
+          <th>Suggested</th>
+          <th>Asking Price</th>
+          <th>Margin</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inst in instances %}
+        {% set uc = inst.unit_cost %}
+        <tr data-id="{{ inst.id }}" data-suggested="{{ float(uc.suggested_price) if uc else 0 }}">
+          <td>
+            <input class="form-check-input row-check" type="checkbox" value="{{ inst.id }}">
+          </td>
+          <td class="fw-medium">{{ get_instance_id(inst) }}</td>
+          <td class="text-muted small">{{ inst.product.make }} {{ inst.product.model }}</td>
+          <td><span class="status-pill status-{{ inst.status }}">{{ inst.status.replace('_', ' ') }}</span></td>
+          <td>
+            {% if uc and uc.total_cost %}
+              ${{ "%.2f"|format(float(uc.total_cost)) }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if uc and uc.suggested_price %}
+              <span class="text-success fw-medium">${{ "%.2f"|format(float(uc.suggested_price)) }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="input-group input-group-sm" style="max-width:130px;">
+              <span class="input-group-text">$</span>
+              <input type="number" step="0.01" min="0"
+                     class="form-control asking-input"
+                     data-instance="{{ inst.id }}"
+                     data-original="{{ "%.2f"|format(float(inst.asking_price or 0)) }}"
+                     value="{{ "%.2f"|format(float(inst.asking_price or 0)) }}">
+            </div>
+          </td>
+          <td class="small" id="marginCell{{ inst.id }}">
+            {% if uc and uc.total_cost and float(uc.total_cost) > 0 and inst.asking_price %}
+              {% set m = (float(inst.asking_price) - float(uc.total_cost)) / float(uc.total_cost) * 100 %}
+              <span class="{{ 'text-success' if m >= 0 else 'text-danger' }}">{{ "%.1f"|format(m) }}%</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('pricing_bp.unit_pricing', instance_id=inst.id) }}" class="btn btn-sm btn-ghost" title="Edit unit costs">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state animate-fade-up">
+  <i class="bi bi-search" style="font-size:2rem;"></i>
+  <p class="mt-2">No units found. Try adjusting the filters.</p>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  const selectAll  = document.getElementById('selectAll');
+  const selActions = document.getElementById('selActions');
+  const btnApply   = document.getElementById('btnApplySuggested2');
+  const btnSave    = document.getElementById('btnSaveAll2');
+  const csrfToken  = document.querySelector('[name="csrf_token"]')?.value || '';
+
+  function getChecked() {
+    return [...document.querySelectorAll('.row-check:checked')].map(el => parseInt(el.value));
+  }
+
+  function updateSelUI() {
+    const ids = getChecked();
+    const count = ids.length;
+    selActions.style.display = count > 0 ? '' : 'none!important';
+    selActions.style.setProperty('display', count > 0 ? 'flex' : 'none');
+    btnApply.disabled = count === 0;
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      document.querySelectorAll('.row-check').forEach(cb => cb.checked = this.checked);
+      updateSelUI();
+    });
+  }
+
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.addEventListener('change', updateSelUI);
+  });
+
+  // Apply suggested → asking inputs (client side only, no save yet)
+  if (btnApply) {
+    btnApply.addEventListener('click', function () {
+      const ids = getChecked();
+      ids.forEach(id => {
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (!row) return;
+        const suggested = parseFloat(row.dataset.suggested) || 0;
+        if (suggested <= 0) return;
+        const input = row.querySelector('.asking-input');
+        if (input) input.value = suggested.toFixed(2);
+      });
+      showToast('Suggested prices applied to selected — click Save to persist.', 'info');
+    });
+  }
+
+  // Save all changed asking prices
+  if (btnSave) {
+    btnSave.addEventListener('click', async function () {
+      const inputs = [...document.querySelectorAll('.asking-input')];
+      const updates = inputs
+        .filter(el => el.value !== el.dataset.original)
+        .map(el => ({ instance_id: parseInt(el.dataset.instance), asking_price: parseFloat(el.value) }));
+
+      if (updates.length === 0) {
+        showToast('No changes to save.', 'info');
+        return;
+      }
+
+      try {
+        const resp = await fetch('{{ url_for("pricing_bp.bulk_update") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify({ updates }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          showToast(`Saved ${data.updated} unit${data.updated !== 1 ? 's' : ''}.`, 'success');
+          inputs.forEach(el => el.dataset.original = el.value);
+        } else {
+          showToast(data.error || 'Save failed.', 'danger');
+        }
+      } catch (e) {
+        showToast('Network error.', 'danger');
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}
