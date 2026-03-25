@@ -4,7 +4,21 @@ from datetime import datetime
 import pytz
 from flask_login import current_user
 from functools import wraps
-from flask import abort
+from flask import abort, redirect, request, url_for
+from urllib.parse import urlparse
+
+
+def safe_redirect_back(fallback='dashboard_bp.main_dashboard', **kwargs):
+    """Redirect to the HTTP Referer only if it is on the same host.
+    Prevents open-redirect attacks via a forged Referer header.
+    """
+    referrer = request.referrer
+    if referrer:
+        ref_host = urlparse(referrer).netloc
+        our_host = urlparse(request.host_url).netloc
+        if ref_host == our_host:
+            return redirect(referrer)
+    return redirect(url_for(fallback, **kwargs))
 
 
 def admin_required(f):
@@ -417,20 +431,6 @@ def get_inventory_notifications(tenant_id):
             "type": "slow_technician",
             "label": label,
             "url": f"/report/tech_profile/{tech.team_assigned}?slow=true" if tech.team_assigned else "/report/tech_profile"
-        })
-
-    # Pending orders (reserved but not delivered)
-    pending_reserves = CustomerOrderTracking.query \
-        .join(Customer) \
-        .filter(
-            Customer.tenant_id == tenant_id,
-            CustomerOrderTracking.status != 'delivered'
-        ).count()
-    if pending_reserves:
-        notifications.append({
-            "type": "pending_orders",
-            "label": f"{pending_reserves} pending order{'s' if pending_reserves > 1 else ''}",
-            "url": "/orders/pending"
         })
 
     # Delayed orders (pending for more than 3 days)

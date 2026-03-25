@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Tenant-aware time utility
 from inventory_flask_app.utils import get_now_for_tenant
-from inventory_flask_app.utils.utils import is_module_enabled, admin_or_supervisor_required, module_required
+from inventory_flask_app.utils.utils import is_module_enabled, admin_or_supervisor_required, module_required, safe_redirect_back
 
 import io
 import csv
@@ -375,7 +375,7 @@ def idle_units():
 
 @reports_bp.route('/update_idle_reason', methods=['POST'])
 @login_required
-@module_required('reports', 'view')
+@module_required('reports', 'full')
 def update_idle_reason():
 
     serial = request.form.get('serial')
@@ -383,7 +383,7 @@ def update_idle_reason():
 
     if not serial:
         flash("Serial is required to update idle reason.", "danger")
-        return redirect(request.referrer or url_for('reports_bp.idle_units'))
+        return safe_redirect_back('reports_bp.idle_units')
 
     from inventory_flask_app.models import ProductInstance, Product
     instance = ProductInstance.query.join(Product).filter(
@@ -392,13 +392,13 @@ def update_idle_reason():
     ).first()
     if not instance:
         flash(f"No unit found with serial {serial}.", "warning")
-        return redirect(request.referrer or url_for('reports_bp.idle_units'))
+        return safe_redirect_back('reports_bp.idle_units')
 
     instance.idle_reason = idle_reason
     from inventory_flask_app import db
     db.session.commit()
     flash("Idle reason updated successfully.", "success")
-    return redirect(request.referrer or url_for('reports_bp.idle_units'))
+    return safe_redirect_back('reports_bp.idle_units')
 # Route to show technicians with slow processing units based on tenant-configured delay threshold
 @reports_bp.route('/report/slow_technicians')
 @login_required

@@ -63,7 +63,11 @@ def index():
 @login_required
 def export_csv():
     tid = current_user.tenant_id
-    rows = CustomerOrder.query.filter_by(tenant_id=tid).order_by(CustomerOrder.created_at.desc()).all()
+    tab = request.args.get('tab', 'all')
+    query = CustomerOrder.query.filter_by(tenant_id=tid)
+    if tab and tab != 'all':
+        query = query.filter(CustomerOrder.status == tab)
+    rows = query.order_by(CustomerOrder.created_at.desc()).all()
 
     buf = io.StringIO()
     writer = csv.writer(buf)

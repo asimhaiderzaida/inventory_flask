@@ -562,7 +562,7 @@ def _pl_data(tid: int, start: date, end: date) -> dict:
         db.session.query(
             func.coalesce(func.sum(SaleItem.price_at_sale), 0).label('pretax'),
             func.coalesce(
-                func.sum(SaleItem.price_at_sale * SaleItem.vat_rate / 100), 0
+                func.sum(SaleItem.price_at_sale * func.coalesce(SaleItem.vat_rate, 0) / 100), 0
             ).label('vat'),
         )
         .join(SaleTransaction, SaleItem.sale_id == SaleTransaction.id)

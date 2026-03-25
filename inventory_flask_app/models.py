@@ -3,6 +3,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import event as _sa_event
 from . import db
 class User(db.Model, UserMixin):
     VALID_ROLES = ('admin', 'supervisor', 'sales', 'staff', 'warehouse', 'technician')
@@ -251,8 +252,8 @@ class Bin(db.Model):
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    asset = db.Column(db.String(100), unique=True, nullable=True, index=True)
-    serial = db.Column(db.String(100), unique=True, nullable=True, index=True)
+    asset = db.Column(db.String(100), nullable=True, index=True)
+    serial = db.Column(db.String(100), nullable=True, index=True)
     item_name = db.Column(db.String(100), nullable=False, index=True)
     make = db.Column(db.String(100))
     model = db.Column(db.String(100))
@@ -288,8 +289,8 @@ class Product(db.Model):
 class ProductInstance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id', ondelete='CASCADE'), nullable=False)
-    serial = db.Column(db.String(100), unique=True, nullable=False, index=True)
-    asset = db.Column(db.String(100), unique=True, index=True)
+    serial = db.Column(db.String(100), nullable=False, index=True)
+    asset = db.Column(db.String(100), index=True)
     status = db.Column(db.String(50), default='unprocessed')
     process_stage = db.Column(db.String(50))
     team_assigned = db.Column(db.String(100))
@@ -308,7 +309,7 @@ class ProductInstance(db.Model):
     po = db.relationship('PurchaseOrder', backref='instances')
     is_sold = db.Column(db.Boolean, default=False)
     shopify_listed = db.Column(db.Boolean, default=False, nullable=False)
-    asking_price = db.Column(db.Float, nullable=True)
+    asking_price = db.Column(db.Numeric(10, 2), nullable=True)
     entered_stage_at = db.Column(db.DateTime, nullable=True)  # timestamp when current stage began
     tenant_id = db.Column(
         db.Integer,
@@ -325,7 +326,12 @@ class ProductInstance(db.Model):
     )
 
     __table_args__ = (
+        db.UniqueConstraint('serial', 'tenant_id', name='uq_pi_serial_tenant'),
+        db.UniqueConstraint('asset', 'tenant_id', name='uq_pi_asset_tenant'),
         db.Index('ix_pi_tenant_sold_status', 'tenant_id', 'is_sold', 'status'),
+        db.Index('ix_pi_process_stage', 'process_stage'),
+        db.Index('ix_pi_location_id', 'location_id'),
+        db.Index('ix_pi_bin_id', 'bin_id'),
     )
 
     @hybrid_property
@@ -429,7 +435,7 @@ class Invoice(db.Model):
 
 class PurchaseOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    po_number = db.Column(db.String(50), unique=True, nullable=False)
+    po_number = db.Column(db.String(50), nullable=False)
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendor.id', ondelete='SET NULL'), nullable=True)
     tenant_id = db.Column(
         db.Integer,
@@ -447,6 +453,10 @@ class PurchaseOrder(db.Model):
     location = db.relationship('Location', foreign_keys=[location_id])
     tenant = db.relationship('Tenant', backref='purchase_orders')
     items = db.relationship('PurchaseOrderItem', backref='po', cascade='all, delete-orphan', lazy='dynamic')
+
+    __table_args__ = (
+        db.UniqueConstraint('po_number', 'tenant_id', name='uq_po_number_tenant'),
+    )
 
 
 class PurchaseOrderItem(db.Model):
@@ -472,10 +482,11 @@ class PurchaseOrderItem(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='SET NULL'), nullable=True)
     # Receiving status: expected | received | missing | extra
     status      = db.Column(db.String(20), nullable=False, default='expected')
-    received_at = db.Column(db.DateTime, nullable=True)
-    notes       = db.Column(db.Text, nullable=True)
-    location    = db.relationship('Location', foreign_keys=[location_id])
-    tenant      = db.relationship('Tenant')
+    received_at    = db.Column(db.DateTime, nullable=True)
+    notes          = db.Column(db.Text, nullable=True)
+    expected_price = db.Column(db.Numeric(10, 2), nullable=True)  # agreed/expected unit cost
+    location       = db.relationship('Location', foreign_keys=[location_id])
+    tenant         = db.relationship('Tenant')
 
 class CustomerOrderTracking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -793,6 +804,10 @@ class TenantSettings(db.Model):
     tenant = db.relationship('Tenant', backref='settings')
     key = db.Column(db.String(100), nullable=False)
     value = db.Column(db.String(500), nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('tenant_id', 'key', name='uq_tenant_settings_key'),
+    )
 
     def __repr__(self):
         return f"<TenantSettings {self.key}={self.value} for Tenant {self.tenant_id}>"
@@ -1199,6 +1214,18 @@ class UnitCost(db.Model):
 
     def __repr__(self):
         return f"<UnitCost instance={self.instance_id} total={self.total_cost}>"
+
+
+@_sa_event.listens_for(UnitCost, 'before_insert')
+def _uc_calc_insert(mapper, connection, target):
+    """Auto-recalculate totals whenever a UnitCost row is inserted."""
+    target.calculate()
+
+
+@_sa_event.listens_for(UnitCost, 'before_update')
+def _uc_calc_update(mapper, connection, target):
+    """Auto-recalculate totals whenever a UnitCost row is updated."""
+    target.calculate()
 
 
 class POCostSettings(db.Model):

@@ -210,7 +210,7 @@ def create_return(instance_id):
     # Resolve sale/invoice context from optional query param
     sale_id = request.args.get('sale_id', type=int)
     sale = db.session.get(SaleTransaction, sale_id) if sale_id else None
-    if sale and sale.tenant_id != current_user.tenant_id:
+    if sale and (sale.customer is None or sale.customer.tenant_id != current_user.tenant_id):
         sale = None
     if not sale:
         sale = (
@@ -286,6 +286,9 @@ def create_return(instance_id):
         instance.is_sold = False
         instance.status = 'unprocessed'
         instance.assigned_to_user_id = None
+
+        if invoice:
+            invoice.payment_status = 'returned'
 
         if sale:
             reversal_note = f"RETURNED {now.strftime('%Y-%m-%d')}: {reason or 'no reason given'}"

@@ -9,7 +9,7 @@
     <div class="page-subtitle">{{ inst.serial or inst.id }} · {{ inst.product.make }} {{ inst.product.model }}</div>
   </div>
   <div class="page-actions">
-    <a href="{{ url_for('instances_bp.view_instance', instance_id=inst.id) }}" class="btn btn-ghost">
+    <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=inst.id) }}" class="btn btn-ghost">
       <i class="bi bi-arrow-left"></i> Back to Unit
     </a>
     {% if inst.po_id %}
@@ -44,7 +44,7 @@
           <div class="mb-2 d-flex align-items-center gap-2">
             <label class="form-label mb-0" style="min-width:170px;font-size:.875rem;">{{ label }}</label>
             <div class="input-group input-group-sm" style="max-width:160px;">
-              <span class="input-group-text">$</span>
+              <span class="input-group-text">AED</span>
               <input type="number" name="{{ name }}" step="0.01" min="0"
                      class="form-control cost-field"
                      value="{{ "%.2f"|format((val or 0)|float) }}"
@@ -96,7 +96,7 @@
 
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Total Cost</span>
-          <span class="fw-bold" id="previewTotalCost">${{ "%.2f"|format((uc.total_cost or 0)|float) }}</span>
+          <span class="fw-bold" id="previewTotalCost">AED {{ "%.2f"|format((uc.total_cost or 0)|float) }}</span>
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Margin</span>
@@ -104,21 +104,21 @@
         </div>
         <div class="d-flex justify-content-between mb-3">
           <span class="text-muted fw-medium">Suggested Price</span>
-          <span class="fw-bold text-success fs-5" id="previewSuggested">${{ "%.2f"|format((uc.suggested_price or 0)|float) }}</span>
+          <span class="fw-bold text-success fs-5" id="previewSuggested">AED {{ "%.2f"|format((uc.suggested_price or 0)|float) }}</span>
         </div>
 
         <hr>
 
         <div class="d-flex justify-content-between mb-2">
           <span class="text-muted">Current Asking Price</span>
-          <span id="currentAsking">${{ "%.2f"|format((inst.asking_price or 0)|float) }}</span>
+          <span id="currentAsking">AED {{ "%.2f"|format((inst.asking_price or 0)|float) }}</span>
         </div>
         {% if inst.asking_price and inst.asking_price|float > 0 and (uc.suggested_price or 0)|float > 0 %}
         <div class="d-flex justify-content-between">
           <span class="text-muted">vs Suggested</span>
           {% set diff = inst.asking_price|float - uc.suggested_price|float %}
           <span class="{% if diff >= 0 %}text-success{% else %}text-danger{% endif %}">
-            {{ '+' if diff >= 0 else '' }}${{ "%.2f"|format(diff) }}
+            {{ '+' if diff >= 0 else '' }}AED {{ "%.2f"|format(diff) }}
           </span>
         </div>
         {% endif %}
@@ -161,8 +161,8 @@
     const margin = parseFloat(marginInput.value) || 25;
     data.margin_percent = margin;
     const suggested = Math.round(total * (1 + margin / 100) * 100) / 100;
-    previewTotal.textContent    = '$' + total.toFixed(2);
-    previewSuggested.textContent = '$' + suggested.toFixed(2);
+    previewTotal.textContent    = 'AED' + total.toFixed(2);
+    previewSuggested.textContent = 'AED' + suggested.toFixed(2);
     if (previewMarginEl) previewMarginEl.textContent = margin.toFixed(1) + '%';
   }
 

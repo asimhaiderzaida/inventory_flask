@@ -4,7 +4,7 @@ import uuid
 import tempfile
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
-from ..models import db, Product, Vendor, Location, ProductInstance
+from ..models import db, Product, Vendor, Location, ProductInstance, UnitCost
 from datetime import datetime
 import pandas as pd
 from inventory_flask_app import csrf
@@ -41,7 +41,8 @@ def template_download():
     wb = Workbook()
     ws = wb.active
     ws.title = 'Import'
-    ws.append(['serial', 'asset', 'item_name', 'make', 'model', 'cpu', 'ram', 'grade', 'display', 'gpu1', 'gpu2', 'disk1size'])
+    ws.append(['serial', 'asset', 'item_name', 'make', 'model', 'cpu', 'ram', 'grade', 'display', 'gpu1', 'gpu2', 'disk1size', 'cost'])
+    ws.append(['SN123456', '', 'Laptop', 'Dell', 'Latitude 5420', 'Core i5', '16GB', 'A', '14"', '', '', '256GB', 1200.00])
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -150,7 +151,7 @@ def upload_excel():
             # Only keep fields defined in Product or ProductInstance models
             allowed_columns = {
                 'asset', 'serial', 'item_name', 'make', 'model', 'cpu', 'ram',
-                'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location'
+                'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location', 'cost'
             }
             df = df[[col for col in df.columns if col in allowed_columns]]
 
@@ -179,6 +180,10 @@ def upload_excel():
 
                     row_loc        = get_location_id(row.get('location'))
                     eff_loc        = row_loc or (int(location_id) if location_id else None)
+                    try:
+                        row_cost = float(row.get('cost') or 0)
+                    except (TypeError, ValueError):
+                        row_cost = 0.0
                     spec_data = {
                         'item_name': _clean(row.get('item_name')) or _clean(row.get('model')),
                         'make':      _clean(row.get('make')),
@@ -212,6 +217,15 @@ def upload_excel():
                         })
                         if outcome == 'created':
                             created_count += 1
+                            if instance and not UnitCost.query.filter_by(instance_id=instance.id).first():
+                                uc = UnitCost(
+                                    instance_id=instance.id,
+                                    tenant_id=instance.tenant_id,
+                                    purchase_cost=row_cost,
+                                    margin_percent=25,
+                                )
+                                uc.calculate()
+                                db.session.add(uc)
                         elif outcome == 'updated':
                             updated_count += 1
                         else:
@@ -288,7 +302,7 @@ def upload_excel():
         # Only keep allowed columns
         allowed_columns = {
             'asset', 'serial', 'item_name', 'make', 'model', 'cpu', 'ram',
-            'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location'
+            'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location', 'cost'
         }
         df = df[[col for col in df.columns if col in allowed_columns]]
         if 'serial' not in df.columns:

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Bulk Price Editor{% endblock %}
-{% block page_title %}Bulk Price Editor{% endblock %}
+{% block title %}Quick Price Editor{% endblock %}
+{% block page_title %}Quick Price Editor{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
   /* ── Flash-green animation for price cells ── */
   @keyframes flash-green {
@@ -22,40 +22,94 @@
     background: var(--primary-light) !important;
     outline: 2px solid var(--primary);
     outline-offset: -2px;
-    transition: background var(--transition-base), outline var(--transition-base);
   }
   .unit-row {
-    transition: background var(--transition-base);
+    transition: background 0.15s ease;
+  }
+  .unit-row:hover {
+    background: var(--surface-2);
+  }
+  .unit-row td {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    vertical-align: middle;
+  }
+
+  /* ── Checkbox column ── */
+  .unit-row td:first-child {
+    text-align: center;
+    width: 36px;
+    padding-left: 0.75rem;
+    padding-right: 0.25rem;
+  }
+
+  /* ── Price cell styled like an input ── */
+  .price-cell {
+    display: inline-flex;
+    align-items: center;
+    min-width: 90px;
+    max-width: 120px;
+    width: 100%;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-family: monospace;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    transition: border-color 0.15s;
+  }
+  .price-cell:focus-within,
+  .price-cell:hover {
+    border-color: var(--primary);
+  }
+  .price-cell.has-value {
+    font-weight: 700;
+    color: var(--color-success);
+    background: transparent;
+    border-color: transparent;
+  }
+  .price-cell.no-value {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 0.8rem;
   }
 
   /* ── Sticky selection toolbar ── */
   .sticky-toolbar {
     position: fixed;
     bottom: 0;
-    left: 0;
+    left: var(--sidebar-width);
     right: 0;
-    z-index: 1030;
-    background: var(--sidebar-bg);
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding: 0.85rem 1.5rem;
+    z-index: 900;
+    background: var(--surface);
+    border-top: 2px solid var(--border);
+    padding: 0.75rem 2rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
     transform: translateY(100%);
-    transition: transform var(--transition-slow);
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+    transition: transform 0.25s ease, left 0.25s ease;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
   }
   .sticky-toolbar.toolbar-visible {
     transform: translateY(0);
+  }
+  body.sidebar-collapsed .sticky-toolbar {
+    left: var(--sidebar-collapsed);
+  }
+  @media (max-width: 991.98px) {
+    .sticky-toolbar { left: 0; }
   }
   .toolbar-count-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(59,130,246,0.2);
-    border: 1px solid rgba(59,130,246,0.3);
-    color: #93c5fd;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
     border-radius: 20px;
     padding: 0.3rem 0.85rem;
     font-size: 0.84rem;
@@ -63,74 +117,99 @@
     white-space: nowrap;
   }
   .toolbar-count-badge i { font-size: 0.8rem; }
-  .sticky-toolbar .btn { min-height: 40px; }
+  .sticky-toolbar .btn { min-height: 38px; }
   .toolbar-set-btn {
     background: var(--primary);
     color: #fff;
     border: none;
     padding: 0 1.1rem;
-    border-radius: var(--btn-radius);
+    border-radius: var(--btn-radius, 6px);
     font-size: 0.875rem;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-height: 40px;
+    min-height: 38px;
     cursor: pointer;
-    transition: background var(--transition-base);
+    transition: background 0.15s;
   }
   .toolbar-set-btn:hover { background: var(--primary-dark); }
   .toolbar-clear-btn {
-    background: rgba(239,68,68,0.12);
-    color: #f87171;
-    border: 1px solid rgba(239,68,68,0.25);
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
     padding: 0 1.1rem;
-    border-radius: var(--btn-radius);
+    border-radius: var(--btn-radius, 6px);
     font-size: 0.875rem;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-height: 40px;
+    min-height: 38px;
     cursor: pointer;
-    transition: background var(--transition-base);
+    transition: background 0.15s;
   }
-  .toolbar-clear-btn:hover { background: rgba(239,68,68,0.2); }
+  .toolbar-clear-btn:hover { background: #fee2e2; }
   .toolbar-deselect-btn {
-    background: rgba(255,255,255,0.06);
-    color: #94a3b8;
-    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
     padding: 0 0.9rem;
-    border-radius: var(--btn-radius);
+    border-radius: var(--btn-radius, 6px);
     font-size: 0.84rem;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-height: 40px;
+    min-height: 38px;
     cursor: pointer;
-    transition: background var(--transition-base);
+    transition: background 0.15s;
     margin-left: auto;
   }
-  .toolbar-deselect-btn:hover { background: rgba(255,255,255,0.1); color: #f1f5f9; }
+  .toolbar-deselect-btn:hover { background: var(--surface-2); color: var(--text-primary); }
 
-  /* bottom padding so sticky toolbar doesn't cover table footer */
-  body { padding-bottom: 80px; }
+  /* ── Prevent sticky toolbar from hiding last rows ── */
+  .table-card { margin-bottom: 0; }
+  .price-editor-wrap { padding-bottom: 80px; }
+
+  /* ── Action button per row ── */
+  .row-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-size: 0.82rem;
+  }
+  .row-action-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
 </style>
+{% endblock %}
 
+{% block content %}
+<script>const SAVE_URL = "{{ url_for('stock_bp.bulk_price_save') }}";</script>
 <!-- Page header -->
 <div class="page-header animate-fade-up">
   <div>
-    <h1 class="page-title">Bulk Price Editor</h1>
-    <div class="page-subtitle" id="selectedCount">{{ instances|length }} unit{{ 's' if instances|length != 1 else '' }}</div>
+    <h1 class="page-title">Quick Price Editor</h1>
+    <p class="page-subtitle" id="selectedCount">Set asking prices for multiple units at once</p>
   </div>
 </div>
 
 <!-- Filters -->
-<div class="animate-fade-up" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.85rem 1rem;margin-bottom:1rem;">
+<div class="animate-fade-up" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;">
   <form method="get" class="row g-2 align-items-end">
     <div class="col-6 col-sm-4 col-md-2">
-      <label class="form-label" style="font-size:0.72rem;">Status</label>
+      <label class="form-label" style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);">Status</label>
       <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="all"           {% if status_filter=='all' %}selected{% endif %}>All (unsold)</option>
         <option value="processed"     {% if status_filter=='processed' %}selected{% endif %}>Processed</option>
@@ -141,12 +220,12 @@
       </select>
     </div>
     <div class="col-6 col-sm-4 col-md-2">
-      <label class="form-label" style="font-size:0.72rem;">Model</label>
+      <label class="form-label" style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);">Model</label>
       <input type="text" name="model" value="{{ model_filter }}"
              class="form-control form-control-sm" placeholder="Filter model…">
     </div>
     <div class="col-6 col-sm-4 col-md-2">
-      <label class="form-label" style="font-size:0.72rem;">Location</label>
+      <label class="form-label" style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);">Location</label>
       <select name="location" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="">All Locations</option>
         {% for loc in locations %}
@@ -155,7 +234,7 @@
       </select>
     </div>
     <div class="col-6 col-sm-4 col-md-2">
-      <label class="form-label" style="font-size:0.72rem;">Price Set?</label>
+      <label class="form-label" style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);">Price Set?</label>
       <select name="priced" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value=""    {% if priced_filter=='' %}selected{% endif %}>Any</option>
         <option value="yes" {% if priced_filter=='yes' %}selected{% endif %}>Has Price</option>
@@ -172,85 +251,109 @@
 </div>
 
 <!-- Table -->
-<div class="table-card animate-fade-up">
-  <div class="table-toolbar">
-    <span class="table-title">
-      <strong>{{ instances|length }}</strong> unit{{ 's' if instances|length != 1 else '' }}
-    </span>
-    <div class="d-flex align-items-center gap-2">
-      <span id="toolbarSelectedText" style="font-size:0.82rem;color:var(--text-muted);display:none;">
-        <span id="toolbarN">0</span> selected
+<div class="price-editor-wrap">
+  <div class="table-card animate-fade-up">
+    <div class="table-toolbar">
+      <span class="table-title">
+        <strong>{{ instances|length }}</strong> unit{{ 's' if instances|length != 1 else '' }}
       </span>
+      <div class="d-flex align-items-center gap-2">
+        <span id="toolbarSelectedText" style="font-size:0.82rem;color:var(--text-muted);display:none;">
+          <span id="toolbarN">0</span> selected
+        </span>
+      </div>
     </div>
-  </div>
-  <div style="overflow-x:auto;">
-    <table class="table table-sm align-middle mb-0" style="min-width:720px;">
-      <thead>
-        <tr>
-          <th style="width:36px;">
-            <input type="checkbox" id="selectAll" class="form-check-input" title="Select all">
-          </th>
-          <th>Serial / Asset</th>
-          <th>Item</th>
-          <th>Specs</th>
-          <th>Status</th>
-          <th>Location</th>
-          <th style="text-align:right;">Asking Price (AED)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in instances %}
-        <tr id="row-{{ i.id }}" class="unit-row{% if i.asking_price %} has-price{% endif %}">
-          <td>
-            <input type="checkbox" class="form-check-input unit-cb"
-                   value="{{ i.id }}"
-                   data-serial="{{ i.serial }}"
-                   data-model="{{ (i.product.model if i.product else None) | nonan }}">
-          </td>
-          <td>
-            <div style="font-family:monospace;font-size:0.82rem;font-weight:600;">{{ i.serial }}</div>
-            {% if i.asset %}
-            <div style="font-family:monospace;font-size:0.76rem;color:var(--text-muted);">{{ i.asset }}</div>
-            {% endif %}
-          </td>
-          <td style="font-size:0.84rem;font-weight:500;">
-            {{ (i.product.item_name if i.product else None) | nonan }}
-            {% if i.product and i.product.model %}
-            <div style="font-size:0.76rem;color:var(--text-muted);">{{ i.product.model | nonan }}</div>
-            {% endif %}
-          </td>
-          <td style="font-size:0.76rem;color:var(--text-secondary);">
-            {% set specs = [i.product.cpu, i.product.ram, i.product.disk1size, i.product.display] | select | list %}
-            {{ specs | join(' · ') if specs else '—' }}
-            {% if i.product and i.product.grade %}
-            <div>Grade: {{ i.product.grade | nonan }}</div>
-            {% endif %}
-          </td>
-          <td>
-            <span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>
-          </td>
-          <td style="font-size:0.82rem;">
-            {% if i.location %}{{ i.location.name }}{% if i.shelf_bin %} / {{ i.shelf_bin }}{% endif %}{% else %}—{% endif %}
-          </td>
-          <td style="text-align:right;">
-            <span class="price-cell" id="price-{{ i.id }}"
-                  style="font-family:monospace;font-weight:{% if i.asking_price %}700{% else %}400{% endif %};color:{% if i.asking_price %}var(--color-success){% else %}var(--text-muted){% endif %};">
-              {% if i.asking_price %}{{ "%.2f"|format(i.asking_price) }}{% else %}—{% endif %}
-            </span>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="7">
-            <div class="empty-state" style="padding:2.5rem 0;">
-              <i class="bi bi-tag"></i>
-              <p>No units found for this filter.</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div style="overflow-x:auto;">
+      <table class="table table-sm align-middle mb-0" style="min-width:720px;table-layout:fixed;">
+        <colgroup>
+          <col style="width:36px;">
+          <col style="width:15%;">
+          <col style="width:15%;">
+          <col style="width:35%;">
+          <col style="width:12%;">
+          <col style="width:13%;">
+          <col style="width:10%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="width:36px;">
+              <input type="checkbox" id="selectAll" class="form-check-input" title="Select all">
+            </th>
+            <th>Serial / Asset</th>
+            <th>Model</th>
+            <th>Specs</th>
+            <th>Status</th>
+            <th style="text-align:right;">Price (AED)</th>
+            <th style="text-align:center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in instances %}
+          <tr id="row-{{ i.id }}" class="unit-row{% if i.asking_price %} has-price{% endif %}">
+            <td>
+              <input type="checkbox" id="cb-{{ i.id }}" class="form-check-input unit-cb"
+                     value="{{ i.id }}"
+                     data-serial="{{ i.serial }}"
+                     data-model="{{ (i.product.model if i.product else None) | nonan }}">
+            </td>
+            <td>
+              <div style="font-family:monospace;font-size:0.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ i.serial }}</div>
+              {% if i.asset %}
+              <div style="font-family:monospace;font-size:0.76rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ i.asset }}</div>
+              {% endif %}
+              {% if i.location %}
+              <div style="font-size:0.73rem;color:var(--text-muted);margin-top:1px;">
+                <i class="bi bi-geo-alt" style="font-size:0.65rem;"></i>
+                {{ i.location.name }}{% if i.shelf_bin %} / {{ i.shelf_bin }}{% endif %}
+              </div>
+              {% endif %}
+            </td>
+            <td style="font-size:0.84rem;overflow:hidden;">
+              <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ (i.product.item_name if i.product else None) | nonan }}">
+                {{ (i.product.item_name if i.product else None) | nonan }}
+              </div>
+              {% if i.product and i.product.model %}
+              <div style="font-size:0.76rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ i.product.model | nonan }}</div>
+              {% endif %}
+            </td>
+            <td style="font-size:0.76rem;color:var(--text-secondary);">
+              {% set specs = [i.product.cpu, i.product.ram, i.product.disk1size, i.product.display] | select | list %}
+              <span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                {{ specs | join(' · ') if specs else '—' }}
+              </span>
+              {% if i.product and i.product.grade %}
+              <div style="margin-top:1px;color:var(--text-muted);">Grade: {{ i.product.grade | nonan }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>
+            </td>
+            <td style="text-align:right;">
+              <span class="price-cell {% if i.asking_price %}has-value{% else %}no-value{% endif %}"
+                    id="price-{{ i.id }}">
+                {% if i.asking_price %}{{ "%.2f"|format(i.asking_price) }}{% else %}Enter price…{% endif %}
+              </span>
+            </td>
+            <td style="text-align:center;">
+              <button type="button" class="row-action-btn" title="Select &amp; set price"
+                      onclick="(function(btn){var cb=btn.closest('tr').querySelector('.unit-cb');if(!cb.checked){cb.checked=true;cb.dispatchEvent(new Event('change',{bubbles:true}));}})(this); openPriceModal();">
+                <i class="bi bi-pencil-square"></i>
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="empty-state" style="padding:2.5rem 0;">
+                <i class="bi bi-tag"></i>
+                <p>No units found for this filter.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -435,7 +538,7 @@
     const btn = document.getElementById('confirmPriceBtn');
     setButtonLoading(btn, true);
 
-    fetch('/stock/bulk_price/save', {
+    fetch(SAVE_URL, {
       method: 'POST',
       headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
       body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: price }),
@@ -456,6 +559,8 @@
             cell.textContent    = data.price.toFixed(2);
             cell.style.fontWeight = '700';
             cell.style.color      = 'var(--color-success)';
+            cell.classList.remove('no-value');
+            cell.classList.add('has-value');
             /* Flash animation */
             cell.classList.remove('price-flash');
             void cell.offsetWidth; /* reflow to restart */
@@ -475,7 +580,7 @@
     const btn = document.getElementById('confirmClearBtn');
     setButtonLoading(btn, true);
 
-    fetch('/stock/bulk_price/save', {
+    fetch(SAVE_URL, {
       method: 'POST',
       headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
       body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: null, clear: true }),
@@ -489,9 +594,11 @@
         selectedIds.forEach(function (id) {
           const cell = document.getElementById('price-' + id);
           if (cell) {
-            cell.textContent    = '—';
+            cell.textContent    = 'Enter price\u2026';
             cell.style.fontWeight = '400';
-            cell.style.color      = 'var(--text-muted)';
+            cell.style.color      = '';
+            cell.classList.remove('has-value');
+            cell.classList.add('no-value');
           }
         });
       } else {

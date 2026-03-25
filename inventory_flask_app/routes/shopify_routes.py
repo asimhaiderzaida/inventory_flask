@@ -624,7 +624,7 @@ def delete_listing(instance_id):
     _require_admin()
     if not is_shopify_enabled(current_user.tenant_id):
         flash("Shopify integration is not enabled.", "warning")
-        return redirect(url_for('shopify_bp.shopify_dashboard'))
+        return redirect(url_for('shopify_bp.dashboard'))
     tid = current_user.tenant_id
     instance = ProductInstance.query.filter_by(id=instance_id, tenant_id=tid).first_or_404()
 
@@ -648,12 +648,9 @@ def delete_listing(instance_id):
 
     # Clear shopify_listed on all instances that shared this product group
     p = instance.product
-    grade_val = getattr(p, 'grade', None)
     q = ProductInstance.query.filter_by(
         tenant_id=tid, product_id=p.id, shopify_listed=True
     )
-    if grade_val:
-        q = q.filter_by(grade=grade_val)
     for inst in q.all():
         inst.shopify_listed = False
 
@@ -731,14 +728,13 @@ def bulk_publish():
                 skipped += 1
                 continue
 
-            # Save price to instance before publishing so it's persisted
+            logger.info(f"bulk_publish: publishing instance {iid}, price={price_override or instance.asking_price}")
+            _publish_one(tid, instance, price_override=price_override)
+            # Only persist the price after a successful publish
             if price_override is not None:
                 instance.asking_price = price_override
                 db.session.commit()
                 logger.info(f"bulk_publish: saved asking_price={price_override} to instance {iid}")
-
-            logger.info(f"bulk_publish: publishing instance {iid}, price={price_override or instance.asking_price}")
-            _publish_one(tid, instance, price_override=price_override)
             published += 1
 
         except Exception as e:
@@ -1072,7 +1068,7 @@ def register_webhooks():
     _require_admin()
     if not is_shopify_enabled(current_user.tenant_id):
         flash("Shopify integration is not enabled.", "warning")
-        return redirect(url_for('shopify_bp.shopify_dashboard'))
+        return redirect(url_for('shopify_bp.dashboard'))
     tid       = current_user.tenant_id
     client    = get_shopify_client(tid)
     if not client:
@@ -1211,7 +1207,7 @@ def confirm_order(order_id):
     tid = current_user.tenant_id
     if not is_shopify_enabled(tid):
         flash("Shopify integration is not enabled.", "warning")
-        return redirect(url_for('shopify_bp.shopify_dashboard'))
+        return redirect(url_for('shopify_bp.dashboard'))
     so  = ShopifyOrder.query.filter_by(id=order_id, tenant_id=tid).first_or_404()
     if so.status != 'draft':
         flash("Order is not in draft status.", "warning")
@@ -1260,7 +1256,7 @@ def reject_order(order_id):
     tid = current_user.tenant_id
     if not is_shopify_enabled(tid):
         flash("Shopify integration is not enabled.", "warning")
-        return redirect(url_for('shopify_bp.shopify_dashboard'))
+        return redirect(url_for('shopify_bp.dashboard'))
     so  = ShopifyOrder.query.filter_by(id=order_id, tenant_id=tid).first_or_404()
     so.status       = 'rejected'
     so.processed_at = datetime.now(timezone.utc)

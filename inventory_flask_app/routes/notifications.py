@@ -35,7 +35,7 @@ def notifications_list():
     )
 
 
-@notifications_bp.route('/<int:notif_id>/read', methods=['POST', 'GET'])
+@notifications_bp.route('/<int:notif_id>/read', methods=['POST'])
 @login_required
 def mark_read(notif_id):
     """Mark a single notification as read and redirect to its link."""

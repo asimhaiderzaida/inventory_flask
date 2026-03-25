@@ -540,14 +540,14 @@ function updateProductTable() {
   products.forEach(function(p, i) {
     const tr = document.createElement('tr');
     tr.innerHTML =
-      '<td style="font-family:monospace;font-size:0.8rem;">' + (p.serial || '') + '</td>' +
-      '<td style="font-size:0.82rem;" class="d-none d-sm-table-cell">' + (p.asset || '') + '</td>' +
+      '<td style="font-family:monospace;font-size:0.8rem;">' + escH(p.serial || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-sm-table-cell">' + escH(p.asset || '') + '</td>' +
       '<td style="font-size:0.84rem;max-width:160px;">' +
-        '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.model || p.name || '') + '</div>' +
+        '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escH(p.model || p.name || '') + '</div>' +
       '</td>' +
-      '<td style="font-size:0.82rem;color:var(--text-secondary);" class="d-none d-md-table-cell">' + (p.cpu || '') + '</td>' +
-      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + (p.ram || '') + '</td>' +
-      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + (p.grade || '') + '</td>' +
+      '<td style="font-size:0.82rem;color:var(--text-secondary);" class="d-none d-md-table-cell">' + escH(p.cpu || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + escH(p.ram || '') + '</td>' +
+      '<td style="font-size:0.82rem;" class="d-none d-md-table-cell">' + escH(p.grade || '') + '</td>' +
       '<td style="text-align:right;">' +
         '<div style="display:flex;align-items:center;gap:0.3rem;justify-content:flex-end;">' +
           '<span style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;">' + SALE_CURRENCY + '</span>' +
@@ -637,7 +637,7 @@ function sendScannedUnitToSession(p) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ serial: p.serial, asset: p.asset })
-  }).catch(function() {});
+  }).catch(function() { showToast('Failed to register unit — please try again.', 'danger'); });
 }
 
 function loadScannedUnits() {

@@ -53,7 +53,7 @@ def create_app():
     app.config['WTF_CSRF_TIME_LIMIT'] = 3600 * 8  # 8 hours (default is 3600 = 1 hour)
 
     # Session cookie security
-    app.config['SESSION_COOKIE_SECURE'] = False   # False for HTTP dev/local; set True behind HTTPS
+    app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_HTTPONLY'] = True
 
@@ -105,7 +105,7 @@ def create_app():
 
     # Register blueprints
     from .routes import (
-        auth, dashboard, instances, stock, vendors, customers,
+        auth, dashboard, stock, vendors, customers,
         order_tracking_routes, sales, invoices, import_excel,
         exports, parts, returns, reports, admin,
         pipeline, scanner, accounting, notifications, shopify_routes,
@@ -114,7 +114,6 @@ def create_app():
 
     app.register_blueprint(auth.auth_bp)
     app.register_blueprint(dashboard.dashboard_bp)
-    app.register_blueprint(instances.instances_bp)
     app.register_blueprint(stock.stock_bp)
     app.register_blueprint(pipeline.pipeline_bp)
     app.register_blueprint(scanner.scanner_bp)
@@ -170,8 +169,7 @@ def create_app():
         format_duration=format_duration,
         calc_duration_minutes=calc_duration_minutes,
         get_status_label=get_status_label,
-        now_utc=datetime.now(timezone.utc),
-    )
+    )  # now_utc is injected per-request by inject_now_utc context processor
 
     # Jinja filter: replace None / 'nan' / empty string with an em-dash
     def _nonan(val):

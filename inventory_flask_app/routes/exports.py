@@ -43,7 +43,7 @@ def export_products():
     # Tenant-specific column visibility and labels
     visible_columns = {
         "Asset": ("asset", settings.get("show_column_asset") == "true", settings.get("label_asset", "Asset")),
-        "Serial": ("serial", settings.get("show_column_serial") == "true", settings.get("label_serial", "Serial")),
+        "Serial": ("serial", settings.get("show_column_serial") == "true", settings.get("label_serial_number", "Serial")),
         "Item Name": ("product.item_name", settings.get("show_column_item_name") == "true", settings.get("label_item_name", "Item Name")),
         "Make": ("product.make", settings.get("show_column_make") == "true", settings.get("label_make", "Make")),
         "Model": ("product.model", settings.get("show_column_model") == "true", settings.get("label_model", "Model")),
@@ -228,12 +228,14 @@ def inventory_export():
             combined.extend([s.strip() for s in asset_tags_raw.replace('\n', ',').split(',') if s.strip()])
         if combined:
             from sqlalchemy import or_
-            query = query.filter(
+            inst_ids = db.session.query(ProductInstance.product_id).filter(
+                ProductInstance.tenant_id == current_user.tenant_id,
                 or_(
-                    Product.serial.in_(combined),
-                    Product.asset.in_(combined)
+                    ProductInstance.serial.in_(combined),
+                    ProductInstance.asset.in_(combined),
                 )
             )
+            query = query.filter(Product.id.in_(inst_ids))
         else:
             if model:
                 query = query.filter(Product.model.ilike(f"%{model}%"))
@@ -345,7 +347,7 @@ def export_aged_inventory():
         from inventory_flask_app.models import TenantSettings
         tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
         settings = {s.key: s.value for s in tenant_settings}
-        threshold_days = int(settings.get("inventory_age_threshold", 60))
+        threshold_days = int(settings.get("aged_threshold_days", 60))
     except:
         pass
 

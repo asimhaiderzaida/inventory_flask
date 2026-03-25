@@ -133,6 +133,7 @@
     body.sidebar-collapsed .sidebar { width: var(--sidebar-collapsed); }
     body.sidebar-collapsed .sidebar-label,
     body.sidebar-collapsed .sidebar-section-title,
+    body.sidebar-collapsed .sidebar-section-label,
     body.sidebar-collapsed .sidebar-chevron { opacity: 0; width: 0; overflow: hidden; }
     body.sidebar-collapsed .sidebar-brand-text { opacity: 0; width: 0; }
     body.sidebar-collapsed .nav-group-header { justify-content: center; padding: 0; }
@@ -201,6 +202,21 @@
       pointer-events: none;
       user-select: none;
       transition: opacity var(--transition-slow);
+    }
+
+    /* ── Primary section label (INVENTORY, SALES, FINANCE, etc.) */
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      padding: 16px 16px 4px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      transition: opacity var(--transition-slow);
+      display: block;
     }
 
     /* ── Nav group header (split: clickable link + chevron toggle) */
@@ -1122,23 +1138,11 @@
 
     {% if current_user.is_authenticated %}
 
-      {# ── Helper: is the current page in a given blueprint group? ── #}
+      {# ── Active-state helpers ── #}
       {% set ep = request.endpoint or '' %}
-      {% set is_warehouse = ep in (
-            'stock_bp.stock_intake','stock_bp.stock_receiving_select',
-            'stock_bp.create_purchase_order','stock_bp.stock_receiving_scan',
-            'stock_bp.stock_receiving_summary','stock_bp.stock_receiving_confirm',
-            'stock_bp.manage_locations','stock_bp.location_contents',
-            'stock_bp.manage_bins','stock_bp.bin_detail','stock_bp.all_bins',
-            'stock_bp.bin_lookup','import_excel_bp.upload_excel',
-            'scanner_bp.scan_unit','scanner_bp.scan_move') %}
-      {% set is_processing = ep in ('stock_bp.process_stage_update','pipeline_bp.pipeline','stock_bp.view_edit_instance') %}
-      {% set is_returns     = ep.startswith('returns_bp') %}
-      {% set is_sales      = ep.startswith('sales_bp') or ep.startswith('order_bp') or ep.startswith('invoices_bp') or ep.startswith('orders_bp') %}
-      {% set is_people     = ep.startswith('customers_bp') or ep.startswith('vendors_bp') %}
-      {% set is_reports    = ep.startswith('reports_bp') %}
-      {% set is_admin      = ep.startswith('admin_bp') or ep == 'auth.register_user' %}
-      {% set is_accounting = ep.startswith('accounting_bp') or ep.startswith('pricing_bp') %}
+      {% set is_returns = ep.startswith('returns_bp') %}
+      {% set is_analytics = ep.startswith('reports_bp') %}
+      {% set is_admin = ep.startswith('admin_bp') or ep == 'auth.register_user' %}
 
       {% if current_user.role == 'technician' %}
       {# ══ TECHNICIAN: focused view ══ #}
@@ -1149,7 +1153,7 @@
           <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <div class="sidebar-section-title">Processing</div>
+        <div class="sidebar-section-label">Processing</div>
         <a href="{{ url_for('stock_bp.process_stage_update') }}"
            class="sidebar-link {% if ep == 'stock_bp.process_stage_update' %}active{% endif %}">
           <i class="bi bi-tools nav-icon"></i>
@@ -1161,7 +1165,7 @@
           <span class="sidebar-label">Pipeline</span>
         </a>
         <a href="{{ url_for('scanner_bp.scan_unit') }}"
-           class="sidebar-link {% if ep == 'scanner_bp.scan_unit' %}active{% endif %}">
+           class="sidebar-link {% if ep in ('scanner_bp.scan_unit','scanner_bp.scan_move') %}active{% endif %}">
           <i class="bi bi-qr-code-scan nav-icon"></i>
           <span class="sidebar-label">Scanner</span>
         </a>
@@ -1176,30 +1180,37 @@
           <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <!-- ── WAREHOUSE ────────────────────────────────── -->
-        <div class="sidebar-section-title">Warehouse</div>
+        <!-- ── INVENTORY ──────────────────────────────────── -->
+        <div class="sidebar-section-label">Inventory</div>
 
-        {% set stock_po_active = ep in ('stock_bp.stock_intake','stock_bp.create_purchase_order','stock_bp.stock_receiving_select','stock_bp.stock_receiving_scan','stock_bp.stock_receiving_summary','stock_bp.stock_receiving_confirm','import_excel_bp.upload_excel') %}
-        <div class="nav-group-header {% if stock_po_active %}active-group{% endif %}">
+        <a href="{{ url_for('stock_bp.group_view_page') }}"
+           class="sidebar-link {% if ep == 'stock_bp.group_view_page' %}active{% endif %}">
+          <i class="bi bi-boxes nav-icon"></i>
+          <span class="sidebar-label">Stock List</span>
+        </a>
+
+        <a href="{{ url_for('stock_bp.add_product_page') }}"
+           class="sidebar-link {% if ep == 'stock_bp.add_product_page' %}active{% endif %}">
+          <i class="bi bi-plus-circle nav-icon"></i>
+          <span class="sidebar-label">Add Single Unit</span>
+        </a>
+
+        {% set stock_intake_active = ep in ('stock_bp.stock_intake','stock_bp.create_purchase_order','stock_bp.stock_receiving_select','stock_bp.stock_receiving_scan','stock_bp.stock_receiving_summary','stock_bp.stock_receiving_confirm','import_excel_bp.upload_excel') %}
+        <div class="nav-group-header {% if stock_intake_active %}active-group{% endif %}">
           <a href="{{ url_for('stock_bp.stock_intake') }}"
              class="nav-group-link {% if ep == 'stock_bp.stock_intake' %}active{% endif %}">
             <i class="bi bi-box-arrow-in-down nav-group-icon"></i>
             <span class="sidebar-label">Stock Intake</span>
           </a>
           <button class="nav-group-toggle"
-                  data-target="wb-po-body"
-                  data-auto-expand="{{ 'true' if stock_po_active else 'false' }}"
+                  data-target="intake-body"
+                  data-auto-expand="{{ 'true' if stock_intake_active else 'false' }}"
                   aria-expanded="false"
                   title="Expand Stock Intake">
             <i class="bi bi-chevron-right sidebar-chevron"></i>
           </button>
         </div>
-        <div class="sidebar-sub collapse-section collapsed" id="wb-po-body">
-          <a href="{{ url_for('stock_bp.create_purchase_order') }}"
-             class="sidebar-link {% if ep == 'stock_bp.create_purchase_order' %}active{% endif %}">
-            <i class="bi bi-file-earmark-plus nav-icon"></i>
-            <span class="sidebar-label">Create PO</span>
-          </a>
+        <div class="collapse-section collapsed" id="intake-body">
           <a href="{{ url_for('stock_bp.stock_receiving_select') }}"
              class="sidebar-link {% if ep in ('stock_bp.stock_receiving_select','stock_bp.stock_receiving_scan','stock_bp.stock_receiving_summary','stock_bp.stock_receiving_confirm') %}active{% endif %}">
             <i class="bi bi-clipboard-check nav-icon"></i>
@@ -1210,44 +1221,29 @@
             <i class="bi bi-file-earmark-spreadsheet nav-icon"></i>
             <span class="sidebar-label">Import Excel</span>
           </a>
+          <a href="{{ url_for('stock_bp.create_purchase_order') }}"
+             class="sidebar-link {% if ep == 'stock_bp.create_purchase_order' %}active{% endif %}">
+            <i class="bi bi-file-earmark-plus nav-icon"></i>
+            <span class="sidebar-label">Create PO</span>
+          </a>
         </div>
 
         <a href="{{ url_for('stock_bp.manage_locations') }}"
            class="sidebar-link {% if ep in ('stock_bp.manage_locations','stock_bp.location_contents','stock_bp.manage_bins','stock_bp.bin_detail','stock_bp.all_bins','stock_bp.bin_lookup') %}active{% endif %}">
           <i class="bi bi-geo-alt nav-icon"></i>
-          <span class="sidebar-label">Locations</span>
-        </a>
-
-        <a href="{{ url_for('scanner_bp.scan_unit') }}"
-           class="sidebar-link {% if ep in ('scanner_bp.scan_unit','scanner_bp.scan_move') %}active{% endif %}">
-          <i class="bi bi-qr-code-scan nav-icon"></i>
-          <span class="sidebar-label">Scanner</span>
+          <span class="sidebar-label">Locations &amp; Bins</span>
         </a>
 
         {% if current_user.can_access('accounting') %}
-        <a href="{{ url_for('stock_bp.bulk_price_editor') }}"
-           class="sidebar-link {% if ep == 'stock_bp.bulk_price_editor' %}active{% endif %}">
-          <i class="bi bi-tag nav-icon"></i>
-          <span class="sidebar-label">Quick Price Editor</span>
-        </a>
-        {% endif %}
-
-        {% if settings.enable_parts_module == 'true' %}
-        <a href="{{ url_for('parts_bp.parts_list') }}"
-           class="sidebar-link {% if ep.startswith('parts_bp') %}active{% endif %}">
-          <i class="bi bi-cpu nav-icon"></i>
-          <span class="sidebar-label">Parts</span>
-          {% if parts_low_stock_count %}
-          <span style="margin-left:auto;background:var(--color-danger);color:#fff;border-radius:20px;
-                 font-size:0.65rem;font-weight:700;padding:0.05rem 0.45rem;line-height:1.6;flex-shrink:0;">
-            {{ parts_low_stock_count }}
-          </span>
-          {% endif %}
+        <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
+           class="sidebar-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
+          <i class="bi bi-tags nav-icon"></i>
+          <span class="sidebar-label">Smart Pricing</span>
         </a>
         {% endif %}
 
         <!-- ── PROCESSING ─────────────────────────────────── -->
-        <div class="sidebar-section-title">Processing</div>
+        <div class="sidebar-section-label">Processing</div>
 
         <a href="{{ url_for('stock_bp.process_stage_update') }}"
            class="sidebar-link {% if ep == 'stock_bp.process_stage_update' %}active{% endif %}">
@@ -1259,60 +1255,54 @@
           <i class="bi bi-columns-gap nav-icon"></i>
           <span class="sidebar-label">Pipeline</span>
         </a>
+        <a href="{{ url_for('scanner_bp.scan_unit') }}"
+           class="sidebar-link {% if ep in ('scanner_bp.scan_unit','scanner_bp.scan_move') %}active{% endif %}">
+          <i class="bi bi-qr-code-scan nav-icon"></i>
+          <span class="sidebar-label">Scanner</span>
+        </a>
 
         <!-- ── SALES ──────────────────────────────────────── -->
-        <div class="nav-group-header {% if is_sales %}active-group{% endif %}">
-          <a href="{{ url_for('sales_bp.sales_index') }}"
-             class="nav-group-link {% if ep == 'sales_bp.sales_index' %}active{% endif %}">
-            <i class="bi bi-bag-check nav-group-icon"></i>
-            <span class="sidebar-label">Sales</span>
-          </a>
-          <button class="nav-group-toggle"
-                  data-target="sales-body"
-                  data-auto-expand="{{ 'true' if is_sales else 'false' }}"
-                  aria-expanded="false"
-                  title="Expand Sales">
-            <i class="bi bi-chevron-right sidebar-chevron"></i>
-          </button>
-        </div>
-        <div class="collapse-section collapsed" id="sales-body">
-          <a href="{{ url_for('sales_bp.create_sale_form') }}"
-             class="sidebar-link {% if ep == 'sales_bp.create_sale_form' %}active{% endif %}">
-            <i class="bi bi-cash-coin nav-icon"></i>
-            <span class="sidebar-label">Create Sale</span>
-          </a>
-          {% if settings.enable_parts_module != 'false' %}
-          <a href="{{ url_for('parts_bp.sales_list') }}"
-             class="sidebar-link {% if ep in ['parts_bp.sales_list', 'parts_bp.sell', 'parts_bp.sale_customer', 'parts_bp.sale_invoice_type', 'parts_bp.sale_payment', 'parts_bp.sale_detail'] %}active{% endif %}">
-            <i class="bi bi-cpu nav-icon"></i>
-            <span class="sidebar-label">Parts Sales</span>
-          </a>
-          {% endif %}
-          <a href="{{ url_for('orders_bp.index') }}"
-             class="sidebar-link {% if ep.startswith('orders_bp') %}active{% endif %}">
-            <i class="bi bi-clipboard-check nav-icon"></i>
-            <span class="sidebar-label">Orders</span>
-          </a>
-          {% if settings.enable_order_module != 'false' %}
-          <a href="{{ url_for('order_bp.reserve_product') }}"
-             class="sidebar-link {% if ep == 'order_bp.reserve_product' %}active{% endif %}">
-            <i class="bi bi-pin-angle nav-icon"></i>
-            <span class="sidebar-label">Reserve</span>
-          </a>
-          <a href="{{ url_for('order_bp.customer_orders') }}"
-             class="sidebar-link {% if ep == 'order_bp.customer_orders' %}active{% endif %}">
-            <i class="bi bi-card-list nav-icon"></i>
-            <span class="sidebar-label">Order Tracker</span>
-          </a>
-          {% endif %}
-          <a href="{{ url_for('sales_bp.sold_units_view') }}"
-             class="sidebar-link {% if ep == 'sales_bp.sold_units_view' %}active{% endif %}">
-            <i class="bi bi-receipt nav-icon"></i>
-            <span class="sidebar-label">Sold Items</span>
-          </a>
-        </div>
+        <div class="sidebar-section-label">Sales</div>
 
-        <!-- ── RETURNS ─────────────────────────────────────── -->
+        <a href="{{ url_for('sales_bp.create_sale_form') }}"
+           class="sidebar-link {% if ep == 'sales_bp.create_sale_form' %}active{% endif %}">
+          <i class="bi bi-cart-plus nav-icon"></i>
+          <span class="sidebar-label">Create Sale</span>
+        </a>
+
+        {% if settings.enable_parts_module != 'false' %}
+        <a href="{{ url_for('parts_bp.sell') }}"
+           class="sidebar-link {% if ep in ('parts_bp.sell','parts_bp.sale_customer','parts_bp.sale_invoice_type','parts_bp.sale_payment') %}active{% endif %}">
+          <i class="bi bi-cpu nav-icon"></i>
+          <span class="sidebar-label">Parts Sale</span>
+        </a>
+        {% endif %}
+
+        <a href="{{ url_for('orders_bp.index') }}"
+           class="sidebar-link {% if ep.startswith('orders_bp') %}active{% endif %}">
+          <i class="bi bi-clipboard-check nav-icon"></i>
+          <span class="sidebar-label">Orders</span>
+        </a>
+
+        {% if settings.enable_order_module != 'false' %}
+        <a href="{{ url_for('order_bp.reserve_product') }}"
+           class="sidebar-link {% if ep == 'order_bp.reserve_product' %}active{% endif %}">
+          <i class="bi bi-pin-angle nav-icon"></i>
+          <span class="sidebar-label">Reservations</span>
+        </a>
+        <a href="{{ url_for('order_bp.customer_orders') }}"
+           class="sidebar-link {% if ep == 'order_bp.customer_orders' %}active{% endif %}">
+          <i class="bi bi-card-list nav-icon"></i>
+          <span class="sidebar-label">Order Tracker</span>
+        </a>
+        {% endif %}
+
+        <a href="{{ url_for('sales_bp.sold_units_view') }}"
+           class="sidebar-link {% if ep == 'sales_bp.sold_units_view' %}active{% endif %}">
+          <i class="bi bi-receipt nav-icon"></i>
+          <span class="sidebar-label">Sold Items</span>
+        </a>
+
         <div class="nav-group-header {% if is_returns %}active-group{% endif %}">
           <a href="{{ url_for('returns_bp.view_returns') }}"
              class="nav-group-link {% if ep == 'returns_bp.view_returns' %}active{% endif %}">
@@ -1329,58 +1319,117 @@
         </div>
         <div class="collapse-section collapsed" id="returns-body">
           <a href="{{ url_for('returns_bp.lookup_return') }}"
-             class="sidebar-link {% if ep == 'returns_bp.lookup_return' %}active{% endif %}">
+             class="sidebar-link {% if ep in ('returns_bp.lookup_return','returns_bp.create_return') %}active{% endif %}">
             <i class="bi bi-pc-display nav-icon"></i>
-            <span class="sidebar-label">Unit Return</span>
+            <span class="sidebar-label">Unit Returns</span>
           </a>
           <a href="{{ url_for('returns_bp.part_lookup') }}"
-             class="sidebar-link {% if ep in ['returns_bp.part_lookup','returns_bp.create_part_return'] %}active{% endif %}">
+             class="sidebar-link {% if ep in ('returns_bp.part_lookup','returns_bp.create_part_return') %}active{% endif %}">
             <i class="bi bi-tools nav-icon"></i>
-            <span class="sidebar-label">Part Return</span>
-          </a>
-          <a href="{{ url_for('returns_bp.view_returns') }}"
-             class="sidebar-link {% if ep == 'returns_bp.view_returns' %}active{% endif %}">
-            <i class="bi bi-list-ul nav-icon"></i>
-            <span class="sidebar-label">All Returns</span>
+            <span class="sidebar-label">Parts Returns</span>
           </a>
           <a href="{{ url_for('returns_bp.credit_notes') }}"
-             class="sidebar-link {% if ep in ['returns_bp.credit_notes','returns_bp.apply_credit_note'] %}active{% endif %}">
+             class="sidebar-link {% if ep in ('returns_bp.credit_notes','returns_bp.apply_credit_note') %}active{% endif %}">
             <i class="bi bi-receipt nav-icon"></i>
             <span class="sidebar-label">Credit Notes</span>
           </a>
         </div>
 
+        <!-- ── PARTS ──────────────────────────────────────── -->
+        {% if settings.enable_parts_module != 'false' %}
+        <div class="sidebar-section-label">Parts</div>
+
+        <a href="{{ url_for('parts_bp.parts_list') }}"
+           class="sidebar-link {% if ep in ('parts_bp.parts_list','parts_bp.part_detail','parts_bp.edit_part','parts_bp.add_part','parts_bp.part_history','parts_bp.sales_list','parts_bp.sale_detail') %}active{% endif %}">
+          <i class="bi bi-cpu nav-icon"></i>
+          <span class="sidebar-label">Parts List</span>
+          {% if parts_low_stock_count %}
+          <span style="margin-left:auto;background:var(--color-danger);color:#fff;border-radius:20px;
+                 font-size:0.65rem;font-weight:700;padding:0.05rem 0.45rem;line-height:1.6;flex-shrink:0;">
+            {{ parts_low_stock_count }}
+          </span>
+          {% endif %}
+        </a>
+
+        <a href="{{ url_for('parts_bp.parts_scan') }}"
+           class="sidebar-link {% if ep == 'parts_bp.parts_scan' %}active{% endif %}">
+          <i class="bi bi-qr-code-scan nav-icon"></i>
+          <span class="sidebar-label">Parts Scanner</span>
+        </a>
+        {% endif %}
+
         <!-- ── PEOPLE ──────────────────────────────────────── -->
-        <div class="nav-group-header {% if is_people %}active-group{% endif %}">
-          <a href="{{ url_for('customers_bp.customer_center') }}"
-             class="nav-group-link {% if ep == 'customers_bp.customer_center' %}active{% endif %}">
-            <i class="bi bi-people nav-group-icon"></i>
-            <span class="sidebar-label">People</span>
+        <div class="sidebar-section-label">People</div>
+
+        <a href="{{ url_for('customers_bp.customer_center') }}"
+           class="sidebar-link {% if ep.startswith('customers_bp') %}active{% endif %}">
+          <i class="bi bi-people nav-icon"></i>
+          <span class="sidebar-label">Customers</span>
+        </a>
+        <a href="{{ url_for('vendors_bp.vendor_center') }}"
+           class="sidebar-link {% if ep.startswith('vendors_bp') %}active{% endif %}">
+          <i class="bi bi-shop nav-icon"></i>
+          <span class="sidebar-label">Vendors</span>
+        </a>
+
+        <!-- ── FINANCE ─────────────────────────────────────── -->
+        {% if current_user.can_access('accounting') %}
+        <div class="sidebar-section-label">Finance</div>
+
+        {% set is_finance_active = ep.startswith('accounting_bp') %}
+        <div class="nav-group-header {% if is_finance_active %}active-group{% endif %}">
+          <a href="{{ url_for('accounting_bp.index') }}"
+             class="nav-group-link {% if ep == 'accounting_bp.index' %}active{% endif %}">
+            <i class="bi bi-cash-stack nav-group-icon"></i>
+            <span class="sidebar-label">Accounting</span>
           </a>
           <button class="nav-group-toggle"
-                  data-target="people-body"
-                  data-auto-expand="{{ 'true' if is_people else 'false' }}"
+                  data-target="accounting-body"
+                  data-auto-expand="{{ 'true' if is_finance_active else 'false' }}"
                   aria-expanded="false"
-                  title="Expand People">
+                  title="Expand Accounting">
             <i class="bi bi-chevron-right sidebar-chevron"></i>
           </button>
         </div>
-        <div class="collapse-section collapsed" id="people-body">
-          <a href="{{ url_for('customers_bp.customer_center') }}"
-             class="sidebar-link {% if ep.startswith('customers_bp') %}active{% endif %}">
-            <i class="bi bi-person-lines-fill nav-icon"></i>
-            <span class="sidebar-label">Customers</span>
+        <div class="collapse-section collapsed" id="accounting-body">
+          <a href="{{ url_for('accounting_bp.index') }}"
+             class="sidebar-link {% if ep == 'accounting_bp.index' %}active{% endif %}">
+            <i class="bi bi-speedometer2 nav-icon"></i>
+            <span class="sidebar-label">Overview</span>
           </a>
-          <a href="{{ url_for('vendors_bp.vendor_center') }}"
-             class="sidebar-link {% if ep.startswith('vendors_bp') %}active{% endif %}">
-            <i class="bi bi-shop nav-icon"></i>
-            <span class="sidebar-label">Vendors</span>
+          <a href="{{ url_for('accounting_bp.expenses') }}"
+             class="sidebar-link {% if ep in ('accounting_bp.expenses','accounting_bp.add_expense','accounting_bp.edit_expense') %}active{% endif %}">
+            <i class="bi bi-receipt-cutoff nav-icon"></i>
+            <span class="sidebar-label">Expenses</span>
+          </a>
+          <a href="{{ url_for('accounting_bp.income') }}"
+             class="sidebar-link {% if ep in ('accounting_bp.income','accounting_bp.add_income','accounting_bp.edit_income') %}active{% endif %}">
+            <i class="bi bi-wallet2 nav-icon"></i>
+            <span class="sidebar-label">Income</span>
+          </a>
+          <a href="{{ url_for('accounting_bp.receivables') }}"
+             class="sidebar-link {% if ep in ('accounting_bp.receivables','accounting_bp.ar_detail') %}active{% endif %}">
+            <i class="bi bi-file-earmark-check nav-icon"></i>
+            <span class="sidebar-label">Receivables</span>
+          </a>
+          <a href="{{ url_for('accounting_bp.pl') }}"
+             class="sidebar-link {% if ep == 'accounting_bp.pl' %}active{% endif %}">
+            <i class="bi bi-bar-chart-line nav-icon"></i>
+            <span class="sidebar-label">P&amp;L Report</span>
+          </a>
+          <a href="{{ url_for('accounting_bp.cashflow') }}"
+             class="sidebar-link {% if ep == 'accounting_bp.cashflow' %}active{% endif %}">
+            <i class="bi bi-graph-up nav-icon"></i>
+            <span class="sidebar-label">Cash Flow</span>
           </a>
         </div>
+        {% endif %}
 
-        <!-- ── REPORTS ─────────────────────────────────────── -->
+        <!-- ── ANALYTICS ──────────────────────────────────── -->
         {% if current_user.can_access('reports') and settings.enable_reports_module != 'false' %}
-        <div class="nav-group-header {% if is_reports %}active-group{% endif %}">
+        <div class="sidebar-section-label">Analytics</div>
+
+        <div class="nav-group-header {% if is_analytics %}active-group{% endif %}">
           <a href="{{ url_for('reports_bp.reports_index') }}"
              class="nav-group-link {% if ep == 'reports_bp.reports_index' %}active{% endif %}">
             <i class="bi bi-bar-chart-line nav-group-icon"></i>
@@ -1388,18 +1437,13 @@
           </a>
           <button class="nav-group-toggle"
                   data-target="reports-body"
-                  data-auto-expand="{{ 'true' if is_reports else 'false' }}"
+                  data-auto-expand="{{ 'true' if is_analytics else 'false' }}"
                   aria-expanded="false"
                   title="Expand Reports">
             <i class="bi bi-chevron-right sidebar-chevron"></i>
           </button>
         </div>
         <div class="collapse-section collapsed" id="reports-body">
-          <a href="{{ url_for('reports_bp.reports_index') }}"
-             class="sidebar-link {% if ep == 'reports_bp.reports_index' %}active{% endif %}">
-            <i class="bi bi-grid nav-icon"></i>
-            <span class="sidebar-label">All Reports</span>
-          </a>
           <a href="{{ url_for('reports_bp.revenue_report') }}"
              class="sidebar-link {% if ep == 'reports_bp.revenue_report' %}active{% endif %}">
             <i class="bi bi-currency-dollar nav-icon"></i>
@@ -1418,7 +1462,7 @@
           <a href="{{ url_for('reports_bp.tech_productivity') }}"
              class="sidebar-link {% if ep == 'reports_bp.tech_productivity' %}active{% endif %}">
             <i class="bi bi-person-workspace nav-icon"></i>
-            <span class="sidebar-label">Productivity</span>
+            <span class="sidebar-label">Tech Productivity</span>
           </a>
           <a href="{{ url_for('reports_bp.stage_times') }}"
              class="sidebar-link {% if ep == 'reports_bp.stage_times' %}active{% endif %}">
@@ -1435,11 +1479,6 @@
             <i class="bi bi-hourglass-split nav-icon"></i>
             <span class="sidebar-label">Idle Units</span>
           </a>
-          <a href="{{ url_for('reports_bp.slow_technicians') }}"
-             class="sidebar-link {% if ep == 'reports_bp.slow_technicians' %}active{% endif %}">
-            <i class="bi bi-hourglass-bottom nav-icon"></i>
-            <span class="sidebar-label">Slow Technicians</span>
-          </a>
           <a href="{{ url_for('reports_bp.purchase_orders_report') }}"
              class="sidebar-link {% if ep == 'reports_bp.purchase_orders_report' %}active{% endif %}">
             <i class="bi bi-file-earmark-text nav-icon"></i>
@@ -1450,11 +1489,6 @@
             <i class="bi bi-tools nav-icon"></i>
             <span class="sidebar-label">Parts Usage</span>
           </a>
-          <a href="{{ url_for('reports_bp.parts_sales_report') }}"
-             class="sidebar-link {% if ep == 'reports_bp.parts_sales_report' %}active{% endif %}">
-            <i class="bi bi-bag-check nav-icon"></i>
-            <span class="sidebar-label">Parts Sales</span>
-          </a>
           <a href="{{ url_for('reports_bp.returns_report') }}"
              class="sidebar-link {% if ep == 'reports_bp.returns_report' %}active{% endif %}">
             <i class="bi bi-arrow-return-left nav-icon"></i>
@@ -1463,73 +1497,11 @@
         </div>
         {% endif %}
 
-        <!-- ── PRICING ───────────────────────────────────── -->
-        {% if current_user.can_access('accounting') %}
-        <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
-           class="sidebar-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
-          <i class="bi bi-tags nav-icon"></i>
-          <span class="sidebar-label">Smart Pricing</span>
-        </a>
-        {% endif %}
-
-        <!-- ── ACCOUNTING ─────────────────────────────────── -->
-        {% if current_user.can_access('accounting') %}
-        <div class="nav-group-header {% if is_accounting %}active-group{% endif %}">
-          <a href="{{ url_for('accounting_bp.index') }}"
-             class="nav-group-link {% if ep == 'accounting_bp.index' %}active{% endif %}">
-            <i class="bi bi-cash-stack nav-group-icon"></i>
-            <span class="sidebar-label">Accounting</span>
-          </a>
-          <button class="nav-group-toggle"
-                  data-target="accounting-body"
-                  data-auto-expand="{{ 'true' if is_accounting else 'false' }}"
-                  aria-expanded="false"
-                  title="Expand Accounting">
-            <i class="bi bi-chevron-right sidebar-chevron"></i>
-          </button>
-        </div>
-        <div class="collapse-section collapsed" id="accounting-body">
-          <a href="{{ url_for('accounting_bp.index') }}"
-             class="sidebar-link {% if ep == 'accounting_bp.index' %}active{% endif %}">
-            <i class="bi bi-speedometer2 nav-icon"></i>
-            <span class="sidebar-label">Overview</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.expenses') }}"
-             class="sidebar-link {% if ep in ('accounting_bp.expenses','accounting_bp.add_expense','accounting_bp.edit_expense') %}active{% endif %}">
-            <i class="bi bi-receipt-cutoff nav-icon"></i>
-            <span class="sidebar-label">Expenses</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.receivables') }}"
-             class="sidebar-link {% if ep in ('accounting_bp.receivables','accounting_bp.ar_detail') %}active{% endif %}">
-            <i class="bi bi-file-earmark-check nav-icon"></i>
-            <span class="sidebar-label">Receivables</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.income') }}"
-             class="sidebar-link {% if ep in ('accounting_bp.income','accounting_bp.add_income','accounting_bp.edit_income') %}active{% endif %}">
-            <i class="bi bi-wallet2 nav-icon"></i>
-            <span class="sidebar-label">Other Income</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.pl') }}"
-             class="sidebar-link {% if ep == 'accounting_bp.pl' %}active{% endif %}">
-            <i class="bi bi-bar-chart-line nav-icon"></i>
-            <span class="sidebar-label">P&amp;L</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.cashflow') }}"
-             class="sidebar-link {% if ep == 'accounting_bp.cashflow' %}active{% endif %}">
-            <i class="bi bi-graph-up nav-icon"></i>
-            <span class="sidebar-label">Cash Flow</span>
-          </a>
-          <a href="{{ url_for('accounting_bp.ar_aging') }}"
-             class="sidebar-link {% if ep == 'accounting_bp.ar_aging' %}active{% endif %}">
-            <i class="bi bi-clock-history nav-icon"></i>
-            <span class="sidebar-label">AR Aging</span>
-          </a>
-        </div>
-        {% endif %}
-
         <!-- ── INTEGRATIONS ──────────────────────────────────── -->
         {% if current_user.can_access('shopify') %}
         {% set is_shopify = ep.startswith('shopify_bp') %}
+        <div class="sidebar-section-label">Integrations</div>
+
         <div class="nav-group-header {% if is_shopify %}active-group{% endif %}">
           <a href="{{ url_for('shopify_bp.dashboard') }}"
              class="nav-group-link {% if is_shopify %}active{% endif %}">
@@ -1565,42 +1537,23 @@
 
         <!-- ── ADMIN ───────────────────────────────────────── -->
         {% if current_user.can_access('admin') %}
-        <div class="nav-group-header {% if is_admin %}active-group{% endif %}">
-          <a href="{{ url_for('admin_bp.admin_settings') }}"
-             class="nav-group-link {% if ep == 'admin_bp.admin_settings' %}active{% endif %}">
-            <i class="bi bi-gear nav-group-icon"></i>
-            <span class="sidebar-label">Admin</span>
-          </a>
-          <button class="nav-group-toggle"
-                  data-target="admin-body"
-                  data-auto-expand="{{ 'true' if is_admin else 'false' }}"
-                  aria-expanded="false"
-                  title="Expand Admin">
-            <i class="bi bi-chevron-right sidebar-chevron"></i>
-          </button>
-        </div>
-        <div class="collapse-section collapsed" id="admin-body">
-          <a href="{{ url_for('admin_bp.admin_settings') }}"
-             class="sidebar-link {% if ep == 'admin_bp.admin_settings' %}active{% endif %}">
-            <i class="bi bi-sliders nav-icon"></i>
-            <span class="sidebar-label">Settings</span>
-          </a>
-          <a href="{{ url_for('auth.register_user') }}"
-             class="sidebar-link {% if ep == 'auth.register_user' %}active{% endif %}">
-            <i class="bi bi-person-plus nav-icon"></i>
-            <span class="sidebar-label">Users</span>
-          </a>
-          <a href="{{ url_for('admin_bp.admin_stages') }}"
-             class="sidebar-link {% if ep == 'admin_bp.admin_stages' %}active{% endif %}">
-            <i class="bi bi-list-columns nav-icon"></i>
-            <span class="sidebar-label">Stages</span>
-          </a>
-          <a href="{{ url_for('admin_bp.admin_self_test') }}"
-             class="sidebar-link {% if ep == 'admin_bp.admin_self_test' %}active{% endif %}">
-            <i class="bi bi-activity nav-icon"></i>
-            <span class="sidebar-label">Self-Test</span>
-          </a>
-        </div>
+        <div class="sidebar-section-label">Admin</div>
+
+        <a href="{{ url_for('admin_bp.admin_settings') }}"
+           class="sidebar-link {% if ep == 'admin_bp.admin_settings' %}active{% endif %}">
+          <i class="bi bi-gear nav-icon"></i>
+          <span class="sidebar-label">Settings</span>
+        </a>
+        <a href="{{ url_for('auth.register_user') }}"
+           class="sidebar-link {% if ep in ('auth.register_user','auth.edit_user') %}active{% endif %}">
+          <i class="bi bi-people nav-icon"></i>
+          <span class="sidebar-label">Users</span>
+        </a>
+        <a href="{{ url_for('admin_bp.admin_self_test') }}"
+           class="sidebar-link {% if ep == 'admin_bp.admin_self_test' %}active{% endif %}">
+          <i class="bi bi-shield-check nav-icon"></i>
+          <span class="sidebar-label">Data Management</span>
+        </a>
         {% endif %}
 
       {% endif %}{# end role check #}

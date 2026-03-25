@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import qrcode
 from io import BytesIO, StringIO
 import base64
-from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage, admin_required, admin_or_supervisor_required
+from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage, admin_required, admin_or_supervisor_required, safe_redirect_back
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
 
@@ -426,7 +426,7 @@ def po_template_download():
     wb = Workbook()
     ws = wb.active
     ws.title = 'PO Import'
-    ws.append(['serial', 'asset', 'item_name', 'make', 'model', 'cpu', 'ram', 'grade', 'display', 'gpu1', 'gpu2', 'disk1size'])
+    ws.append(['serial', 'asset', 'item_name', 'make', 'model', 'cpu', 'ram', 'grade', 'display', 'gpu1', 'gpu2', 'disk1size', 'cost'])
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -479,6 +479,9 @@ def create_purchase_order():
             'storage':        'disk1size',
             'processor':      'cpu',
             'memory':         'ram',
+            'unit_cost':      'cost',
+            'price':          'cost',
+            'purchase_cost':  'cost',
         }, inplace=True)
 
         # Serial is the only truly required column
@@ -513,6 +516,12 @@ def create_purchase_order():
                 skipped += 1
                 continue
 
+            raw_cost = row.get('cost')
+            try:
+                poi_cost = float(raw_cost) if raw_cost is not None and str(raw_cost).strip() not in ('', 'nan', 'None') else None
+            except (ValueError, TypeError):
+                poi_cost = None
+
             poi = PurchaseOrderItem(
                 po_id=po.id,
                 tenant_id=current_user.tenant_id,
@@ -530,6 +539,7 @@ def create_purchase_order():
                 disk1size=_clean(row.get('disk1size')) or None,
                 location_id=int(location_id) if location_id else None,
                 status='expected',
+                expected_price=poi_cost,
             )
             db.session.add(poi)
             items_added += 1
@@ -827,6 +837,19 @@ def stock_receiving_summary():
     prev_count     = sum(1 for r in table_rows if r['match_status'] == 'previously_received')
     locations      = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
 
+    # Build per-model summary for cost entry
+    from collections import OrderedDict
+    model_counts = OrderedDict()
+    for r in table_rows:
+        if r['match_status'] == 'matched' and r.get('poi'):
+            poi = r['poi']
+            key = f"{poi.make or ''}|{poi.model or poi.item_name or 'Unknown'}"
+            label = f"{poi.make or ''} {poi.model or poi.item_name or 'Unknown'}".strip() or 'Unknown'
+            if key not in model_counts:
+                model_counts[key] = {'key': key, 'label': label, 'count': 0}
+            model_counts[key]['count'] += 1
+    models_summary = list(model_counts.values())
+
     return render_template(
         'stock_receiving_summary.html',
         po=po,
@@ -836,6 +859,7 @@ def stock_receiving_summary():
         extra_count=extra_count,
         prev_count=prev_count,
         locations=locations,
+        models_summary=models_summary,
     )
 
 
@@ -886,6 +910,55 @@ def stock_receiving_export(category):
     return export_csv(export_rows, ['serial', 'asset', 'model', 'cpu', 'ram', 'status'], f'{category}_receiving_{po_id}.csv')
 
 
+def _auto_create_unit_cost(instance, po_item=None, po=None, purchase_cost_override=None):
+    """Create a UnitCost for a newly received instance if one doesn't exist yet.
+    Seeded from: (1) form override, (2) po_item.expected_price, (3) POCostSettings."""
+    from inventory_flask_app.models import UnitCost, POCostSettings, PurchaseOrderItem
+    if UnitCost.query.filter_by(instance_id=instance.id).first():
+        return  # Already exists — don't overwrite
+
+    # Determine purchase cost
+    if purchase_cost_override is not None and purchase_cost_override > 0:
+        purchase_cost = float(purchase_cost_override)
+    elif po_item and po_item.expected_price:
+        purchase_cost = float(po_item.expected_price)
+    else:
+        purchase_cost = 0.0
+
+    uc = UnitCost(
+        instance_id=instance.id,
+        tenant_id=instance.tenant_id,
+        purchase_cost=purchase_cost,
+        margin_percent=25,
+    )
+
+    # Apply PO-level shipping/duty/margin if POCostSettings exist
+    if po:
+        po_settings = POCostSettings.query.filter_by(po_id=po.id).first()
+        if po_settings:
+            poi_count = PurchaseOrderItem.query.filter_by(po_id=po.id).count()
+            unit_count = max(poi_count, 1)
+
+            if po_settings.shipping_mode == 'shared' and po_settings.total_shipping:
+                uc.shipping_cost = round(float(po_settings.total_shipping) / unit_count, 2)
+            elif po_settings.shipping_mode == 'per_unit' and po_settings.shipping_per_unit:
+                uc.shipping_cost = float(po_settings.shipping_per_unit)
+
+            if po_settings.duty_type == 'percent' and po_settings.duty_value:
+                uc.duty_amount = round(
+                    float(uc.purchase_cost) * float(po_settings.duty_value) / 100, 2
+                )
+            elif po_settings.duty_type == 'fixed' and po_settings.duty_value:
+                uc.duty_amount = round(float(po_settings.duty_value) / unit_count, 2)
+
+            if po_settings.default_margin:
+                uc.margin_percent = float(po_settings.default_margin)
+
+    # calculate() is also called by the before_insert SA event, but call explicitly for clarity
+    uc.calculate()
+    db.session.add(uc)
+
+
 @stock_bp.route('/stock_receiving/confirm', methods=['POST'])
 @login_required
 def stock_receiving_confirm():
@@ -893,6 +966,15 @@ def stock_receiving_confirm():
     scanned     = session.get('scanned', [])
     status_choice  = request.form.get('status_choice')
     location_id    = request.form.get('location_choice')
+    # Per-model cost: form sends cost_by_model[key] = value
+    cost_by_model = {}
+    for k, v in request.form.items():
+        if k.startswith('cost_by_model[') and k.endswith(']'):
+            model_key = k[len('cost_by_model['):-1]
+            try:
+                cost_by_model[model_key] = float(v) if v.strip() else 0.0
+            except (ValueError, AttributeError):
+                cost_by_model[model_key] = 0.0
 
     if not po_id:
         flash('Session expired. Select a PO again.', 'danger')
@@ -974,6 +1056,13 @@ def stock_receiving_confirm():
                 poi.received_at = now_ts
                 if outcome == 'created':
                     created_count += 1
+                    # Resolve cost: per-model > poi.expected_price > fallback
+                    poi_key = f"{poi.make or ''}|{poi.model or poi.item_name or 'Unknown'}"
+                    unit_cost_override = cost_by_model.get(poi_key) or None
+                    _auto_create_unit_cost(
+                        instance, po_item=poi, po=po,
+                        purchase_cost_override=unit_cost_override,
+                    )
                 else:
                     updated_count += 1
             else:
@@ -1084,7 +1173,7 @@ def print_labels_batch():
     ids = request.form.getlist('instance_ids')
     if not ids:
         flash("No items selected for label printing.", "warning")
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     # Support both integer IDs (from group_view unit-level checkboxes)
     # and model|||cpu keys (from instance_table grouped-level checkboxes)
@@ -1104,7 +1193,7 @@ def print_labels_batch():
         base_q = base_q.filter(ProductInstance.id.in_(exact_ids))
     else:
         flash("No valid items selected for label printing.", "warning")
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     instances = base_q.all()
     # Generate QR codes for each
@@ -1150,12 +1239,12 @@ def bulk_status_change():
     valid_statuses = {'unprocessed', 'under_process', 'processed', 'idle', 'disputed'}
     if new_status not in valid_statuses:
         flash('Invalid status selected.', 'danger')
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     ids = request.form.getlist('instance_ids')
     if not ids:
         flash('No units selected.', 'warning')
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     grouped_keys = [v for v in ids if '|||' in v]
     exact_ids    = [int(v) for v in ids if v.isdigit()]
@@ -1173,7 +1262,7 @@ def bulk_status_change():
         base_q = base_q.filter(ProductInstance.id.in_(exact_ids))
     else:
         flash('No valid units selected.', 'warning')
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     instances = base_q.all()
     updated = 0
@@ -1196,7 +1285,7 @@ def bulk_status_change():
 
     db.session.commit()
     flash(f'Updated {updated} unit(s) to "{new_status}".', 'success')
-    return redirect(request.referrer or url_for('stock_bp.under_process'))
+    return safe_redirect_back('stock_bp.under_process')
 
 
 # ── Bulk move to bin ──────────────────────────────────────────────────────────
@@ -1209,7 +1298,7 @@ def bulk_move_to_bin():
     ids    = request.form.getlist('instance_ids')
     if not ids:
         flash('No units selected.', 'warning')
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     target_bin = None
     if bin_id:
@@ -1231,7 +1320,7 @@ def bulk_move_to_bin():
         base_q = base_q.filter(ProductInstance.id.in_(exact_ids))
     else:
         flash('No valid units selected.', 'warning')
-        return redirect(request.referrer or url_for('stock_bp.under_process'))
+        return safe_redirect_back('stock_bp.under_process')
 
     instances = base_q.all()
     updated = 0
@@ -1248,7 +1337,7 @@ def bulk_move_to_bin():
     db.session.commit()
     dest = target_bin.name if target_bin else 'no bin'
     flash(f'Moved {updated} unit(s) to {dest}.', 'success')
-    return redirect(request.referrer or url_for('stock_bp.under_process'))
+    return safe_redirect_back('stock_bp.under_process')
 
 
 @stock_bp.route('/under_process', methods=['GET', 'POST'])
@@ -1305,19 +1394,18 @@ def under_process():
         )
         query = query.filter(ProductInstance.product_id.in_(db.session.query(low_stock_product_ids.c.product_id)))
 
-    # Join Product only once if any filter is present (or always, to simplify filter logic)
-    if model_filter or processor_filter or ram_filter or disk_filter or True:
+    video_card_filter = request.args.get('video_card', '').strip()
+    # Join Product only once if any Product-column filter is present
+    if model_filter or processor_filter or ram_filter or disk_filter or video_card_filter:
         query = query.join(Product)
     if model_filter:
         query = query.filter(Product.model.ilike(f"%{model_filter}%"))
     if processor_filter:
         query = query.filter(Product.cpu == processor_filter)
-    # RAM and Disk filter logic (re-added after model/processor filter)
     if ram_filter:
         query = query.filter(Product.ram == ram_filter)
     if disk_filter:
         query = query.filter(Product.disk1size == disk_filter)
-    video_card_filter = request.args.get('video_card', '').strip()
     if video_card_filter:
         query = query.filter(
             or_(Product.gpu1.ilike(f'%{video_card_filter}%'), Product.gpu2.ilike(f'%{video_card_filter}%'))
@@ -1397,8 +1485,12 @@ def under_process():
     all_processors = sorted({i.product.cpu for i in all_instances if i.product and i.product.cpu})
     all_rams = sorted({i.product.ram for i in all_instances if i.product and i.product.ram})
     all_disks = sorted({i.product.disk1size for i in all_instances if i.product and i.product.disk1size})
-    distinct_stages = db.session.query(ProductInstance.process_stage).distinct().all()
-    distinct_teams = db.session.query(ProductInstance.team_assigned).distinct().all()
+    distinct_stages = (db.session.query(ProductInstance.process_stage)
+                       .join(Product).filter(Product.tenant_id == current_user.tenant_id)
+                       .distinct().all())
+    distinct_teams = (db.session.query(ProductInstance.team_assigned)
+                      .join(Product).filter(Product.tenant_id == current_user.tenant_id)
+                      .distinct().all())
     # Dynamically derive unique locations from visible instances
     all_locations = sorted({i.location.name for i in all_instances if i.location and i.location.name})
 
@@ -1661,6 +1753,8 @@ def view_edit_instance(instance_id):
             return redirect(url_for('stock_bp.view_edit_instance', instance_id=instance.id))
 
         instance.status = status
+        if status == 'sold':
+            instance.is_sold = True
         instance.process_stage = new_stage_raw if new_stage_raw is not None else instance.process_stage
         instance.team_assigned = request.form.get('team_assigned', instance.team_assigned)
         # location and bin
@@ -1706,15 +1800,19 @@ def view_edit_instance(instance_id):
                 instance.entered_stage_at = None
             sync_reservation_stage(instance.id, _final_stage, current_user.username)
 
-        # Save custom field values
+        # Save custom field values — pre-fetch all CFVs in one query (H16)
         from inventory_flask_app.models import CustomField, CustomFieldValue
         custom_fields = CustomField.query.filter_by(tenant_id=current_user.tenant_id).order_by(CustomField.sort_order).all()
+        existing_cfvs = {
+            cfv.field_id: cfv
+            for cfv in CustomFieldValue.query.filter_by(instance_id=instance.id).all()
+        }
         for cf in custom_fields:
             form_key = f'cf_{cf.field_key}'
             raw_val = request.form.get(form_key)
             if raw_val is None:
                 continue
-            cfv = CustomFieldValue.query.filter_by(instance_id=instance.id, field_id=cf.id).first()
+            cfv = existing_cfvs.get(cf.id)
             if cfv:
                 cfv.value = raw_val or None
             else:
@@ -1888,7 +1986,7 @@ def return_from_idle(instance_id):
     ))
     db.session.commit()
     flash(f'Unit {instance.serial} returned to unprocessed.', 'success')
-    return redirect(request.referrer or url_for('reports_bp.idle_units'))
+    return safe_redirect_back('reports_bp.idle_units')
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1940,7 +2038,7 @@ def mark_disputed(instance_id):
         )
     db.session.commit()
     flash(f'Unit {instance.serial} marked as disputed.', 'warning')
-    return redirect(request.referrer or url_for('stock_bp.view_edit_instance', instance_id=instance_id))
+    return safe_redirect_back('stock_bp.view_edit_instance', instance_id=instance_id)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1978,7 +2076,7 @@ def resolve_dispute(instance_id):
     ))
     db.session.commit()
     flash(f'Dispute resolved for {instance.serial}. Unit returned to unprocessed.', 'success')
-    return redirect(request.referrer or url_for('stock_bp.view_edit_instance', instance_id=instance_id))
+    return safe_redirect_back('stock_bp.view_edit_instance', instance_id=instance_id)
 
 
 # --- Unit history route ---
@@ -2105,8 +2203,22 @@ def checkin_checkout():
     skipped = 0
     checkin_results = []  # track per-unit results for check-in summary table
 
-    # Process union of instance ids and idle ids
+    # Process union of instance ids and idle ids — batch-fetch all at once (H15)
     all_ids = set(instance_ids).union(idle_ids)
+    valid_int_ids = []
+    for iid in all_ids:
+        try:
+            valid_int_ids.append(int(iid))
+        except Exception:
+            pass
+
+    instances_by_id = {
+        inst.id: inst
+        for inst in ProductInstance.query.join(Product).filter(
+            ProductInstance.id.in_(valid_int_ids),
+            Product.tenant_id == current_user.tenant_id
+        ).all()
+    }
 
     for iid in all_ids:
         try:
@@ -2114,10 +2226,7 @@ def checkin_checkout():
         except Exception:
             continue
 
-        instance = ProductInstance.query.join(Product).filter(
-            ProductInstance.id == iid_int,
-            Product.tenant_id == current_user.tenant_id
-        ).first()
+        instance = instances_by_id.get(iid_int)
         if not instance:
             continue
 
@@ -2339,14 +2448,13 @@ def export_instances():
         joinedload(ProductInstance.location)
     )
 
-    # Join Product only once if any filter is present (or always, to simplify filter logic)
-    if model_filter or processor_filter or ram_filter or disk_filter or True:
+    # Join Product only once if any Product-column filter is present
+    if model_filter or processor_filter or ram_filter or disk_filter:
         query = query.join(Product)
     if model_filter:
         query = query.filter(Product.model.ilike(f"%{model_filter}%"))
     if processor_filter:
         query = query.filter(Product.cpu == processor_filter)
-    # RAM and Disk filter logic (re-added after model/processor filter)
     if ram_filter:
         query = query.filter(Product.ram == ram_filter)
     if disk_filter:
@@ -2456,7 +2564,7 @@ def print_label(instance_id):
     ).first_or_404()
     if not instance.product:
         flash("No product linked to this instance.", "danger")
-        return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
+        return safe_redirect_back('dashboard_bp.main_dashboard')
 
     # Encode key info as QR code using unified product structure
     qr_data = {
@@ -2497,13 +2605,13 @@ def batch_update_status():
     location_id = request.form.get('location_id')
     if not ids or not status:
         flash("Please select at least one item and a status.", "danger")
-        return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
+        return safe_redirect_back('dashboard_bp.main_dashboard')
 
     # Only allow certain statuses for safety
     allowed_statuses = ['unprocessed', 'under_process', 'processed', 'sold']
     if status not in allowed_statuses:
         flash("Invalid status selected.", "danger")
-        return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
+        return safe_redirect_back('dashboard_bp.main_dashboard')
 
     # Enforce tenant scoping: only update ProductInstances for current tenant
     updated_count = 0
@@ -2519,50 +2627,71 @@ def batch_update_status():
     db.session.commit()
 
     flash(f"✅ {updated_count} item(s) updated to '{status.replace('_', ' ').title()}' status.", "success")
-    return redirect(request.referrer or url_for('dashboard_bp.main_dashboard'))
+    return safe_redirect_back('dashboard_bp.main_dashboard')
 
 # Add product page route
 @stock_bp.route('/products/add', methods=['GET', 'POST'])
 @login_required
+@admin_or_supervisor_required
 def add_product_page():
-    from inventory_flask_app.models import TenantSettings
-    tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
-    settings = {s.key: s.value for s in tenant_settings}
+    vendors   = Vendor.query.filter_by(tenant_id=current_user.tenant_id).order_by(Vendor.name).all()
+    locations = Location.query.filter_by(tenant_id=current_user.tenant_id).order_by(Location.name).all()
 
     if request.method == 'POST':
-        data = request.form.to_dict()
-        serial = (data.get("serial") or "").strip()
+        serial = request.form.get('serial', '').strip().upper()
         if not serial:
-            flash("Serial number is required.", "danger")
-            return render_template('add_product.html', settings=settings)
+            flash('Serial number is required.', 'danger')
+            return render_template('add_product.html', vendors=vendors, locations=locations)
 
-        product = Product(
-            item_name=data.get("item_name", "").strip(),
-            model=data.get("model", "").strip(),
-            cpu=data.get("cpu", "").strip(),
-            ram=data.get("ram", "").strip(),
-            disk1size=data.get("disk1size", "").strip(),
-            display=data.get("display", "").strip(),
-            gpu1=data.get("gpu1", "").strip(),
-            gpu2=data.get("gpu2", "").strip(),
-            grade=data.get("grade", "").strip(),
-            tenant_id=current_user.tenant_id
+        from inventory_flask_app.utils.utils import upsert_instance
+        from inventory_flask_app.models import UnitCost
+
+        vendor_id   = request.form.get('vendor_id') or None
+        location_id = request.form.get('location_id') or None
+
+        spec_data = {
+            'make':      request.form.get('make', '').strip(),
+            'model':     request.form.get('model', '').strip(),
+            'item_name': request.form.get('item_name', '').strip(),
+            'cpu':       request.form.get('cpu', '').strip(),
+            'ram':       request.form.get('ram', '').strip(),
+            'display':   request.form.get('display', '').strip(),
+            'gpu1':      request.form.get('gpu1', '').strip(),
+            'grade':     request.form.get('grade', '').strip(),
+            'disk1size': request.form.get('disk1size', '').strip(),
+            'asset':     request.form.get('asset', '').strip(),
+        }
+
+        outcome, instance, _ = upsert_instance(
+            serial=serial,
+            spec_data=spec_data,
+            tenant_id=current_user.tenant_id,
+            location_id=int(location_id) if location_id else None,
+            vendor_id=int(vendor_id) if vendor_id else None,
+            status=request.form.get('status', 'unprocessed'),
+            moved_by_id=current_user.id,
         )
-        db.session.add(product)
         db.session.flush()
 
-        instance = ProductInstance(
-            serial=serial,
-            status=data.get("status", "unprocessed"),
-            product_id=product.id,
-            tenant_id=current_user.tenant_id
-        )
-        db.session.add(instance)
-        db.session.commit()
-        flash("✅ Product and instance added successfully!", "success")
-        return redirect(url_for('stock_bp.print_label', instance_id=instance.id))
+        if outcome == 'created':
+            purchase_cost = request.form.get('purchase_cost', type=float) or 0.0
+            uc = UnitCost(
+                instance_id=instance.id,
+                tenant_id=current_user.tenant_id,
+                purchase_cost=purchase_cost,
+                margin_percent=25,
+            )
+            uc.calculate()
+            db.session.add(uc)
+            db.session.commit()
+            flash(f'Unit {serial} added successfully.', 'success')
+        else:
+            db.session.commit()
+            flash(f'Unit {serial} already exists — record updated.', 'info')
 
-    return render_template('add_product.html', settings=settings)
+        return redirect(url_for('stock_bp.view_edit_instance', instance_id=instance.id))
+
+    return render_template('add_product.html', vendors=vendors, locations=locations)
 
 @stock_bp.route('/bin_lookup', methods=['GET', 'POST'])
 @login_required
@@ -2664,7 +2793,10 @@ def add_location():
 
     if request.method == 'GET':
         locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
-        next_url = request.args.get('next') or request.referrer or url_for('stock_bp.manage_locations')
+        _ref = request.referrer
+        from urllib.parse import urlparse as _urlparse
+        _safe_ref = _ref if (_ref and _urlparse(_ref).netloc == _urlparse(request.host_url).netloc) else None
+        next_url = request.args.get('next') or _safe_ref or url_for('stock_bp.manage_locations')
         return render_template("add_location.html", locations=locations, next_url=next_url)
 
     next_url = request.args.get('next') or request.form.get('next') or url_for('stock_bp.manage_locations')
@@ -3515,3 +3647,4 @@ def aged_inventory():
         settings=settings_dict,
         threshold_days=threshold_days
     )
+

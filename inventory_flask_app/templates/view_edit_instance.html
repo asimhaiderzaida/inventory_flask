@@ -198,18 +198,78 @@
           </a>
         </div>
         {% set uc = instance.unit_cost %}
-        {% if uc and uc.total_cost %}
-        <div class="d-flex justify-content-between small mb-1">
-          <span class="text-muted">Total Cost</span>
-          <span>${{ "%.2f"|format(float(uc.total_cost)) }}</span>
-        </div>
-        <div class="d-flex justify-content-between small mb-1">
-          <span class="text-muted">Suggested Price</span>
-          <span class="text-success fw-medium">${{ "%.2f"|format(float(uc.suggested_price or 0)) }}</span>
-        </div>
-        <div class="d-flex justify-content-between small">
-          <span class="text-muted">Margin</span>
-          <span>{{ uc.margin_percent }}%</span>
+        {% if uc %}
+        {% set _purchase = (uc.purchase_cost or 0)|float %}
+        {% set _shipping = (uc.shipping_cost or 0)|float %}
+        {% set _duty     = (uc.duty_amount or 0)|float %}
+        {% set _repair   = (uc.repair_cost or 0)|float %}
+        {% set _upgrades = ((uc.ram_upgrade_cost or 0)|float) + ((uc.ssd_upgrade_cost or 0)|float) %}
+        {% set _other    = (uc.other_cost or 0)|float %}
+        {% set _total    = (uc.total_cost or 0)|float %}
+        {% set _sugg     = (uc.suggested_price or 0)|float %}
+        {% set _asking   = (instance.asking_price or 0)|float %}
+        {% set _profit   = _asking - _total %}
+        <div style="font-size:0.8rem;">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Purchase</span>
+            <span>AED {{ "%.2f"|format(_purchase) }}</span>
+          </div>
+          {% if _shipping > 0 %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">+ Shipping</span>
+            <span>AED {{ "%.2f"|format(_shipping) }}</span>
+          </div>
+          {% endif %}
+          {% if _duty > 0 %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">+ Duty</span>
+            <span>AED {{ "%.2f"|format(_duty) }}</span>
+          </div>
+          {% endif %}
+          {% if _repair > 0 %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">+ Repair</span>
+            <span>AED {{ "%.2f"|format(_repair) }}</span>
+          </div>
+          {% endif %}
+          {% if _upgrades > 0 %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">+ Upgrades</span>
+            <span>AED {{ "%.2f"|format(_upgrades) }}</span>
+          </div>
+          {% endif %}
+          {% if _other > 0 %}
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">+ Other</span>
+            <span>AED {{ "%.2f"|format(_other) }}</span>
+          </div>
+          {% endif %}
+          <div class="d-flex justify-content-between mb-1 pt-1" style="border-top:1px solid var(--border);font-weight:600;">
+            <span>Total Cost</span>
+            <span>AED {{ "%.2f"|format(_total) }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Margin</span>
+            <span>{{ uc.margin_percent }}%</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Suggested</span>
+            <span class="text-success fw-medium">AED {{ "%.2f"|format(_sugg) }}</span>
+          </div>
+          {% if _asking > 0 %}
+          <div class="d-flex justify-content-between mb-1 pt-1" style="border-top:1px solid var(--border);">
+            <span class="text-muted">Asking</span>
+            <span>AED {{ "%.2f"|format(_asking) }}</span>
+          </div>
+          {% if _total > 0 %}
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Profit if sold</span>
+            <span class="fw-semibold" style="color:{% if _profit >= 0 %}var(--color-success){% else %}var(--color-danger){% endif %};">
+              {% if _profit >= 0 %}+{% endif %}AED {{ "%.2f"|format(_profit) }}
+            </span>
+          </div>
+          {% endif %}
+          {% endif %}
         </div>
         {% else %}
         <div class="text-muted small">No cost data — <a href="{{ url_for('pricing_bp.unit_pricing', instance_id=instance.id) }}">add costs</a></div>
@@ -362,7 +422,7 @@
   const locSelect = document.querySelector('select[name="location_id"]');
   const binSelect = document.getElementById('shelf-bin-edit');
   const manageLink = document.getElementById('bin-manage-link');
-  const currentBin = {{ ('"' + (instance.bin.name if instance.bin else instance.shelf_bin or '') + '"') | safe }};
+  const currentBin = {{ (instance.bin.name if instance.bin else instance.shelf_bin or '') | tojson }};
   const currentLocId = {{ instance.location_id or 'null' }};
 
   function loadBins(locationId, selectedBin) {

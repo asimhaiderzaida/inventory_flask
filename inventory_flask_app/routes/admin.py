@@ -2,6 +2,7 @@ import csv
 import io
 import logging
 import os
+import time
 import zipfile
 from datetime import datetime
 from io import BytesIO
@@ -166,8 +167,6 @@ def upload_logo():
     return redirect(url_for('admin_bp.admin_settings'))
 
 
-import time
-
 @admin_bp.route('/admin/self_test', methods=['GET'])
 @login_required
 @admin_required
@@ -207,7 +206,7 @@ def admin_self_test():
     }
 
     # ---------------- Config checks ----------------
-    csrf_enabled = bool(app.config.get('WTF_CSRF_ENABLED', False))
+    csrf_enabled = bool(app.config.get('WTF_CSRF_ENABLED', True))
     secret_ok = bool(app.config.get('SECRET_KEY'))
     debug_mode = bool(app.config.get('DEBUG', False))
 

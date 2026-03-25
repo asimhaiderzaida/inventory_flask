@@ -15,32 +15,63 @@
   </div>
 </div>
 
-<!-- KPI Cards -->
-<div class="row g-3 mb-4 animate-fade-up">
-  <div class="col-sm-4">
+<!-- KPI Cards — row 1 -->
+<div class="row g-3 mb-3 animate-fade-up">
+  <div class="col-sm-4 col-lg-2">
     <div class="card h-100">
       <div class="card-body">
-        <div class="text-muted small mb-1">Units With Cost Data</div>
+        <div class="text-muted small mb-1">Units Tracked</div>
         <div class="fs-3 fw-bold">{{ total_units_priced }}</div>
+        {% if units_missing_cost_record > 0 %}
+        <div class="small" style="color:var(--color-warning);">{{ units_missing_cost_record }} missing record</div>
+        {% endif %}
       </div>
     </div>
   </div>
-  <div class="col-sm-4">
+  <div class="col-sm-4 col-lg-2">
     <div class="card h-100">
       <div class="card-body">
-        <div class="text-muted small mb-1">Total Cost Value</div>
-        <div class="fs-3 fw-bold">${{ "%.2f"|format(total_cost_value) }}</div>
+        <div class="text-muted small mb-1">No Purchase Cost</div>
+        <div class="fs-3 fw-bold {% if units_no_purchase_cost > 0 %}text-warning{% endif %}">{{ units_no_purchase_cost }}</div>
+        <div class="text-muted small">units with cost = 0</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-4">
+  <div class="col-sm-4 col-lg-2">
     <div class="card h-100">
       <div class="card-body">
-        <div class="text-muted small mb-1">Total Suggested Revenue</div>
-        <div class="fs-3 fw-bold">${{ "%.2f"|format(total_suggested) }}</div>
+        <div class="text-muted small mb-1">Avg Margin</div>
+        <div class="fs-3 fw-bold">{{ avg_margin }}%</div>
+        <div class="text-muted small">across priced units</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Inventory at Cost</div>
+        <div class="fs-3 fw-bold">AED {{ "%.0f"|format(total_cost_value) }}</div>
         {% if total_cost_value > 0 %}
         <div class="text-muted small">{{ "%.1f"|format((total_suggested - total_cost_value) / total_cost_value * 100) }}% blended margin</div>
         {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Potential Revenue</div>
+        <div class="fs-3 fw-bold text-success">AED {{ "%.0f"|format(total_at_asking) }}</div>
+        <div class="text-muted small">{{ units_with_asking }} units priced</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Selling at Loss</div>
+        <div class="fs-3 fw-bold {% if units_below_cost %}text-danger{% endif %}">{{ units_below_cost|length }}</div>
+        <div class="text-muted small">asking &lt; total cost</div>
       </div>
     </div>
   </div>
@@ -70,14 +101,14 @@
         <tbody>
           {% for r in at_risk %}
           <tr>
-            <td><a href="{{ url_for('instances_bp.view_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ r.instance.serial or r.instance.id }}</a></td>
+            <td><a href="{{ url_for('stock_bp.view_edit_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ r.instance.serial or r.instance.id }}</a></td>
             <td class="text-muted">{{ r.instance.product.make }} {{ r.instance.product.model }}</td>
-            <td>${{ "%.2f"|format((r.unit_cost.total_cost or 0)|float) }}</td>
-            <td class="text-success fw-medium">${{ "%.2f"|format(r.suggested) }}</td>
+            <td>AED {{ "%.2f"|format((r.unit_cost.total_cost or 0)|float) }}</td>
+            <td class="text-success fw-medium">AED {{ "%.2f"|format(r.suggested) }}</td>
             <td class="{% if r.asking == 0 %}text-muted{% else %}text-danger{% endif %}">
-              {% if r.asking == 0 %}—{% else %}${{ "%.2f"|format(r.asking) }}{% endif %}
+              {% if r.asking == 0 %}—{% else %}AED {{ "%.2f"|format(r.asking) }}{% endif %}
             </td>
-            <td class="text-danger">-${{ "%.2f"|format(r.gap) }}</td>
+            <td class="text-danger">-AED {{ "%.2f"|format(r.gap) }}</td>
             <td>
               <a href="{{ url_for('pricing_bp.unit_pricing', instance_id=r.instance.id) }}" class="btn btn-sm btn-ghost">
                 <i class="bi bi-pencil"></i>
@@ -95,6 +126,48 @@
   <div class="empty-state">
     <i class="bi bi-check-circle text-success" style="font-size:2rem;"></i>
     <p class="mt-2 mb-0">No at-risk units — all priced units meet or exceed suggested price.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Selling at a Loss -->
+{% if units_below_cost %}
+<div class="animate-fade-up mb-4">
+  <div class="table-card">
+    <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+      <h6 class="mb-0"><i class="bi bi-exclamation-circle text-danger me-2"></i>Selling at a Loss (asking &lt; total cost)</h6>
+      <span class="badge bg-danger">{{ units_below_cost|length }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Unit</th>
+            <th>Product</th>
+            <th>Total Cost</th>
+            <th>Asking Price</th>
+            <th>Loss</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in units_below_cost %}
+          <tr>
+            <td><a href="{{ url_for('stock_bp.view_edit_instance', instance_id=r.instance.id) }}" class="fw-medium">{{ r.instance.serial or r.instance.id }}</a></td>
+            <td class="text-muted">{{ r.instance.product.make }} {{ r.instance.product.model }}</td>
+            <td>AED {{ "%.2f"|format(r.total_cost) }}</td>
+            <td class="text-danger">AED {{ "%.2f"|format(r.asking) }}</td>
+            <td class="text-danger fw-medium">-AED {{ "%.2f"|format(r.loss) }}</td>
+            <td>
+              <a href="{{ url_for('pricing_bp.unit_pricing', instance_id=r.instance.id) }}" class="btn btn-sm btn-ghost">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endif %}
@@ -126,13 +199,13 @@
             <td class="text-muted">{{ po.vendor.name if po.vendor else '—' }}</td>
             <td>
               {% if cs.shipping_mode == 'shared' %}
-                Shared (${{ "%.2f"|format((cs.total_shipping or 0)|float) }} total)
+                Shared (AED {{ "%.2f"|format((cs.total_shipping or 0)|float) }} total)
               {% else %}
-                Per unit (${{ "%.2f"|format((cs.shipping_per_unit or 0)|float) }})
+                Per unit (AED {{ "%.2f"|format((cs.shipping_per_unit or 0)|float) }})
               {% endif %}
             </td>
             <td>
-              {% if cs.duty_type == 'percent' %}{{ cs.duty_value }}%{% else %}${{ cs.duty_value }} fixed{% endif %}
+              {% if cs.duty_type == 'percent' %}{{ cs.duty_value }}%{% else %}AED {{ cs.duty_value }} fixed{% endif %}
             </td>
             <td>{{ cs.default_margin }}%</td>
             <td>

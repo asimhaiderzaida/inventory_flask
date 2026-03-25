@@ -81,6 +81,10 @@ def register_user():
             flash("Username and password are required.", "warning")
             return render_template('register_user.html', settings=settings, username=username, role=role, users=users)
 
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "warning")
+            return render_template('register_user.html', settings=settings, username=username, role=role, users=users)
+
         if User.query.filter_by(username=username).first():
             flash("Username already taken, please choose another.", "warning")
             return render_template('register_user.html', settings=settings, username=username, role=role, users=users)
@@ -116,6 +120,10 @@ def register_tenant():
 
         if not tenant_name or not username or not password or password != confirm:
             flash("All fields are required and passwords must match.", "danger")
+            return render_template('register_tenant.html')
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "danger")
             return render_template('register_tenant.html')
 
         from ..models import Tenant, User, TenantSettings

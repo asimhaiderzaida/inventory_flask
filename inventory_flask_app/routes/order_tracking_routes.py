@@ -1,5 +1,5 @@
 import logging
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from ..models import db, Customer, ProductInstance, CustomerOrderTracking, Product, ProcessStage
 from inventory_flask_app.models import TenantSettings, ProductProcessLog
@@ -308,8 +308,6 @@ def mark_delivered(order_id):
         email_note = f" Ready email sent to {order.customer.email}." if email_sent else ""
         flash(f"✅ {order.product_instance.serial} marked as ready for pickup.{email_note}", "success")
 
-    elif order and order.status == 'delivered':
-        flash("Unit is already marked as ready.", "info")
     else:
         flash("❌ Order not found.", "error")
 

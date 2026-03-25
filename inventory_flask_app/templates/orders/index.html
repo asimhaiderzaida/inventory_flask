@@ -73,7 +73,6 @@
           </td>
           <td style="font-size:0.84rem;">
             {% if o.delivery_date %}
-              {% set today = namespace(d=none) %}
               <span style="{% if o.delivery_date < now_utc.date() and o.status == 'open' %}color:var(--color-danger);font-weight:600;{% endif %}">
                 {{ o.delivery_date.strftime('%d %b %Y') }}
               </span>

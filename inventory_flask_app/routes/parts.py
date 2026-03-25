@@ -1104,6 +1104,7 @@ def _get_sale_parts_data(tenant_id):
 @parts_bp.route('/sell', methods=['GET', 'POST'])
 @login_required
 def sell():
+    _require_parts_module()
     parts, summaries = _get_sale_parts_data(current_user.tenant_id)
     preselect_part_id = request.args.get('part_id', type=int)
     customers = Customer.query.filter_by(tenant_id=current_user.tenant_id).order_by(Customer.name).all()
@@ -1382,9 +1383,16 @@ def sale_payment():
 
     subtotal = sum(item['subtotal'] for item in cart)
 
+    # Load VAT rate from tenant settings (same logic as single-step sell())
+    _settings = {s.key: s.value for s in TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()}
+    _vat_rate = float(_settings.get('vat_rate') or '5')
+
     if request.method == 'POST':
         method = request.form.get('payment_method', 'cash')
         notes = request.form.get('notes', '').strip()
+        vat_applied = request.form.get('vat_applied', 'false') == 'true'
+        tax = round(subtotal * _vat_rate / 100, 2) if vat_applied else 0
+        total_amount = subtotal + tax
 
         # ── Process the sale ───────────────────────────────────────────────────
         status = 'pending' if method == 'credit' else 'paid'
@@ -1399,8 +1407,8 @@ def sale_payment():
             payment_method=method,
             payment_status=status,
             subtotal=subtotal,
-            tax=0,
-            total_amount=subtotal,
+            tax=tax,
+            total_amount=total_amount,
             notes=notes or None,
             sold_by=current_user.id,
             sold_at=now,
@@ -1449,7 +1457,7 @@ def sale_payment():
         if method == 'credit' and customer_data.get('customer_id'):
             c = db.session.get(Customer, customer_data['customer_id'])
             if c:
-                c.parts_balance = float(c.parts_balance or 0) + subtotal
+                c.parts_balance = float(c.parts_balance or 0) + total_amount
 
         db.session.commit()
 
@@ -1469,7 +1477,8 @@ def sale_payment():
                            cart=cart,
                            customer=customer_data,
                            invoice_data=invoice_data,
-                           subtotal=subtotal)
+                           subtotal=subtotal,
+                           vat_rate=_vat_rate)
 
 
 # ── Sale detail / success ─────────────────────────────────────────────────────

@@ -336,9 +336,10 @@ def sold_units_view():
     if cpu_filter:
         query = query.filter(Product.cpu.ilike(f"%{cpu_filter}%"))
 
-    # Pagination logic
-    page, per_page, offset = get_page_args(page_parameter='page', per_page_parameter='per_page')
-    per_page = 50  # Or adjust based on preference
+    # Pagination logic — per_page must be set BEFORE computing offset
+    per_page = 50
+    page, _, _ = get_page_args(page_parameter='page', per_page_parameter='per_page')
+    offset = (page - 1) * per_page
     total = query.count()
     sold_items = query.order_by(SaleTransaction.id.desc()).offset(offset).limit(per_page).all()
     pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')

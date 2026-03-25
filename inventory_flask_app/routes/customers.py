@@ -125,8 +125,28 @@ def customer_center():
             )
         )
 
+    # ── SQL-level filters (H18: must filter before paginate) ─
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    if filt == 'has_balance':
+        open_cust_ids = db.session.query(AccountReceivable.customer_id).filter(
+            AccountReceivable.tenant_id == current_user.tenant_id,
+            AccountReceivable.status.in_(('open', 'partial', 'overdue')),
+            AccountReceivable.amount_due > AccountReceivable.amount_paid,
+        ).distinct()
+        query = query.filter(Customer.id.in_(open_cust_ids))
+    elif filt == 'no_purchases':
+        has_sales_ids = db.session.query(SaleTransaction.customer_id).filter(
+            SaleTransaction.customer_id.isnot(None)
+        ).distinct()
+        query = query.filter(~Customer.id.in_(has_sales_ids))
+    elif filt == 'recent':
+        recent_cust_ids = db.session.query(SaleTransaction.customer_id).filter(
+            SaleTransaction.customer_id.isnot(None),
+            SaleTransaction.date_sold >= thirty_days_ago,
+        ).distinct()
+        query = query.filter(Customer.id.in_(recent_cust_ids))
+
     # ── Fetch the page of customers ──────────────────────────
-    # Sorting by name first; aggregation sorts applied after annotation
     if sort_by == 'name':
         query = query.order_by(Customer.name)
     else:
@@ -177,21 +197,12 @@ def customer_center():
         ar_totals = {r.customer_id: float(r.balance or 0) for r in ar_rows}
 
     # Annotate customers
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     for c in customers:
         s = sale_stats.get(c.id, {})
         c._total_orders  = s.get('total_orders', 0)
         c._total_spent   = s.get('total_spent', 0.0)
         c._last_purchase = s.get('last_purchase')
         c._open_balance  = ar_totals.get(c.id, 0.0)
-
-    # ── Client-side filter ───────────────────────────────────
-    if filt == 'has_balance':
-        customers = [c for c in customers if c._open_balance > 0]
-    elif filt == 'no_purchases':
-        customers = [c for c in customers if c._total_orders == 0]
-    elif filt == 'recent':
-        customers = [c for c in customers if c._last_purchase and c._last_purchase >= thirty_days_ago]
 
     # ── Client-side sort (post-annotation) ───────────────────
     if sort_by == 'total_spent':
@@ -562,7 +573,7 @@ def export_customer_sales(customer_id):
     ws.title = "Sales History"
     ws.append([
         'Date Sold',
-        settings.get("label_serial", "Serial"),
+        settings.get("label_serial_number", "Serial"),
         settings.get("label_asset", "Asset"),
         settings.get("label_item_name", "Item Name"),
         settings.get("label_model", "Model"),

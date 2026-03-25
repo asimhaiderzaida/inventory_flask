@@ -75,10 +75,34 @@ def pricing_dashboard():
 
     # At-risk: asking_price < suggested_price (or no asking price set)
     at_risk = []
+    units_below_cost = []
+    units_no_purchase_cost = 0
+    total_at_asking = 0.0
+    units_with_asking = 0
+    margin_values = []
+
     for uc in all_costs:
         inst = uc.instance
         asking = float(inst.asking_price or 0)
         suggested = float(uc.suggested_price or 0)
+        total = float(uc.total_cost or 0)
+        purchase = float(uc.purchase_cost or 0)
+
+        if purchase == 0:
+            units_no_purchase_cost += 1
+
+        if asking > 0:
+            total_at_asking += asking
+            units_with_asking += 1
+            if total > 0 and asking < total:
+                units_below_cost.append({
+                    'instance': inst,
+                    'unit_cost': uc,
+                    'asking': asking,
+                    'total_cost': total,
+                    'loss': total - asking,
+                })
+
         if suggested > 0 and (asking == 0 or asking < suggested):
             at_risk.append({
                 'instance': inst,
@@ -88,7 +112,22 @@ def pricing_dashboard():
                 'gap': suggested - asking,
             })
 
+        if uc.margin_percent:
+            margin_values.append(float(uc.margin_percent))
+
     at_risk.sort(key=lambda x: x['gap'], reverse=True)
+    units_below_cost.sort(key=lambda x: x['loss'], reverse=True)
+    avg_margin = round(sum(margin_values) / len(margin_values), 1) if margin_values else 0
+
+    # Unsold units with NO UnitCost at all
+    from sqlalchemy import func as _func
+    units_total_unsold = (
+        ProductInstance.query
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        .count()
+    )
+    units_missing_cost_record = units_total_unsold - total_units_priced
 
     # Recent POs with cost settings
     pos_with_settings = (
@@ -106,6 +145,13 @@ def pricing_dashboard():
         total_cost_value=total_cost_value,
         total_suggested=total_suggested,
         at_risk=at_risk[:20],
+        units_below_cost=units_below_cost[:20],
+        units_no_purchase_cost=units_no_purchase_cost,
+        units_missing_cost_record=units_missing_cost_record,
+        units_total_unsold=units_total_unsold,
+        total_at_asking=total_at_asking,
+        units_with_asking=units_with_asking,
+        avg_margin=avg_margin,
         pos_with_settings=pos_with_settings,
     )
 
