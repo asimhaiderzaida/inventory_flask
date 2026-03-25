@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
 from sqlalchemy import or_
@@ -104,7 +105,6 @@ def api_customer_search():
 def customer_center():
     from inventory_flask_app.models import TenantSettings, SaleTransaction, AccountReceivable
     from sqlalchemy import func, case
-    from datetime import datetime, timedelta, timezone
 
     search    = request.args.get('search', '').strip()
     sort_by   = request.args.get('sort', 'name')       # name|total_spent|last_purchase|balance
@@ -630,6 +630,12 @@ def customer_portal(token):
 
     customer = Customer.query.filter_by(portal_token=token).first_or_404()
 
+    # Check token expiry (30-day TTL)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if customer.portal_token_expires_at and customer.portal_token_expires_at < now:
+        from flask import abort
+        abort(410)  # Gone — link expired
+
     # Tenant settings (for company name/logo)
     _ts = TenantSettings.query.filter_by(tenant_id=customer.tenant_id).all()
     settings = {s.key: s.value for s in _ts}
@@ -704,8 +710,14 @@ def generate_portal_token(customer_id):
     ).first_or_404()
 
     regenerate = request.args.get('regenerate') or (request.json or {}).get('regenerate')
-    if not customer.portal_token or regenerate:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    token_expired = (
+        customer.portal_token_expires_at and
+        customer.portal_token_expires_at < now
+    )
+    if not customer.portal_token or regenerate or token_expired:
         customer.portal_token = secrets.token_urlsafe(32)
+        customer.portal_token_expires_at = now + timedelta(days=30)
         db.session.commit()
 
     portal_url = url_for('customers_bp.customer_portal',

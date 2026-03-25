@@ -10,7 +10,7 @@ from inventory_flask_app.models import CustomerOrderTracking, ProductProcessLog
 from flask import jsonify
 from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy import func, or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import qrcode
 from io import BytesIO, StringIO
 import base64
@@ -369,7 +369,7 @@ def api_group_detail():
     unit_sort     = request.args.get('sort', 'serial')
     unit_sort_dir = request.args.get('sort_dir', 'asc')
     unit_reverse  = (unit_sort_dir == 'desc')
-    _now_utc = datetime.utcnow()
+    _now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     _sort_key = {
         'serial':        lambda i: (i.serial or '').lower(),
         'status':        lambda i: (i.status or '').lower(),
@@ -3487,7 +3487,7 @@ def group_view_page():
     # Support filtering for aged units when filter=aged is passed in the query string
     filter_mode = request.args.get("filter")
     if filter_mode == "aged":
-        threshold = datetime.utcnow() - timedelta(days=60)
+        threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=60)
         instances = instances.filter(ProductInstance.created_at <= threshold)
 
     if ram:
@@ -3512,7 +3512,7 @@ def group_view_page():
     unit_sort     = request.args.get('sort', 'serial')
     unit_sort_dir = request.args.get('sort_dir', 'asc')
     unit_reverse  = (unit_sort_dir == 'desc')
-    _now_utc = datetime.utcnow()
+    _now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     _sort_key = {
         'serial':        lambda i: (i.serial or '').lower(),
         'status':        lambda i: (i.status or '').lower(),
@@ -3554,7 +3554,7 @@ def group_view_page():
         cpu=cpu,
         unit_sort=unit_sort,
         unit_sort_dir=unit_sort_dir,
-        now_utc=datetime.utcnow(),
+        now_utc=datetime.now(timezone.utc).replace(tzinfo=None),
         page=_page,
         total_pages=_total_pages,
         total_count=_total_count,
@@ -3568,7 +3568,7 @@ def aged_inventory():
     from inventory_flask_app.models import TenantSettings
 
     threshold_days = 60
-    cutoff_date = datetime.utcnow() - timedelta(days=threshold_days)
+    cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=threshold_days)
 
     instances = ProductInstance.query.join(Product).options(
         joinedload(ProductInstance.product),

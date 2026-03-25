@@ -298,7 +298,7 @@ def main_dashboard():
     for r in tech_rows:
         oldest_dt = r.oldest_stage_at or r.oldest_created
         if oldest_dt:
-            age_hours = int((datetime.utcnow() - oldest_dt).total_seconds() / 3600)
+            age_hours = int((datetime.now(timezone.utc).replace(tzinfo=None) - oldest_dt).total_seconds() / 3600)
         else:
             age_hours = None
         avg_min = avg_times.get(r.id)
@@ -330,7 +330,7 @@ def main_dashboard():
         # Build SLA info for each unit
         stages = ProcessStage.query.filter_by(tenant_id=tid).all()
         sla_map = {s.name: s.sla_hours for s in stages if s.sla_hours and s.sla_hours > 0}
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         for inst in my_units_raw:
             sla_h = sla_map.get((inst.process_stage or '').strip(), 0)
             hours_in = None

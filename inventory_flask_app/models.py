@@ -145,6 +145,7 @@ class Customer(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     portal_token = db.Column(db.String(48), unique=True, nullable=True, index=True)
+    portal_token_expires_at = db.Column(db.DateTime, nullable=True)
     parts_balance = db.Column(db.Numeric(10, 2), default=0, nullable=False)
     tenant_id = db.Column(
         db.Integer,

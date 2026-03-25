@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, send_file, render_template, redirect, flash, url_for
 from flask_login import login_required
 from ..models import db, Product, CustomerOrderTracking, Customer
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO, StringIO
 import pandas as pd
 import csv
@@ -352,7 +352,7 @@ def export_aged_inventory():
     except:
         pass
 
-    cutoff_date = datetime.utcnow() - timedelta(days=threshold_days)
+    cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=threshold_days)
 
     instances = ProductInstance.query.join(Product).filter(
         ProductInstance.created_at <= cutoff_date,

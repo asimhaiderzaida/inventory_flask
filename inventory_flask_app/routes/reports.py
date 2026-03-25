@@ -673,7 +673,7 @@ def slow_technicians_export():
         ProductInstance.is_sold == False
     ).yield_per(200)
 
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Serial', 'Asset', 'Model', 'Stage', 'Team', 'Last Updated', 'Days Delayed'])
@@ -766,7 +766,7 @@ def aged_inventory_export():
         .all()
     )
 
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Serial', 'Asset', 'Item Name', 'Model', 'CPU', 'RAM', 'Grade', 'Days In Stock', 'Status'])

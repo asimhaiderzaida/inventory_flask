@@ -977,10 +977,16 @@ def webhook_orders_cancelled():
 
 def _handle_new_order(order_data, shop_domain=''):
     """Process incoming Shopify order — find/create customer and ShopifyOrder."""
-    # Resolve tenant from Shopify access token setting — avoids hardcoded first()
-    enabled_setting = TenantSettings.query.filter_by(
-        key='shopify_access_token'
-    ).filter(TenantSettings.value != '').first()
+    # Resolve tenant from shop_domain (preferred) or fall back to first token row
+    enabled_setting = None
+    if shop_domain:
+        enabled_setting = TenantSettings.query.filter_by(
+            key='shopify_store_url'
+        ).filter(TenantSettings.value.contains(shop_domain)).first()
+    if not enabled_setting:
+        enabled_setting = TenantSettings.query.filter_by(
+            key='shopify_access_token'
+        ).filter(TenantSettings.value != '').first()
     if not enabled_setting:
         logger.warning("_handle_new_order: no tenant with shopify_access_token found")
         return
