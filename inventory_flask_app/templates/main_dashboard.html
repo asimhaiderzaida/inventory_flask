@@ -668,7 +668,7 @@
         {% if aged_inventory_count > 0 %}
         {% set has_alert = true %}
         <a href="{{ url_for('reports_bp.idle_units', threshold=1) }}" class="alert-item db-amber">
-          <span><i class="bi bi-clock-history me-2"></i>{{ aged_inventory_count }} unit{{ 's' if aged_inventory_count != 1 }} aged 60+ days</span>
+          <span><i class="bi bi-clock-history me-2"></i>{{ aged_inventory_count }} unit{{ 's' if aged_inventory_count != 1 }} aged {{ aged_threshold_days }}+ days</span>
           <span class="alert-item-count">{{ aged_inventory_count }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
         </a>
         {% endif %}

@@ -102,6 +102,7 @@ def confirm_sale():
 
         serial_asset_pairs = [(item.get("serial"), item.get("asset")) for item in scanned_sale]
         instances = []
+        dropped_serials = []
         for serial, asset in serial_asset_pairs:
             instance = ProductInstance.query.join(Product).filter(
                 ProductInstance.serial == serial,
@@ -110,6 +111,10 @@ def confirm_sale():
             ).first()
             if instance:
                 instances.append(instance)
+            else:
+                dropped_serials.append(serial or asset or '(unknown)')
+        if dropped_serials:
+            flash(f"Warning: {len(dropped_serials)} unit(s) not found and excluded from sale: {', '.join(dropped_serials)}", 'warning')
         customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first()
 
         if not customer:
@@ -146,6 +151,7 @@ def confirm_sale():
                     customer_id=customer.id,
                     user_id=user_id,
                     price_at_sale=price,
+                    date_sold=now,
                     notes=""
                 )
                 sale.order_id = new_order.id

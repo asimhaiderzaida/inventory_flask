@@ -422,6 +422,8 @@ def main_dashboard():
         # Technician role
         my_units=my_units,
         my_completions_today=my_completions_today,
+        # Configurable thresholds
+        aged_threshold_days=aged_threshold_days,
     )
 
 

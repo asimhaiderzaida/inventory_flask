@@ -76,12 +76,6 @@ def _instance_to_unit_dict(instance):
         'disk1size': prod.disk1size if prod else '',
     }
 
-@order_bp.route('/orders')
-@login_required
-def orders_index():
-    _require_order_module()
-    return render_template('orders_index.html')
-
 @order_bp.route('/customer_orders')
 @login_required
 def customer_orders():
@@ -142,12 +136,6 @@ def customer_orders():
         stage_colors=stage_colors,
         stage_filter=stage_filter,
     )
-
-# --- Pending Orders Route — redirect to customer_orders with reserved filter ---
-@order_bp.route('/orders/pending')
-@login_required
-def pending_orders():
-    return redirect(url_for('order_bp.customer_orders', status='reserved'))
 
 @order_bp.route('/customer_orders/reserve', methods=['GET', 'POST'])
 @login_required

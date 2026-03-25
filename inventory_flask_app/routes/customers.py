@@ -104,7 +104,7 @@ def api_customer_search():
 def customer_center():
     from inventory_flask_app.models import TenantSettings, SaleTransaction, AccountReceivable
     from sqlalchemy import func, case
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     search    = request.args.get('search', '').strip()
     sort_by   = request.args.get('sort', 'name')       # name|total_spent|last_purchase|balance
@@ -126,7 +126,7 @@ def customer_center():
         )
 
     # ── SQL-level filters (H18: must filter before paginate) ─
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     if filt == 'has_balance':
         open_cust_ids = db.session.query(AccountReceivable.customer_id).filter(
             AccountReceivable.tenant_id == current_user.tenant_id,

@@ -415,7 +415,8 @@ def slow_technicians():
 
     instances = ProductInstance.query.join(Product).filter(
         Product.tenant_id == current_user.tenant_id,
-        ProductInstance.updated_at < delay_threshold,
+        ProductInstance.entered_stage_at.isnot(None),
+        ProductInstance.entered_stage_at < delay_threshold,
         ProductInstance.team_assigned.isnot(None),
         ProductInstance.is_sold == False
     ).all()
@@ -574,7 +575,7 @@ def idle_units_export():
         Product.tenant_id == current_user.tenant_id,
         ProductInstance.status == 'idle',
         ProductInstance.is_sold == False
-    ).order_by(ProductInstance.updated_at.asc()).all()
+    ).order_by(ProductInstance.updated_at.asc()).yield_per(200)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -666,10 +667,11 @@ def slow_technicians_export():
 
     instances = ProductInstance.query.join(Product).filter(
         Product.tenant_id == current_user.tenant_id,
-        ProductInstance.updated_at < delay_threshold,
+        ProductInstance.entered_stage_at.isnot(None),
+        ProductInstance.entered_stage_at < delay_threshold,
         ProductInstance.team_assigned.isnot(None),
         ProductInstance.is_sold == False
-    ).all()
+    ).yield_per(200)
 
     now_dt = datetime.utcnow()
     output = io.StringIO()
@@ -729,7 +731,7 @@ def aged_inventory():
     )
 
     grouped_instances = [
-        {'model': r.model, 'cpu': r.cpu, 'product_id': r.product_id, 'count': r.count}
+        {'item_name': r.model, 'cpu': r.cpu, 'product_id': r.product_id, 'count': r.count}
         for r in rows
     ]
     total_count = sum(g['count'] for g in grouped_instances)

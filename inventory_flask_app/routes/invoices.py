@@ -3,7 +3,7 @@ from flask import redirect, url_for, flash, jsonify
 from flask import Blueprint, request, render_template, send_file
 from flask_login import login_required, current_user
 from ..models import db, Invoice, SaleItem, ProductInstance
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from weasyprint import HTML as WeasyHTML
 from inventory_flask_app.models import TenantSettings
@@ -41,7 +41,7 @@ def _build_invoice_data(invoice):
 
         unit_price = item.price_at_sale or 0
         # Per-item vat_rate via linked SaleItem; fall back to invoice-level default
-        sale_item = next((si for si in item.items if si.invoice_id == invoice.id), None)
+        sale_item = SaleItem.query.filter_by(sale_id=item.id).first()
         vat_rate = float(sale_item.vat_rate) if (sale_item and sale_item.vat_rate is not None) else default_vat_rate
         vat_amount = unit_price * vat_rate / 100
         total_line = unit_price + vat_amount
@@ -202,7 +202,7 @@ def send_invoice_email(invoice_id):
         mail.send(msg)
 
         # Log the send date
-        invoice.email_sent_at = datetime.utcnow()
+        invoice.email_sent_at = datetime.now(timezone.utc)
         db.session.commit()
 
         # Log communication record
@@ -261,7 +261,7 @@ def generate_invoice_for_order(order_number):
             customer_id=order.customer_id,
             user_id=current_user.id,
             tenant_id=order.tenant_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.session.add(invoice)
         db.session.commit()

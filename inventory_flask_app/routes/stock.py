@@ -549,9 +549,6 @@ def create_purchase_order():
             flash('No valid rows found in Excel (serial column was empty for all rows).', 'warning')
             return redirect(url_for('stock_bp.create_purchase_order'))
 
-        # Also keep expected_serials for backward compat with old session-based code paths
-        serials_list = [_clean(r.get('serial')) for _, r in df.iterrows() if _clean(r.get('serial'))]
-        po.expected_serials = ','.join(serials_list)
         db.session.commit()
 
         msg = f'PO {po.po_number} created with {items_added} item(s).'

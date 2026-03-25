@@ -329,7 +329,6 @@ def upload_excel():
             'upload_product.html',
             vendors=vendors,
             locations=locations,
-            preview_columns=preview_columns,
             preview_data=preview_data,
             vendor_id=vendor_id,
             location_id=location_id,

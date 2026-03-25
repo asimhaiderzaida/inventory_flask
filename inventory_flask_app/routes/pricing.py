@@ -148,7 +148,6 @@ def pricing_dashboard():
         units_below_cost=units_below_cost[:20],
         units_no_purchase_cost=units_no_purchase_cost,
         units_missing_cost_record=units_missing_cost_record,
-        units_total_unsold=units_total_unsold,
         total_at_asking=total_at_asking,
         units_with_asking=units_with_asking,
         avg_margin=avg_margin,

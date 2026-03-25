@@ -24,11 +24,6 @@ exports_bp = Blueprint('exports_bp', __name__)
 def export_products():
     from inventory_flask_app.models import ProductInstance
     from flask_login import current_user
-    instances = ProductInstance.query.join(Product).filter(
-        Product.tenant_id == current_user.tenant_id,
-        ProductInstance.is_sold == False
-    ).all()
-
     from inventory_flask_app.models import TenantSettings
     tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
     settings = {s.key: s.value for s in tenant_settings}
@@ -36,9 +31,15 @@ def export_products():
         flash("Export module is disabled for your tenant.", "warning")
         return redirect(url_for('dashboard_bp.main_dashboard'))
 
-    if not instances:
+    _base_q = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.is_sold == False
+    )
+    if _base_q.count() == 0:
         flash("No product instances found for export.", "warning")
         return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    instances = _base_q.yield_per(200)
 
     # Tenant-specific column visibility and labels
     visible_columns = {
@@ -356,7 +357,7 @@ def export_aged_inventory():
     instances = ProductInstance.query.join(Product).filter(
         ProductInstance.created_at <= cutoff_date,
         Product.tenant_id == current_user.tenant_id
-    ).all()
+    ).yield_per(200)
 
     output = io.StringIO()
     writer = csv.writer(output)

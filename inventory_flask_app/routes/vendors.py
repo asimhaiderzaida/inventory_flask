@@ -279,7 +279,8 @@ def vendor_profile(vendor_id):
     direct_uploads_map = {}
     instances = ProductInstance.query.join(Product).filter(
         Product.vendor_id == vendor.id,
-        Product.tenant_id == current_user.tenant_id
+        Product.tenant_id == current_user.tenant_id,
+        ProductInstance.po_id == None
     ).all()
     upload_groups = defaultdict(list)
     for inst in instances:

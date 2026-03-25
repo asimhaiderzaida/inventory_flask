@@ -91,7 +91,7 @@ class Tenant(db.Model):
     logo = db.Column(db.String(255))
     plan = db.Column(db.String(50), default='basic')
     timezone = db.Column(db.String(64), default='UTC')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<Tenant {self.name}>"
@@ -143,7 +143,7 @@ class Customer(db.Model):
     city = db.Column(db.String(100), nullable=True)
     country = db.Column(db.String(100), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     portal_token = db.Column(db.String(48), unique=True, nullable=True, index=True)
     parts_balance = db.Column(db.Numeric(10, 2), default=0, nullable=False)
     tenant_id = db.Column(
@@ -161,7 +161,7 @@ class CustomerNote(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='CASCADE'), nullable=False)
     note = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     tenant = db.relationship('Tenant', backref='customer_notes')
     customer = db.relationship('Customer', backref='note_log')
@@ -178,7 +178,7 @@ class CustomerCommunication(db.Model):
     type = db.Column(db.String(50), nullable=False)
     subject = db.Column(db.String(200), nullable=True)
     sent_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sent_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     tenant = db.relationship('Tenant', backref='customer_comms')
     customer = db.relationship('Customer', backref='communications')
@@ -197,7 +197,7 @@ class Vendor(db.Model):
     country = db.Column(db.String(100), nullable=True)
     payment_terms = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
@@ -213,7 +213,7 @@ class VendorNote(db.Model):
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendor.id', ondelete='CASCADE'), nullable=False)
     note = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     tenant = db.relationship('Tenant', backref='vendor_notes')
     vendor = db.relationship('Vendor', backref='note_log')
@@ -244,7 +244,7 @@ class Bin(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='CASCADE'), nullable=False)
     description = db.Column(db.String(255), nullable=True)
     tenant_id   = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     bin_type    = db.Column(db.String(10), nullable=False, server_default='units', default='units')
 
     location = db.relationship('Location', backref='bins')
@@ -274,7 +274,7 @@ class Product(db.Model):
     disk1size = db.Column(db.String(100))
     grade = db.Column(db.String(20))
     # stock = db.Column(db.Integer, default=0)   ← REMOVED - use ProductInstance count instead
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendor.id', ondelete='SET NULL'), nullable=True)
     vendor = db.relationship('Vendor', backref='products')
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='SET NULL'), nullable=True)
@@ -298,8 +298,8 @@ class ProductInstance(db.Model):
     note = db.Column(db.Text)
     assigned_to_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'))
     assigned_user = db.relationship('User', backref='assigned_instances')
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='SET NULL'))
     location = db.relationship('Location', backref='product_instances')
     shelf_bin = db.Column(db.String(64))   # kept in sync with bin.name for backward compat
@@ -361,7 +361,7 @@ class Order(db.Model):
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
         nullable=False
     )
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     customer = db.relationship('Customer', backref='orders')
     user = db.relationship('User')
     tenant = db.relationship('Tenant')
@@ -376,7 +376,7 @@ class SaleTransaction(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='CASCADE'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     price_at_sale = db.Column(db.Float, nullable=False)
-    date_sold = db.Column(db.DateTime, default=datetime.utcnow)
+    date_sold = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     notes = db.Column(db.Text)
     payment_method = db.Column(db.String(16), nullable=True)   # cash/card/transfer/credit
     payment_status = db.Column(db.String(16), nullable=True, default='paid')
@@ -424,7 +424,7 @@ class Invoice(db.Model):
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
         nullable=False
     )
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     email_sent_at = db.Column(db.DateTime, nullable=True)
     payment_method = db.Column(db.String(16), nullable=True)   # cash/card/transfer/credit
     payment_status = db.Column(db.String(16), nullable=True, default='paid')
@@ -448,7 +448,7 @@ class PurchaseOrder(db.Model):
     # status: pending | partial | received | cancelled
     status = db.Column(db.String(20), default='pending')
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     vendor = db.relationship('Vendor')
     location = db.relationship('Location', foreign_keys=[location_id])
     tenant = db.relationship('Tenant', backref='purchase_orders')
@@ -495,7 +495,7 @@ class CustomerOrderTracking(db.Model):
     status = db.Column(db.String(50), default='reserved')
     process_stage = db.Column(db.String(50))
     team_assigned = db.Column(db.String(100))
-    reserved_date = db.Column(db.DateTime, default=datetime.utcnow)
+    reserved_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     delivered_date = db.Column(db.DateTime)
     cancelled_at = db.Column(db.DateTime, nullable=True)
     cancelled_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
@@ -519,7 +519,7 @@ class ProductProcessLog(db.Model):
     from_team = db.Column(db.String(100))
     to_team = db.Column(db.String(100))
     moved_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'))
-    moved_at = db.Column(db.DateTime, default=datetime.utcnow)
+    moved_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     action = db.Column(db.String(50))
     note = db.Column(db.String(200))
     duration_minutes = db.Column(db.Integer, nullable=True)  # time spent in previous stage
@@ -550,7 +550,7 @@ class POImportLog(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     status = db.Column(db.String(50), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f'<POImportLog PO#{self.po_id} imported {self.quantity} as {self.status}>'
@@ -570,7 +570,7 @@ class Part(db.Model):
     price = db.Column(db.Float)
     description = db.Column(db.Text)
     barcode = db.Column(db.String(100), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
@@ -614,7 +614,7 @@ class PartMovement(db.Model):
     quantity = db.Column(db.Integer)
     movement_type = db.Column(db.String(32))
     note = db.Column(db.String(256))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'))
     instance_id = db.Column(
         db.Integer,
@@ -636,7 +636,7 @@ class PartUsage(db.Model):
     instance_id = db.Column(db.Integer, db.ForeignKey('product_instance.id', ondelete='SET NULL'), nullable=True, index=True)
     quantity = db.Column(db.Integer, nullable=False)
     used_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    used_at = db.Column(db.DateTime, default=datetime.utcnow)
+    used_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     note = db.Column(db.String(256))
     tenant_id = db.Column(
         db.Integer,
@@ -661,7 +661,7 @@ class PartSale(db.Model):
     unit_price = db.Column(db.Float, nullable=True)   # price at time of sale
     note = db.Column(db.String(256))
     sold_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    sold_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sold_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
@@ -690,7 +690,7 @@ class PartSaleTransaction(db.Model):
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     sold_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    sold_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sold_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id', ondelete='CASCADE'), nullable=False)
     customer = db.relationship('Customer', backref='part_sale_transactions')
     seller = db.relationship('User', foreign_keys=[sold_by], backref='part_sale_transactions')
@@ -739,7 +739,7 @@ class Return(db.Model):
     part_quantity = db.Column(db.Integer, nullable=True)
     part_sale_id = db.Column(db.Integer, db.ForeignKey('part_sale_transaction.id', ondelete='SET NULL'), nullable=True)
     # Common fields
-    return_date = db.Column(db.DateTime, default=datetime.utcnow)
+    return_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     reason = db.Column(db.String(255))
     condition = db.Column(db.String(50))
     action = db.Column(db.String(50))
@@ -775,7 +775,7 @@ class CreditNote(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='SET NULL'), nullable=True)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     currency = db.Column(db.String(3), nullable=False, default='USD')
-    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+    issued_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     issued_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     # Application tracking: unapplied / applied / void
@@ -866,7 +866,7 @@ class Expense(db.Model):
     po_id          = db.Column(db.Integer, db.ForeignKey('purchase_order.id', ondelete='SET NULL'), nullable=True)
     receipt_url    = db.Column(db.String(255), nullable=True)
     notes          = db.Column(db.Text, nullable=True)
-    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at     = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     created_by     = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     deleted_at     = db.Column(db.DateTime, nullable=True)      # soft delete
 
@@ -898,8 +898,8 @@ class AccountReceivable(db.Model):
     # open / partial / paid / overdue / written_off
     status       = db.Column(db.String(20), default='open', nullable=False)
     notes        = db.Column(db.Text, nullable=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     tenant   = db.relationship('Tenant', backref='receivables')
     customer = db.relationship('Customer', backref='receivables')
@@ -945,7 +945,7 @@ class ARPayment(db.Model):
     reference      = db.Column(db.String(100), nullable=True)
     recorded_by    = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     notes          = db.Column(db.Text, nullable=True)
-    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at     = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     tenant   = db.relationship('Tenant', backref='ar_payments')
     recorder = db.relationship('User', backref='ar_payments_recorded')
@@ -968,7 +968,7 @@ class OtherIncome(db.Model):
     income_date  = db.Column(db.Date, nullable=False)
     reference    = db.Column(db.String(100), nullable=True)
     notes        = db.Column(db.Text, nullable=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     created_by   = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     deleted_at   = db.Column(db.DateTime, nullable=True)        # soft delete
 
@@ -1039,7 +1039,7 @@ class Notification(db.Model):
     message    = db.Column(db.Text, nullable=False)
     link       = db.Column(db.String(255), nullable=True)
     is_read    = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     tenant = db.relationship('Tenant', backref='notifications')
     user   = db.relationship('User',   backref='notifications')
@@ -1158,7 +1158,7 @@ class CustomerOrder(db.Model):
     notes           = db.Column(db.Text, nullable=True)
     created_by      = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'),
                                 nullable=True)
-    created_at      = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     closed_at       = db.Column(db.DateTime, nullable=True)
 
     customer = db.relationship('Customer', backref='purchase_orders', lazy='select')

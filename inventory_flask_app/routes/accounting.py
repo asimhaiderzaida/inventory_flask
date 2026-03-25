@@ -7,7 +7,7 @@ import csv
 import io
 import logging
 from calendar import month_abbr
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify, Response
@@ -21,6 +21,7 @@ from inventory_flask_app.models import (
     SaleTransaction, SaleItem, ProductInstance, Product,
     PartSaleTransaction,
 )
+from sqlalchemy.orm import joinedload
 from inventory_flask_app.utils.accounting import (
     seed_expense_categories, recalculate_ar_status, get_currency,
 )
@@ -299,7 +300,7 @@ def delete_expense(expense_id):
     _require_accounting()
     tid = _tid()
     expense = Expense.query.filter_by(id=expense_id, tenant_id=tid).first_or_404()
-    expense.deleted_at = datetime.utcnow()
+    expense.deleted_at = datetime.now(timezone.utc)
     db.session.commit()
     flash('Expense deleted.', 'success')
     return redirect(url_for('accounting_bp.expenses'))
@@ -542,7 +543,7 @@ def delete_income(income_id):
     _require_accounting()
     tid = _tid()
     income_rec = OtherIncome.query.filter_by(id=income_id, tenant_id=tid).first_or_404()
-    income_rec.deleted_at = datetime.utcnow()
+    income_rec.deleted_at = datetime.now(timezone.utc)
     db.session.commit()
     flash('Income record deleted.', 'success')
     return redirect(url_for('accounting_bp.income'))
@@ -802,6 +803,9 @@ def ar_aging():
     open_ar = AccountReceivable.query.filter(
         AccountReceivable.tenant_id == tid,
         AccountReceivable.status.in_(('open', 'partial', 'overdue')),
+    ).options(
+        joinedload(AccountReceivable.customer),
+        joinedload(AccountReceivable.invoice),
     ).all()
 
     buckets = {

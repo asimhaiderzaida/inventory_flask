@@ -29,7 +29,7 @@
       <tbody>
         {% for group in grouped_instances %}
         <tr>
-          <td style="font-weight:600;">{{ group.model | nonan }}</td>
+          <td style="font-weight:600;">{{ group.item_name | nonan }}</td>
           <td style="font-size:0.84rem;color:var(--text-secondary);">{{ group.cpu | nonan }}</td>
           <td>
             <span style="display:inline-flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.1);color:var(--color-danger);border-radius:20px;padding:0.15rem 0.65rem;font-size:0.76rem;font-weight:600;">
@@ -37,7 +37,7 @@
             </span>
           </td>
           <td>
-            <a href="{{ url_for('stock_bp.group_view_page', product_id=group.product_id, model=group.model, cpu=group.cpu) }}&filter=aged"
+            <a href="{{ url_for('stock_bp.group_view_page', product_id=group.product_id, model=group.item_name, cpu=group.cpu) }}&filter=aged"
                class="btn btn-ghost btn-sm">
               <i class="bi bi-eye"></i> View Units
             </a>

@@ -232,19 +232,23 @@ def upsert_instance(serial, spec_data, tenant_id, location_id=None, vendor_id=No
     return ('created', instance, {})
 
 def generate_part_invoice_number(tenant_id):
-    """Return next PRT-XXXX invoice number for the given tenant (zero-padded to 4 digits)."""
-    from inventory_flask_app.models import PartSaleTransaction
-    from sqlalchemy import func
-    last = (
-        PartSaleTransaction.query
-        .filter_by(tenant_id=tenant_id)
-        .filter(PartSaleTransaction.invoice_number.like('PRT-%'))
-        .order_by(PartSaleTransaction.id.desc())
-        .first()
-    )
-    if last:
+    """Return next PRT-XXXX invoice number for the given tenant (zero-padded to 4 digits).
+
+    Uses SELECT FOR UPDATE to prevent race conditions under concurrent requests.
+    """
+    from inventory_flask_app.models import db
+    from sqlalchemy import text
+    row = db.session.execute(
+        text(
+            "SELECT invoice_number FROM part_sale_transaction "
+            "WHERE tenant_id = :tid AND invoice_number LIKE 'PRT-%' "
+            "ORDER BY id DESC LIMIT 1 FOR UPDATE"
+        ),
+        {'tid': tenant_id}
+    ).fetchone()
+    if row:
         try:
-            last_num = int(last.invoice_number.split('-')[1])
+            last_num = int(row[0].split('-')[1])
         except (IndexError, ValueError):
             last_num = 0
     else:

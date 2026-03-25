@@ -23,6 +23,7 @@ from inventory_flask_app.models import (
 )
 from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
+from inventory_flask_app import csrf
 from inventory_flask_app.utils.utils import admin_required
 
 admin_bp = Blueprint('admin_bp', __name__)
@@ -778,6 +779,7 @@ def download_backup():
 @login_required
 @admin_required
 def confirm_reset():
+    csrf.protect()
     if request.form.get('confirm_text', '').strip() != 'RESET':
         flash('You must type RESET exactly to confirm.', 'danger')
         return redirect(url_for('admin_bp.admin_settings') + '#sec-data')
