@@ -326,8 +326,7 @@ def create_app():
             )
             unread_count = len(db_notifs)
             # Also include legacy inventory system notifications for admins
-            from .utils.utils import get_inventory_notifications
-            system_notifs = get_inventory_notifications(current_user.tenant_id)
+            system_notifs = []  # legacy — DB notifications replaced this
             return dict(
                 notifications=db_notifs,
                 system_notifications=system_notifs,

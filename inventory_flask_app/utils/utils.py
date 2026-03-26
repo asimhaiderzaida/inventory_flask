@@ -1,3 +1,4 @@
+import logging
 from inventory_flask_app.models import ProductInstance
 from inventory_flask_app.models import CustomerOrderTracking, Customer
 from datetime import datetime
@@ -295,8 +296,8 @@ def create_notification(user_id, notif_type, title, message, link=None, tenant_i
         )
         db.session.add(notif)
         # No commit here — caller handles commit
-    except Exception:
-        pass  # Notifications are non-critical; never break the main flow
+    except Exception as e:
+        logging.getLogger(__name__).warning("create_notification failed: %s", e)
 
 
 def get_now_for_tenant():
@@ -365,8 +366,8 @@ def sync_reservation_stage(instance_id, new_stage, username):
             'updated_by': username,
         })
         reservation.stage_history = json.dumps(history)
-    except Exception:
-        pass  # Stage sync is non-critical; never break the main flow
+    except Exception as e:
+        logging.getLogger(__name__).warning("sync_reservation_stage failed: %s", e)
 
 
 # Inventory and order notifications for a tenant

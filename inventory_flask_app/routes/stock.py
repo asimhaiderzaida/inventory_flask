@@ -3734,7 +3734,9 @@ def bin_export_csv(bin_id):
         ])
     resp = make_response(output.getvalue())
     resp.headers['Content-Type'] = 'text/csv'
-    resp.headers['Content-Disposition'] = f'attachment; filename=bin_{b.name}.csv'
+    from werkzeug.utils import secure_filename
+    safe_name = secure_filename(b.name) or 'bin'
+    resp.headers['Content-Disposition'] = f'attachment; filename=bin_{safe_name}.csv'
     return resp
 
 

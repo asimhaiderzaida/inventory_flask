@@ -1180,6 +1180,7 @@
           <span class="sidebar-label">Dashboard</span>
         </a>
 
+        {% if current_user.can_access('stock') %}
         <!-- ── INVENTORY ──────────────────────────────────── -->
         <div class="sidebar-section-label">Inventory</div>
 
@@ -1263,8 +1264,10 @@
           </a>
         </div>
         {% endif %}
+        {% endif %}{# /can_access('stock') #}
 
         <!-- ── PROCESSING ─────────────────────────────────── -->
+        {% if current_user.can_access('processing') %}
         <div class="sidebar-section-label">Processing</div>
 
         <a href="{{ url_for('stock_bp.process_stage_update') }}"
@@ -1283,7 +1286,10 @@
           <span class="sidebar-label">Scanner</span>
         </a>
 
+        {% endif %}{# /can_access('processing') #}
+
         <!-- ── SALES ──────────────────────────────────────── -->
+        {% if current_user.can_access('sales') %}
         <div class="sidebar-section-label">Sales</div>
 
         <a href="{{ url_for('sales_bp.create_sale_form') }}"
@@ -1292,7 +1298,7 @@
           <span class="sidebar-label">Create Sale</span>
         </a>
 
-        {% if settings.enable_parts_module != 'false' %}
+        {% if settings.enable_parts_module != 'false' and current_user.can_access('parts') %}
         <a href="{{ url_for('parts_bp.sell') }}"
            class="sidebar-link {% if ep in ('parts_bp.sell','parts_bp.sale_customer','parts_bp.sale_invoice_type','parts_bp.sale_payment') %}active{% endif %}">
           <i class="bi bi-cpu nav-icon"></i>
@@ -1357,8 +1363,10 @@
           </a>
         </div>
 
+        {% endif %}{# /can_access('sales') #}
+
         <!-- ── PARTS ──────────────────────────────────────── -->
-        {% if settings.enable_parts_module != 'false' %}
+        {% if settings.enable_parts_module != 'false' and current_user.can_access('parts') %}
         <div class="sidebar-section-label">Parts</div>
 
         <a href="{{ url_for('parts_bp.parts_list') }}"
@@ -1381,18 +1389,23 @@
         {% endif %}
 
         <!-- ── PEOPLE ──────────────────────────────────────── -->
+        {% if current_user.can_access('customers') or current_user.can_access('vendors') %}
         <div class="sidebar-section-label">People</div>
-
+        {% if current_user.can_access('customers') %}
         <a href="{{ url_for('customers_bp.customer_center') }}"
            class="sidebar-link {% if ep.startswith('customers_bp') %}active{% endif %}">
           <i class="bi bi-people nav-icon"></i>
           <span class="sidebar-label">Customers</span>
         </a>
+        {% endif %}
+        {% if current_user.can_access('vendors') %}
         <a href="{{ url_for('vendors_bp.vendor_center') }}"
            class="sidebar-link {% if ep.startswith('vendors_bp') %}active{% endif %}">
           <i class="bi bi-shop nav-icon"></i>
           <span class="sidebar-label">Vendors</span>
         </a>
+        {% endif %}
+        {% endif %}{# /can_access customers or vendors #}
 
         <!-- ── FINANCE ─────────────────────────────────────── -->
         {% if current_user.can_access('accounting') %}

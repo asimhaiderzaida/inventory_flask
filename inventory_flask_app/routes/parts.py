@@ -1555,7 +1555,9 @@ def sale_invoice_pdf(txn_id):
     pdf_bytes = WeasyHTML(string=html, base_url=request.host_url).write_pdf()
     resp = make_response(pdf_bytes)
     resp.headers['Content-Type'] = 'application/pdf'
-    resp.headers['Content-Disposition'] = f'inline; filename={txn.invoice_number}.pdf'
+    from werkzeug.utils import secure_filename
+    safe_num = secure_filename(txn.invoice_number or 'invoice')
+    resp.headers['Content-Disposition'] = f'inline; filename={safe_num}.pdf'
     return resp
 
 

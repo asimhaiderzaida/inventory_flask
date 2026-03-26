@@ -49,7 +49,14 @@ def mark_read(notif_id):
         notif.is_read = True
         db.session.commit()
 
-    next_url = request.args.get('next') or (notif.link if notif else None) or url_for('notifications_bp.notifications_list')
+    from urllib.parse import urlparse
+    next_url = request.args.get('next') or (notif.link if notif else None)
+    if next_url:
+        parsed = urlparse(next_url)
+        if parsed.netloc and parsed.netloc != urlparse(request.host_url).netloc:
+            next_url = url_for('notifications_bp.notifications_list')
+    else:
+        next_url = url_for('notifications_bp.notifications_list')
     return redirect(next_url)
 
 
