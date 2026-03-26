@@ -47,9 +47,16 @@ def admin_settings():
         'default_terms', 'enable_export_module', 'enable_order_module',
         'enable_parts_module', 'enable_reports_module',
         'font_size',
+        'company_trn',
         'invoice_accent_color', 'invoice_bank_details', 'invoice_footer', 'invoice_footer_note',
         'invoice_header_note', 'invoice_logo', 'invoice_show_bank_details', 'invoice_show_logo',
         'invoice_terms', 'invoice_title',
+        'invoice_type_label', 'invoice_layout', 'invoice_logo_position',
+        'invoice_show_buyer_trn', 'invoice_show_po_reference', 'invoice_show_supply_date',
+        'invoice_show_due_date', 'invoice_show_delivery_address', 'invoice_show_serial',
+        'invoice_show_asset', 'invoice_show_specs', 'invoice_show_grade', 'invoice_show_qty_column',
+        'invoice_show_discount', 'invoice_show_payment_method', 'invoice_show_qr',
+        'invoice_signature_line', 'invoice_signature_labels', 'invoice_watermark',
         'label_asset', 'label_cpu', 'label_disk1size', 'label_display', 'label_grade',
         'label_gpu1', 'label_gpu2', 'label_item_name', 'label_location', 'label_make',
         'label_model', 'label_ram', 'label_serial_number', 'primary_color',
@@ -227,6 +234,70 @@ def label_template():
 
     return render_template('admin_label_template.html',
                            config=config, logo_path=logo_path, company_name=company_name)
+
+
+@admin_bp.route('/admin/invoice_designer', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def invoice_designer():
+    """Configure invoice layout, fields, and FTA compliance settings."""
+    tid = current_user.tenant_id
+
+    defaults = {
+        'company_trn': '',
+        'invoice_type_label': 'Tax Invoice',
+        'invoice_layout': 'standard',
+        'invoice_logo_position': 'left',
+        'invoice_accent_color': '#3B82F6',
+        'invoice_show_logo': 'true',
+        'invoice_show_buyer_trn': 'true',
+        'invoice_show_po_reference': 'false',
+        'invoice_show_supply_date': 'false',
+        'invoice_show_due_date': 'false',
+        'invoice_show_delivery_address': 'false',
+        'invoice_show_serial': 'true',
+        'invoice_show_asset': 'true',
+        'invoice_show_specs': 'true',
+        'invoice_show_grade': 'false',
+        'invoice_show_qty_column': 'true',
+        'invoice_show_discount': 'false',
+        'invoice_show_payment_method': 'true',
+        'invoice_show_qr': 'false',
+        'invoice_show_bank_details': 'false',
+        'invoice_signature_line': 'false',
+        'invoice_signature_labels': 'Authorized Signature,Customer Signature',
+        'invoice_watermark': '',
+        'invoice_header_note': '',
+        'invoice_footer': '',
+        'invoice_footer_note': '',
+        'invoice_terms': '',
+        'invoice_bank_details': '',
+        'vat_rate': '5',
+    }
+
+    all_rows = TenantSettings.query.filter_by(tenant_id=tid).all()
+    current_cfg = {r.key: r.value for r in all_rows}
+    extra_keys = ('company_name', 'company_address', 'company_phone', 'company_email',
+                  'company_website', 'currency', 'dashboard_logo', 'invoice_logo', 'invoice_title')
+    config = {**defaults, **{k: v for k, v in current_cfg.items() if k in defaults or k in extra_keys}}
+
+    if request.method == 'POST':
+        for key in defaults:
+            checkbox_keys = {k for k in defaults if k.startswith('invoice_show_')} | {'invoice_signature_line'}
+            if key in checkbox_keys:
+                val = 'true' if request.form.get(key) else 'false'
+            else:
+                val = request.form.get(key, '').strip()
+            setting = TenantSettings.query.filter_by(tenant_id=tid, key=key).first()
+            if setting:
+                setting.value = val
+            else:
+                db.session.add(TenantSettings(tenant_id=tid, key=key, value=val))
+        db.session.commit()
+        flash('Invoice template saved.', 'success')
+        return redirect(url_for('admin_bp.invoice_designer'))
+
+    return render_template('admin_invoice_designer.html', config=config)
 
 
 @admin_bp.route('/admin/self_test', methods=['GET'])

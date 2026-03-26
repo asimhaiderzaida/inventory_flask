@@ -374,7 +374,12 @@
       {# ═══ 5. INVOICE BRANDING ═══ #}
       <div class="s-section" id="sec-invoice">
         <div class="s-heading"><i class="bi bi-receipt"></i> Invoice Branding</div>
-        <div class="s-subhead">Customize how invoices look when sent to customers or exported as PDF.</div>
+        <div class="s-subhead">
+          Customize how invoices look when sent to customers or exported as PDF.
+          <a href="{{ url_for('admin_bp.invoice_designer') }}" class="btn btn-sm btn-ghost ms-2" style="vertical-align:middle;">
+            <i class="bi bi-receipt-cutoff me-1"></i>Open Invoice Designer
+          </a>
+        </div>
 
         <div class="sub-sep">Identity</div>
         <div class="row g-3 mb-3">

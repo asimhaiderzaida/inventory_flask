@@ -153,6 +153,7 @@ class Customer(db.Model):
     portal_token = db.Column(db.String(48), unique=True, nullable=True, index=True)
     portal_token_expires_at = db.Column(db.DateTime, nullable=True)
     parts_balance = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+    trn = db.Column(db.String(20), nullable=True)  # Tax Registration Number (UAE: 15 digits)
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE'),
@@ -440,6 +441,12 @@ class Invoice(db.Model):
     email_sent_at = db.Column(db.DateTime, nullable=True)
     payment_method = db.Column(db.String(16), nullable=True)   # cash/card/transfer/credit
     payment_status = db.Column(db.String(16), nullable=True, default='paid')
+    po_reference = db.Column(db.String(100), nullable=True)
+    delivery_address = db.Column(db.Text, nullable=True)
+    supply_date = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
+    discount_amount = db.Column(db.Numeric(10, 2), default=0)
+    notes = db.Column(db.Text, nullable=True)
     tenant = db.relationship('Tenant', backref='invoices')
     customer = db.relationship('Customer', backref='invoices')
     user = db.relationship('User', backref='invoices')

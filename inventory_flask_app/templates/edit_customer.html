@@ -41,6 +41,12 @@
           <label class="form-label">Email</label>
           <input type="email" name="email" class="form-control" value="{{ customer.email or '' }}">
         </div>
+        <div class="col-md-6">
+          <label class="form-label">TRN <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(Tax Registration Number)</span></label>
+          <input type="text" name="trn" class="form-control" value="{{ customer.trn or '' }}"
+                 placeholder="15-digit Tax Registration Number" maxlength="20"
+                 pattern="[0-9]{15}" title="UAE TRN is 15 digits">
+        </div>
 
         <!-- Address -->
         <div class="col-12" style="padding-bottom:0;padding-top:0.25rem;">

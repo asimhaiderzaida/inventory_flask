@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% block title %}Invoice Designer{% endblock %}
+{% block page_title %}Invoice Designer{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Invoice Designer</h1>
+    <div class="page-subtitle">Configure invoice layout for FTA compliance</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('admin_bp.admin_settings') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Settings
+    </a>
+  </div>
+</div>
+
+<div class="row g-4 animate-fade-up">
+
+  {# ── Left: Configuration Form ── #}
+  <div class="col-12 col-lg-7">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {# ─── Section 1: FTA Compliance ─────────────────────── #}
+      <div class="panel mb-3">
+        <div class="panel-header">
+          <span class="panel-title"><i class="bi bi-shield-check me-2" style="color:#1D4ED8;"></i>FTA Compliance</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Invoice Type</label>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              {% for lbl in ['Tax Invoice','Simplified Tax Invoice','Invoice','Proforma Invoice'] %}
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="invoice_type_label"
+                       id="inv_type_{{ loop.index }}" value="{{ lbl }}"
+                       onchange="updatePreview()"
+                       {% if config.invoice_type_label == lbl %}checked{% endif %}>
+                <label class="form-check-label" for="inv_type_{{ loop.index }}">{{ lbl }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Company TRN</label>
+              <input type="text" name="company_trn" class="form-control" id="inp_company_trn"
+                     value="{{ config.company_trn or '' }}"
+                     placeholder="100XXXXXXXXX5 (15 digits)"
+                     maxlength="20" oninput="updatePreview()">
+              <div class="form-text">UAE Tax Registration Number (15 digits)</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">VAT Rate (%)</label>
+              <input type="number" name="vat_rate" class="form-control" id="inp_vat_rate"
+                     value="{{ config.vat_rate or '5' }}" min="0" max="100" step="0.5"
+                     oninput="updatePreview()">
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="invoice_show_buyer_trn" id="chk_buyer_trn"
+                       style="width:38px;height:21px;"
+                       onchange="updatePreview()"
+                       {% if config.invoice_show_buyer_trn == 'true' %}checked{% endif %}>
+                <label class="form-check-label" for="chk_buyer_trn">Show Buyer TRN on invoice</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="invoice_show_qr" id="chk_qr"
+                       style="width:38px;height:21px;"
+                       onchange="updatePreview()"
+                       {% if config.invoice_show_qr == 'true' %}checked{% endif %}>
+                <label class="form-check-label" for="chk_qr">
+                  Show FTA QR Code
+                  <span style="font-size:0.74rem;color:var(--text-muted);display:block;font-weight:400;">Required for simplified tax invoices under AED 10,000</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ─── Section 2: Layout & Branding ──────────────────── #}
+      <div class="panel mb-3">
+        <div class="panel-header">
+          <span class="panel-title"><i class="bi bi-palette me-2" style="color:#8B5CF6;"></i>Layout &amp; Branding</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Layout</label>
+              <div class="mt-1">
+                {% for val, lbl in [('standard','Standard'),('compact','Compact'),('detailed','Detailed')] %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="invoice_layout"
+                         id="layout_{{ val }}" value="{{ val }}"
+                         onchange="updatePreview()"
+                         {% if config.invoice_layout == val %}checked{% endif %}>
+                  <label class="form-check-label" for="layout_{{ val }}">{{ lbl }}</label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Logo Position</label>
+              <div class="mt-1">
+                {% for val, lbl in [('left','Left'),('center','Center')] %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="invoice_logo_position"
+                         id="logo_pos_{{ val }}" value="{{ val }}"
+                         onchange="updatePreview()"
+                         {% if config.invoice_logo_position == val %}checked{% endif %}>
+                  <label class="form-check-label" for="logo_pos_{{ val }}">{{ lbl }}</label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Accent Color</label>
+              <div style="display:flex;gap:.5rem;align-items:center;">
+                <input type="color" id="accentPicker"
+                       value="{{ config.invoice_accent_color or '#3B82F6' }}"
+                       style="width:42px;height:38px;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px;cursor:pointer;flex-shrink:0;"
+                       oninput="document.getElementById('inp_accent').value=this.value;updatePreview()">
+                <input type="text" name="invoice_accent_color" id="inp_accent"
+                       class="form-control font-monospace"
+                       value="{{ config.invoice_accent_color or '#3B82F6' }}"
+                       oninput="document.getElementById('accentPicker').value=this.value;updatePreview()">
+              </div>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label">Watermark Text</label>
+              <input type="text" name="invoice_watermark" class="form-control" id="inp_watermark"
+                     value="{{ config.invoice_watermark or '' }}"
+                     placeholder="e.g. DRAFT or PROFORMA (leave empty for none)"
+                     oninput="updatePreview()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ─── Section 3: Document Fields ────────────────────── #}
+      <div class="panel mb-3">
+        <div class="panel-header">
+          <span class="panel-title"><i class="bi bi-list-check me-2" style="color:#10B981;"></i>Document Fields</span>
+        </div>
+        <div class="panel-body">
+          <div class="row g-2">
+            {% set field_toggles = [
+              ('invoice_show_logo',             'Show Logo',                       'true'),
+              ('invoice_show_serial',           'Show Serial Number',              'true'),
+              ('invoice_show_asset',            'Show Asset Tag',                  'true'),
+              ('invoice_show_specs',            'Show Specs (CPU/RAM/Disk)',        'true'),
+              ('invoice_show_grade',            'Show Grade',                      'false'),
+              ('invoice_show_qty_column',       'Show Qty Column',                 'true'),
+              ('invoice_show_po_reference',     'Show PO Reference',               'false'),
+              ('invoice_show_supply_date',      'Show Supply Date',                'false'),
+              ('invoice_show_due_date',         'Show Due Date',                   'false'),
+              ('invoice_show_delivery_address', 'Show Delivery Address',           'false'),
+              ('invoice_show_discount',         'Show Discount Line',              'false'),
+              ('invoice_show_payment_method',   'Show Payment Method',             'true'),
+            ] %}
+            {% for key, label, default in field_toggles %}
+            <div class="col-6 col-md-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="{{ key }}" id="chk_{{ key }}"
+                       onchange="updatePreview()"
+                       {% if config.get(key, default) == 'true' %}checked{% endif %}>
+                <label class="form-check-label" for="chk_{{ key }}" style="font-size:0.84rem;">{{ label }}</label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {# ─── Section 4: Footer & Signatures ────────────────── #}
+      <div class="panel mb-3">
+        <div class="panel-header">
+          <span class="panel-title"><i class="bi bi-pen me-2" style="color:#F59E0B;"></i>Footer &amp; Signatures</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Invoice Terms &amp; Conditions</label>
+              <textarea name="invoice_terms" class="form-control" rows="2"
+                        placeholder="Payment due within 14 days…">{{ config.invoice_terms or '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Footer Note</label>
+              <textarea name="invoice_footer_note" class="form-control" rows="2"
+                        placeholder="e.g. Thank you for your business!">{{ config.invoice_footer_note or '' }}</textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Footer Line</label>
+              <input type="text" name="invoice_footer" class="form-control"
+                     placeholder="Appears at the very bottom of the invoice"
+                     value="{{ config.invoice_footer or '' }}">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="invoice_show_bank_details" id="chk_bank"
+                       style="width:38px;height:21px;"
+                       onchange="toggleBankSection()"
+                       {% if config.invoice_show_bank_details == 'true' %}checked{% endif %}>
+                <label class="form-check-label" for="chk_bank">Show Bank Details</label>
+              </div>
+              <div id="bankSection" style="display:{% if config.invoice_show_bank_details == 'true' %}block{% else %}none{% endif %};">
+                <textarea name="invoice_bank_details" class="form-control" rows="4"
+                          placeholder="Bank: Example Bank&#10;Account: Your Company&#10;IBAN: AE00 0000 0000 0000 0000&#10;SWIFT: EXBKAEAD">{{ config.invoice_bank_details or '' }}</textarea>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="invoice_signature_line" id="chk_sig"
+                       style="width:38px;height:21px;"
+                       onchange="toggleSigSection();updatePreview()"
+                       {% if config.invoice_signature_line == 'true' %}checked{% endif %}>
+                <label class="form-check-label" for="chk_sig">Show Signature Lines</label>
+              </div>
+              <div id="sigSection" style="display:{% if config.invoice_signature_line == 'true' %}block{% else %}none{% endif %};">
+                <label class="form-label" style="font-size:0.8rem;">Signature Labels <span style="color:var(--text-muted);font-weight:400;">(comma-separated)</span></label>
+                <input type="text" name="invoice_signature_labels" class="form-control" id="inp_sig_labels"
+                       value="{{ config.invoice_signature_labels or 'Authorized Signature,Customer Signature' }}"
+                       oninput="updatePreview()">
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 mb-2">
+            <label class="form-label">Invoice Header Note <span style="color:var(--text-muted);font-weight:400;">(shown below company name)</span></label>
+            <textarea name="invoice_header_note" class="form-control" rows="2"
+                      placeholder="e.g. All sales are final…">{{ config.invoice_header_note or '' }}</textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2-circle me-1"></i> Save Invoice Template
+      </button>
+    </form>
+  </div>
+
+  {# ── Right: Live Preview ── #}
+  <div class="col-12 col-lg-5">
+    <div style="position:sticky;top:80px;">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title"><i class="bi bi-eye me-2"></i>Live Preview</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);">Updates as you change settings</span>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <div id="invPreview" style="
+            background:#fff;
+            border-radius:0 0 var(--radius-lg) var(--radius-lg);
+            padding:18px 20px 16px;
+            font-family:Arial,sans-serif;
+            font-size:11px;
+            color:#1a1a1a;
+            min-height:480px;
+            position:relative;
+            overflow:hidden;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>{# end row #}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* ── Live preview engine ───────────────────────────── */
+function getVal(name) {
+  var els = document.getElementsByName(name);
+  if (!els.length) return '';
+  var el = els[0];
+  if (el.type === 'radio') {
+    for (var e of document.getElementsByName(name)) {
+      if (e.checked) return e.value;
+    }
+    return '';
+  }
+  return el.value;
+}
+function getChk(name) {
+  var el = document.getElementById('chk_' + name.replace('invoice_show_','').replace('invoice_',''));
+  if (!el) { var els = document.getElementsByName(name); el = els[0]; }
+  return el ? el.checked : false;
+}
+function chk(id) {
+  var el = document.getElementById(id);
+  return el ? el.checked : false;
+}
+
+function updatePreview() {
+  var accent  = document.getElementById('inp_accent').value || '#3B82F6';
+  var invType = getVal('invoice_type_label') || 'Tax Invoice';
+  var layout  = getVal('invoice_layout') || 'standard';
+  var logoPos = getVal('invoice_logo_position') || 'left';
+  var trn     = document.getElementById('inp_company_trn').value;
+  var vatRate = document.getElementById('inp_vat_rate').value || '5';
+  var wmText  = document.getElementById('inp_watermark').value;
+
+  var showLogo    = chk('chk_invoice_show_logo') || chk('chk_show_logo');
+  var showBuyerTrn = chk('chk_buyer_trn');
+  var showQr      = chk('chk_qr');
+  var showSpecs   = chk('chk_invoice_show_specs') || chk('chk_show_specs');
+  var showSerial  = chk('chk_invoice_show_serial') || chk('chk_show_serial');
+  var showQty     = chk('chk_invoice_show_qty_column') || chk('chk_show_qty_column');
+  var showSig     = chk('chk_sig');
+  var sigLabels   = document.getElementById('inp_sig_labels') ? document.getElementById('inp_sig_labels').value : '';
+
+  var companyName = '{{ config.company_name or config.invoice_title or "Your Company" | e }}';
+  var logoSrc     = '{{ config.dashboard_logo or config.invoice_logo or "" | e }}';
+
+  var html = '';
+
+  /* Watermark */
+  if (wmText) {
+    html += '<div style="position:absolute;top:42%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);' +
+            'font-size:48px;font-weight:900;color:rgba(0,0,0,0.05);letter-spacing:8px;pointer-events:none;white-space:nowrap;">' +
+            esc(wmText.toUpperCase()) + '</div>';
+  }
+
+  /* Header */
+  if (logoPos === 'center') {
+    html += '<div style="text-align:center;margin-bottom:10px;">';
+    if (showLogo && logoSrc) html += '<img src="' + esc(logoSrc) + '" style="height:36px;display:block;margin:0 auto 6px;">';
+    html += '<div style="font-size:18px;font-weight:800;color:' + esc(accent) + ';letter-spacing:2px;">' + esc(invType.toUpperCase()) + '</div>';
+    html += '<div style="font-size:13px;font-weight:700;margin-top:3px;">' + esc(companyName) + '</div>';
+    if (trn) html += '<div style="font-size:10px;color:#666;margin-top:2px;font-weight:600;">TRN: ' + esc(trn) + '</div>';
+    html += '</div>';
+  } else {
+    html += '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;"><tr>';
+    html += '<td width="55%" style="vertical-align:top;padding-right:12px;">';
+    if (showLogo && logoSrc) html += '<img src="' + esc(logoSrc) + '" style="height:36px;display:block;margin-bottom:5px;">';
+    html += '<div style="font-size:14px;font-weight:700;">' + esc(companyName) + '</div>';
+    html += '<div style="font-size:9px;color:#666;line-height:1.8;margin-top:2px;">{{ config.company_address or "Dubai, UAE" | e }}';
+    if (trn) html += '<br><strong>TRN: ' + esc(trn) + '</strong>';
+    html += '</div></td>';
+    html += '<td width="45%" style="vertical-align:top;text-align:right;">';
+    html += '<div style="font-size:20px;font-weight:800;color:' + esc(accent) + ';letter-spacing:2px;">' + esc(invType.toUpperCase()) + '</div>';
+    html += '<div style="font-size:11px;font-weight:700;margin-top:3px;">INV-00001</div>';
+    html += '<div style="font-size:9px;color:#666;">Date: 26 Mar 2026</div>';
+    html += '</td></tr></table>';
+  }
+
+  /* Divider */
+  html += '<div style="border-top:2px solid ' + esc(accent) + ';margin:8px 0 10px;"></div>';
+
+  /* Bill To */
+  html += '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;"><tr>';
+  html += '<td width="50%" style="vertical-align:top;padding-right:10px;">';
+  html += '<div style="font-size:8px;font-weight:700;color:#9CA3AF;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Bill To</div>';
+  html += '<div style="font-size:11px;font-weight:700;">Sample Customer LLC</div>';
+  html += '<div style="font-size:9px;color:#555;">sample@example.com</div>';
+  if (showBuyerTrn) html += '<div style="font-size:9px;font-weight:600;margin-top:2px;">TRN: 100123456700003</div>';
+  html += '</td>';
+  html += '<td width="50%" style="vertical-align:top;">';
+  html += '<table cellpadding="0" cellspacing="0" style="border:1px solid #D1D5DB;font-size:9px;width:100%;">';
+  html += '<tr><td style="color:#666;padding:4px 7px;">Invoice #</td><td style="text-align:right;font-weight:bold;padding:4px 7px;">INV-00001</td></tr>';
+  html += '<tr><td style="color:#666;padding:4px 7px;">Date</td><td style="text-align:right;padding:4px 7px;">26 Mar 2026</td></tr>';
+  html += '<tr><td style="color:#666;padding:4px 7px;">Status</td><td style="text-align:right;padding:4px 7px;"><span style="background:#D1FAE5;color:#065F46;padding:1px 5px;font-size:8px;font-weight:bold;">PAID</span></td></tr>';
+  html += '</table></td></tr></table>';
+
+  /* Items table */
+  var vatPct = parseFloat(vatRate) || 0;
+  var unitPrice1 = 1200, unitPrice2 = 850;
+  var vat1 = vatPct > 0 ? unitPrice1 * vatPct/100 : 0;
+  var vat2 = vatPct > 0 ? unitPrice2 * vatPct/100 : 0;
+
+  html += '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:9px;">';
+  html += '<thead><tr>';
+  html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:left;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">#</th>';
+  if (showSerial) html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:left;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">Serial</th>';
+  html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:left;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">Description</th>';
+  if (showQty) html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:center;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;width:28px;">Qty</th>';
+  html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:right;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">Price</th>';
+  if (vatPct > 0) {
+    html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:center;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">VAT</th>';
+    html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:right;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">VAT Amt</th>';
+  }
+  html += '<th style="background:#F3F4F6;padding:5px 6px;text-align:right;font-weight:700;text-transform:uppercase;color:#6B7280;border-bottom:2px solid #E5E7EB;">Total</th>';
+  html += '</tr></thead><tbody>';
+
+  var rows = [
+    {idx:1, serial:'SN-ABC12345', desc:'Dell Laptop i7', specs:'i7-1165G7 / 16GB / 512GB SSD', price:unitPrice1, vat:vat1, bg:'#fff'},
+    {idx:2, serial:'SN-DEF67890', desc:'HP EliteBook', specs:'i5-1135G7 / 8GB / 256GB SSD', price:unitPrice2, vat:vat2, bg:'#F9FAFB'},
+  ];
+  rows.forEach(function(r) {
+    html += '<tr>';
+    html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;color:#999;">' + r.idx + '</td>';
+    if (showSerial) html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;font-family:monospace;font-size:8px;font-weight:700;">' + r.serial + '</td>';
+    html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;">';
+    html += '<div style="font-weight:600;">' + r.desc + '</div>';
+    if (showSpecs) html += '<div style="font-size:8px;color:#6B7280;margin-top:1px;">' + r.specs + '</div>';
+    html += '</td>';
+    if (showQty) html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;text-align:center;">1</td>';
+    html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;text-align:right;white-space:nowrap;">' + r.price.toFixed(2) + '</td>';
+    if (vatPct > 0) {
+      html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;text-align:center;color:#777;">' + vatPct + '%</td>';
+      html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;text-align:right;color:#777;">' + r.vat.toFixed(2) + '</td>';
+    }
+    html += '<td style="background:' + r.bg + ';padding:5px 6px;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:700;white-space:nowrap;">' + (r.price + r.vat).toFixed(2) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  /* Totals */
+  var subtotal = unitPrice1 + unitPrice2;
+  var totalVat = vat1 + vat2;
+  var grandTotal = subtotal + totalVat;
+  html += '<table style="float:right;border-collapse:collapse;margin-top:6px;font-size:10px;">';
+  html += '<tr><td style="text-align:right;color:#555;padding:3px 6px;">Subtotal</td><td style="text-align:right;padding:3px 6px;">' + subtotal.toFixed(2) + '</td></tr>';
+  if (vatPct > 0) html += '<tr><td style="text-align:right;color:#555;padding:3px 6px;">VAT (' + vatPct + '%)</td><td style="text-align:right;padding:3px 6px;color:#777;">' + totalVat.toFixed(2) + '</td></tr>';
+  html += '<tr style="border-top:2px solid #1a1a1a;"><td style="text-align:right;padding:5px 6px 2px;font-weight:800;font-size:12px;">Total</td><td style="text-align:right;padding:5px 6px 2px;font-weight:800;font-size:12px;color:' + esc(accent) + ';">' + grandTotal.toFixed(2) + '</td></tr>';
+  html += '</table><div style="clear:both;"></div>';
+
+  /* Signature lines */
+  if (showSig && sigLabels) {
+    var labels = sigLabels.split(',');
+    html += '<div style="display:flex;gap:16px;margin-top:28px;">';
+    labels.forEach(function(l) {
+      html += '<div style="flex:1;border-top:1px solid #999;padding-top:4px;text-align:center;font-size:8px;color:#666;">' + esc(l.trim()) + '</div>';
+    });
+    html += '</div>';
+  }
+
+  /* QR placeholder */
+  if (showQr) {
+    html += '<div style="margin-top:10px;">';
+    html += '<div style="font-size:7px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;font-weight:700;">FTA QR</div>';
+    html += '<div style="width:60px;height:60px;background:#f3f4f6;border:1px solid #d1d5db;display:flex;align-items:center;justify-content:center;">';
+    html += '<i class="bi bi-qr-code" style="font-size:32px;color:#9CA3AF;"></i></div></div>';
+  }
+
+  document.getElementById('invPreview').innerHTML = html;
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleBankSection() {
+  var show = document.getElementById('chk_bank').checked;
+  document.getElementById('bankSection').style.display = show ? 'block' : 'none';
+}
+
+function toggleSigSection() {
+  var show = document.getElementById('chk_sig').checked;
+  document.getElementById('sigSection').style.display = show ? 'block' : 'none';
+}
+
+/* Wire up all checkboxes dynamically */
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('input[type=checkbox], input[type=radio], input[type=text], input[type=number], textarea')
+    .forEach(function(el) {
+      if (!el.getAttribute('oninput') && !el.getAttribute('onchange')) {
+        el.addEventListener('change', updatePreview);
+        el.addEventListener('input', updatePreview);
+      }
+    });
+  updatePreview();
+});
+</script>
+{% endblock %}

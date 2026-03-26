@@ -56,6 +56,7 @@ def add_customer():
             city=city or None,
             country=country or None,
             notes=cust_notes or None,
+            trn=request.form.get('trn', '').strip() or None,
             tenant_id=current_user.tenant_id,
         )
         db.session.add(new_customer)
@@ -539,6 +540,7 @@ def edit_customer(customer_id):
         customer.city    = request.form.get('city', '').strip() or None
         customer.country = request.form.get('country', '').strip() or None
         customer.notes   = request.form.get('notes', '').strip() or None
+        customer.trn     = request.form.get('trn', '').strip() or None
         db.session.commit()
         flash('Customer updated successfully!', 'success')
         return redirect(url_for('customers_bp.customer_profile', customer_id=customer.id, view='orders'))

@@ -192,9 +192,12 @@ def confirm_sale():
 
         # Assign invoice number, payment info, and link sales
         payment_method = request.form.get('payment_method', 'cash')
-        invoice.invoice_number = f"INV-{invoice.id:05d}"
-        invoice.payment_method = payment_method
-        invoice.payment_status = 'pending' if payment_method == 'credit' else 'paid'
+        invoice.invoice_number    = f"INV-{invoice.id:05d}"
+        invoice.payment_method    = payment_method
+        invoice.payment_status    = 'pending' if payment_method == 'credit' else 'paid'
+        invoice.po_reference      = request.form.get('po_reference', '').strip() or None
+        invoice.delivery_address  = request.form.get('delivery_address', '').strip() or None
+        invoice.notes             = request.form.get('invoice_notes', '').strip() or None
         for sale in sale_transactions:
             sale.invoice_id = invoice.id
             sale.payment_method = payment_method

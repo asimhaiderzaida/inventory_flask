@@ -202,6 +202,7 @@
 
 {% set inv_accent = settings.invoice_accent_color or '#3b82f6' %}
 {% set inv_show_logo = settings.invoice_show_logo != 'false' %}
+{% set inv_type = settings.invoice_type_label or 'Tax Invoice' %}
 
 <!-- Invoice card -->
 <div class="card animate-fade-up invoice-outer" style="border-top:4px solid {{ inv_accent }};">
@@ -237,15 +238,27 @@
         {% if settings.company_website %}
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ settings.company_website }}</div>
         {% endif %}
+        {% if settings.company_trn %}
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;font-weight:600;">TRN: {{ settings.company_trn }}</div>
+        {% endif %}
       </div>
       <div class="invoice-head-right">
-        <div class="invoice-word" style="color:{{ inv_accent }};">INVOICE</div>
+        <div class="invoice-word" style="color:{{ inv_accent }};">{{ inv_type | upper }}</div>
         <div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-top:0.4rem;">
           {{ invoice.invoice_number or '#' ~ invoice.id }}
         </div>
         <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.15rem;">
           {{ invoice.created_at.strftime('%d %B %Y') if invoice.created_at else '' }}
         </div>
+        {% if settings.invoice_show_supply_date == 'true' and invoice.supply_date %}
+        <div style="font-size:0.78rem;color:var(--text-muted);">Supply Date: {{ invoice.supply_date.strftime('%d %B %Y') }}</div>
+        {% endif %}
+        {% if settings.invoice_show_due_date == 'true' and invoice.due_date %}
+        <div style="font-size:0.78rem;color:var(--text-muted);">Due Date: {{ invoice.due_date.strftime('%d %B %Y') }}</div>
+        {% endif %}
+        {% if settings.invoice_show_po_reference == 'true' and invoice.po_reference %}
+        <div style="font-size:0.78rem;color:var(--text-muted);">PO Ref: {{ invoice.po_reference }}</div>
+        {% endif %}
         {% if printed_time %}
         <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.1rem;">
           Printed {{ printed_time }}
@@ -259,10 +272,22 @@
       <div class="bill-to-label">Bill To</div>
       <div class="bill-to-name">{{ customer.name }}</div>
       <div class="bill-to-detail">
+        {% if customer.company %}<div>{{ customer.company }}</div>{% endif %}
         {% if customer.phone %}<div>{{ customer.phone }}</div>{% endif %}
         {% if customer.email %}<div>{{ customer.email }}</div>{% endif %}
+        {% if customer.address %}<div>{{ customer.address }}</div>{% endif %}
+        {% if customer.city or customer.country %}<div>{{ [customer.city, customer.country] | select | join(', ') }}</div>{% endif %}
+        {% if settings.invoice_show_buyer_trn == 'true' and customer.trn %}
+        <div style="font-weight:600;margin-top:0.2rem;">TRN: {{ customer.trn }}</div>
+        {% endif %}
       </div>
     </div>
+    {% if settings.invoice_show_delivery_address == 'true' and invoice.delivery_address %}
+    <div style="margin-bottom:1.75rem;">
+      <div class="bill-to-label">Ship To</div>
+      <div class="bill-to-detail" style="white-space:pre-line;">{{ invoice.delivery_address }}</div>
+    </div>
+    {% endif %}
 
     <!-- ── Items table ── -->
     <div class="section-lbl">Items</div>
@@ -352,6 +377,14 @@
       </table>
     </div>
 
+    <!-- ── Invoice Notes ── -->
+    {% if invoice.notes %}
+    <div style="padding:0.75rem 1rem;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-md);margin-bottom:1.25rem;">
+      <span style="font-size:0.78rem;font-weight:600;color:#92400e;">Notes:</span>
+      <span style="font-size:0.82rem;color:#78350f;"> {{ invoice.notes }}</span>
+    </div>
+    {% endif %}
+
     <!-- ── Bank Details ── -->
     {% if settings.invoice_show_bank_details == 'true' and settings.invoice_bank_details %}
     <div style="padding:1rem;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:1.25rem;border:1px solid var(--border);">
@@ -361,7 +394,7 @@
     {% endif %}
 
     <!-- ── Footer / Terms ── -->
-    {% if settings.invoice_footer or settings.invoice_terms or settings.invoice_footer_note %}
+    {% if settings.invoice_footer or settings.invoice_terms or settings.invoice_footer_note or settings.company_trn %}
     <div style="padding-top:1rem;border-top:1px solid var(--border);">
       {% if settings.invoice_footer %}
       <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 0.35rem;">{{ settings.invoice_footer }}</p>
@@ -372,8 +405,32 @@
       </p>
       {% endif %}
       {% if settings.invoice_footer_note %}
-      <p style="font-size:0.78rem;color:var(--text-muted);margin:0;font-style:italic;">{{ settings.invoice_footer_note }}</p>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0 0 0.35rem;font-style:italic;">{{ settings.invoice_footer_note }}</p>
       {% endif %}
+      {% if settings.company_trn %}
+      <p style="font-size:0.78rem;color:var(--text-muted);margin:0;font-weight:600;">Tax Registration Number: {{ settings.company_trn }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Signature Lines ── -->
+    {% if settings.invoice_signature_line == 'true' %}
+    {% set sig_labels = (settings.invoice_signature_labels or 'Authorized Signature,Customer Signature').split(',') %}
+    <div style="display:flex;gap:2rem;margin-top:3rem;" class="no-print">
+      {% for label in sig_labels %}
+      <div style="flex:1;text-align:center;border-top:1px solid var(--border);padding-top:0.5rem;">
+        <span style="font-size:0.75rem;color:var(--text-muted);">{{ label.strip() }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── FTA QR Code ── -->
+    {% if settings.invoice_show_qr == 'true' %}
+    <div style="margin-top:1rem;" class="no-print">
+      <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.35rem;">FTA Compliant QR</div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ ((settings.company_name or '') ~ '|' ~ (settings.company_trn or '') ~ '|' ~ (invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else '') ~ '|' ~ ('%.2f'|format(grand_total)) ~ '|' ~ ('%.2f'|format(total_vat))) | urlencode }}"
+           style="width:80px;height:80px;" alt="FTA QR Code">
     </div>
     {% endif %}
 

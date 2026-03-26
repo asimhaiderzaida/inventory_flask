@@ -1599,6 +1599,11 @@
           <i class="bi bi-upc-scan nav-icon"></i>
           <span class="sidebar-label">Label Template</span>
         </a>
+        <a href="{{ url_for('admin_bp.invoice_designer') }}"
+           class="sidebar-link {% if ep == 'admin_bp.invoice_designer' %}active{% endif %}">
+          <i class="bi bi-receipt-cutoff nav-icon"></i>
+          <span class="sidebar-label">Invoice Designer</span>
+        </a>
         <a href="{{ url_for('admin_bp.admin_self_test') }}"
            class="sidebar-link {% if ep == 'admin_bp.admin_self_test' %}active{% endif %}">
           <i class="bi bi-shield-check nav-icon"></i>
