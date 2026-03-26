@@ -1,3 +1,4 @@
+import logging
 from flask import redirect, url_for
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
@@ -14,6 +15,8 @@ from collections import defaultdict
 from inventory_flask_app.utils.mail_utils import get_low_stock_parts, get_overdue_units, maybe_send_sla_alert
 from sqlalchemy.orm import aliased
 import time as _time
+
+logger = logging.getLogger(__name__)
 
 reserved_order = aliased(CustomerOrderTracking)
 

@@ -1,13 +1,18 @@
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
 from flask_wtf.csrf import validate_csrf
 from wtforms import ValidationError
 from ..models import db
+from inventory_flask_app import limiter
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=["POST"])
 def login():
     settings = {}
     if current_user.is_authenticated and current_user.tenant_id:

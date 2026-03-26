@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
 from flask_login import login_required
 from ..models import db, Vendor
@@ -18,6 +19,8 @@ class VendorForm(FlaskForm):
     email = StringField('Email', validators=[Optional()])
     phone = StringField('Phone', validators=[Optional()])
     address = StringField('Address', validators=[Optional()])
+
+logger = logging.getLogger(__name__)
 
 vendors_bp = Blueprint('vendors_bp', __name__)
 

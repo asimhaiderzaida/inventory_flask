@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from sqlalchemy import or_
@@ -7,6 +8,8 @@ from inventory_flask_app.models import (
     PartSaleTransaction, PartSaleItem, Location, AccountReceivable, ARPayment,
 )
 from inventory_flask_app.utils.utils import get_now_for_tenant
+
+logger = logging.getLogger(__name__)
 
 returns_bp = Blueprint('returns_bp', __name__, url_prefix='/returns')
 

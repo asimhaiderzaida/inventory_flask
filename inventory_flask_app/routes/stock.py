@@ -1236,7 +1236,13 @@ def stock_receiving_confirm():
     received_count = created_count + updated_count
     log = POImportLog(po_id=po.id, user_id=current_user.id, status=status_choice, quantity=received_count)
     db.session.add(log)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to commit stock_receiving_confirm")
+        flash("An error occurred while saving the receiving session. Please try again.", "danger")
+        return redirect(url_for('stock_bp.stock_receiving_summary'))
 
     session.pop('scanned', None)
     session.pop('po_id', None)
@@ -2684,7 +2690,13 @@ def checkin_checkout():
                 tab = "check_in"
             return redirect(url_for('stock_bp.process_stage_update', tab=tab))
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to commit check-in/check-out")
+        flash("An error occurred during check-in/check-out. Please try again.", "danger")
+        return redirect(request.url)
 
     # Clear session scan lists after processing; store check-in results for display
     if action == "check-in":
@@ -3231,6 +3243,7 @@ def rename_location(location_id):
 
 @stock_bp.route('/locations/<int:location_id>/delete', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def delete_location(location_id):
     if current_user.role not in ('admin', 'supervisor'):
         flash("Admin access required.", "danger")
@@ -3344,6 +3357,7 @@ def edit_bin(location_id, bin_id):
 
 @stock_bp.route('/location/<int:location_id>/bins/<int:bin_id>/delete', methods=['POST'])
 @login_required
+@admin_or_supervisor_required
 def delete_bin(location_id, bin_id):
     if current_user.role not in ('admin', 'supervisor'):
         flash("Admin access required.", "danger")

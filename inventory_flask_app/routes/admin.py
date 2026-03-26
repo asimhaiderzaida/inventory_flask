@@ -26,6 +26,8 @@ from werkzeug.utils import secure_filename
 from inventory_flask_app import csrf
 from inventory_flask_app.utils.utils import admin_required
 
+logger = logging.getLogger(__name__)
+
 admin_bp = Blueprint('admin_bp', __name__)
 
 @admin_bp.route('/admin/settings', methods=['GET', 'POST'])

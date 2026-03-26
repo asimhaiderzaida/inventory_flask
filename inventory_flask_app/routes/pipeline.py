@@ -1,9 +1,12 @@
+import logging
 from flask import Blueprint, render_template, request, jsonify, url_for
 from flask_login import login_required, current_user
 from inventory_flask_app import csrf
 from inventory_flask_app.models import db, Product, ProductInstance, ProductProcessLog, ProcessStage
 from inventory_flask_app.utils.utils import calc_duration_minutes, create_notification, sync_reservation_stage
 from inventory_flask_app.utils import get_now_for_tenant
+
+logger = logging.getLogger(__name__)
 
 pipeline_bp = Blueprint('pipeline_bp', __name__, url_prefix='/stock')
 

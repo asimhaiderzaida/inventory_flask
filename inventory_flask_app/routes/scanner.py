@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import or_, func
@@ -6,6 +7,8 @@ from inventory_flask_app import csrf
 from inventory_flask_app.models import db, Product, ProductInstance, Location, ProductProcessLog, Bin, Part, PartStock, PartMovement
 from inventory_flask_app.utils import get_now_for_tenant
 from inventory_flask_app.utils.utils import calc_duration_minutes
+
+logger = logging.getLogger(__name__)
 
 scanner_bp = Blueprint('scanner_bp', __name__, url_prefix='/stock')
 

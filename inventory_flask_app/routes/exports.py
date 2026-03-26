@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify, send_file, render_template, redirect, flash, url_for
 from flask_login import login_required
 from ..models import db, Product, CustomerOrderTracking, Customer
@@ -15,6 +16,8 @@ from datetime import timedelta
 from inventory_flask_app.models import ProductInstance
 from flask_login import current_user
 import io
+
+logger = logging.getLogger(__name__)
 
 exports_bp = Blueprint('exports_bp', __name__)
 
@@ -349,7 +352,7 @@ def export_aged_inventory():
         tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
         settings = {s.key: s.value for s in tenant_settings}
         threshold_days = int(settings.get("aged_threshold_days", 60))
-    except:
+    except Exception:
         pass
 
     cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=threshold_days)

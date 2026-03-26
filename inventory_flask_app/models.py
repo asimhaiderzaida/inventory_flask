@@ -9,7 +9,7 @@ class User(db.Model, UserMixin):
     VALID_ROLES = ('admin', 'supervisor', 'sales', 'staff', 'warehouse', 'technician')
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), nullable=False, unique=True, index=True)
+    username = db.Column(db.String(50), nullable=False, index=True)
     full_name = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='staff')
@@ -19,6 +19,10 @@ class User(db.Model, UserMixin):
         nullable=False
     )
     tenant = db.relationship('Tenant', backref='users')
+
+    __table_args__ = (
+        db.UniqueConstraint('username', 'tenant_id', name='uq_user_username_tenant'),
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -376,7 +380,7 @@ class SaleTransaction(db.Model):
     product_instance_id = db.Column(db.Integer, db.ForeignKey('product_instance.id', ondelete='CASCADE'), nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='CASCADE'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    price_at_sale = db.Column(db.Float, nullable=False)
+    price_at_sale = db.Column(db.Numeric(10, 2), nullable=False)
     date_sold = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     notes = db.Column(db.Text)
     payment_method = db.Column(db.String(16), nullable=True)   # cash/card/transfer/credit
@@ -397,8 +401,8 @@ class SaleItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey('sale_transaction.id', ondelete='CASCADE'), nullable=False)
     product_instance_id = db.Column(db.Integer, db.ForeignKey('product_instance.id', ondelete='CASCADE'), nullable=False)
-    price_at_sale = db.Column(db.Float, nullable=False)
-    vat_rate = db.Column(db.Float, default=5.0)
+    price_at_sale = db.Column(db.Numeric(10, 2), nullable=False)
+    vat_rate = db.Column(db.Numeric(5, 2), default=5.0)
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoice.id', ondelete='SET NULL'))
     invoice = db.relationship('Invoice', backref='sale_items')
     product_instance = db.relationship(
@@ -527,6 +531,12 @@ class ProductProcessLog(db.Model):
     product_instance = db.relationship('ProductInstance', backref='process_logs')
     user = db.relationship('User')
 
+    __table_args__ = (
+        db.Index('ix_ppl_moved_at',     'moved_at'),
+        db.Index('ix_ppl_instance_id',  'product_instance_id'),
+        db.Index('ix_ppl_moved_by',     'moved_by'),
+    )
+
 class ProcessStage(db.Model):
     """Tenant-configurable ordered list of processing stages."""
     __tablename__ = 'process_stage'
@@ -568,7 +578,7 @@ class Part(db.Model):
         nullable=True
     )
     min_stock = db.Column(db.Integer, default=1)
-    price = db.Column(db.Float)
+    price = db.Column(db.Numeric(10, 2))
     description = db.Column(db.Text)
     barcode = db.Column(db.String(100), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -659,7 +669,7 @@ class PartSale(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='SET NULL'), nullable=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='SET NULL'), nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
-    unit_price = db.Column(db.Float, nullable=True)   # price at time of sale
+    unit_price = db.Column(db.Numeric(10, 2), nullable=True)   # price at time of sale
     note = db.Column(db.String(256))
     sold_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     sold_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

@@ -10,6 +10,8 @@ from flask import Flask
 from flask_login import LoginManager
 from flask_wtf import CSRFProtect
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -18,6 +20,7 @@ from flask_mail import Mail
 db = SQLAlchemy()
 migrate = Migrate()
 mail = Mail()
+limiter = Limiter(key_func=get_remote_address, default_limits=[], storage_uri="memory://")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,6 +93,9 @@ def create_app():
     # CSRF
     csrf.init_app(app)
     logger.info("CSRF protection is ENABLED")
+
+    # Rate limiting
+    limiter.init_app(app)
 
     # CORS — restrict to same-origin; update CORS_ORIGINS in .env for cross-origin deployments
     allowed_origins = os.getenv('CORS_ORIGINS', '').split(',')
@@ -272,6 +278,17 @@ def create_app():
     def not_found(e):
         from flask import render_template
         return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        from flask import render_template
+        db.session.rollback()
+        return render_template('errors/500.html', settings={}), 500
+
+    @app.errorhandler(410)
+    def gone_error(e):
+        from flask import render_template
+        return render_template('errors/410.html', settings={}), 410
 
     @app.context_processor
     def inject_now_utc():
