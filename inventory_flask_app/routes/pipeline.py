@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, jsonify, url_for
 from flask_login import login_required, current_user
 from inventory_flask_app import csrf
 from inventory_flask_app.models import db, Product, ProductInstance, ProductProcessLog, ProcessStage
-from inventory_flask_app.utils.utils import calc_duration_minutes, create_notification, sync_reservation_stage
+from inventory_flask_app.utils.utils import calc_duration_minutes, create_notification, sync_reservation_stage, module_required
 from inventory_flask_app.utils import get_now_for_tenant
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ pipeline_bp = Blueprint('pipeline_bp', __name__, url_prefix='/stock')
 # ─────────────────────────────────────────────────────────────
 @pipeline_bp.route('/pipeline')
 @login_required
+@module_required('processing', 'view')
 def pipeline():
     stages = ProcessStage.query.filter_by(
         tenant_id=current_user.tenant_id
@@ -103,6 +104,7 @@ def pipeline():
 
 @pipeline_bp.route('/pipeline/move', methods=['POST'])
 @login_required
+@module_required('processing', 'full')
 def pipeline_move():
     data = request.get_json(silent=True)
     if not data:

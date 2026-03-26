@@ -4,13 +4,14 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from ..models import db, Customer
-from inventory_flask_app.utils.utils import admin_or_supervisor_required
+from inventory_flask_app.utils.utils import admin_or_supervisor_required, module_required
 
 logger = logging.getLogger(__name__)
 customers_bp = Blueprint('customers_bp', __name__)
 
 @customers_bp.route('/customers/add', methods=['GET', 'POST'])
 @login_required
+@module_required('customers', 'full')
 def add_customer():
     from inventory_flask_app.models import TenantSettings
     settings = {}
@@ -70,6 +71,7 @@ def add_customer():
 
 @customers_bp.route('/customers/api/search')
 @login_required
+@module_required('customers', 'view')
 def api_customer_search():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
@@ -102,6 +104,7 @@ def api_customer_search():
 # Customer center route with search, sort, and filter functionality
 @customers_bp.route('/customers/center')
 @login_required
+@module_required('customers', 'view')
 def customer_center():
     from inventory_flask_app.models import TenantSettings, SaleTransaction, AccountReceivable
     from sqlalchemy import func, case
@@ -227,6 +230,7 @@ def customer_center():
 
 @customers_bp.route('/customers/<int:customer_id>/profile')
 @login_required
+@module_required('customers', 'view')
 def customer_profile(customer_id):
     from inventory_flask_app.models import (
         SaleTransaction, ProductInstance, Product, Invoice,
@@ -483,6 +487,7 @@ def customer_profile(customer_id):
 
 @customers_bp.route('/customers/<int:customer_id>/notes/add', methods=['POST'])
 @login_required
+@module_required('customers', 'full')
 def add_customer_note(customer_id):
     from inventory_flask_app.models import CustomerNote
     customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first_or_404()
@@ -502,6 +507,7 @@ def add_customer_note(customer_id):
 
 @customers_bp.route('/customers/<int:customer_id>/notes/<int:note_id>/delete', methods=['POST'])
 @login_required
+@module_required('customers', 'full')
 def delete_customer_note(customer_id, note_id):
     from inventory_flask_app.models import CustomerNote
     # Only admin can delete notes
@@ -516,6 +522,7 @@ def delete_customer_note(customer_id, note_id):
 
 @customers_bp.route('/customers/<int:customer_id>/edit', methods=['GET', 'POST'])
 @login_required
+@module_required('customers', 'full')
 def edit_customer(customer_id):
     customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first_or_404()
     if request.method == 'POST':
@@ -560,6 +567,7 @@ from inventory_flask_app.utils import get_now_for_tenant
 
 @customers_bp.route('/customers/<int:customer_id>/export_sales')
 @login_required
+@module_required('customers', 'view')
 def export_customer_sales(customer_id):
     customer = Customer.query.filter_by(id=customer_id, tenant_id=current_user.tenant_id).first_or_404()
     from inventory_flask_app.models import SaleTransaction, TenantSettings
@@ -703,6 +711,7 @@ def _mask_serial(serial):
 # ─────────────────────────────────────────────────────────────
 @customers_bp.route('/customers/<int:customer_id>/portal_token', methods=['POST'])
 @login_required
+@module_required('customers', 'full')
 def generate_portal_token(customer_id):
     import secrets
     customer = Customer.query.filter_by(
@@ -730,6 +739,7 @@ def generate_portal_token(customer_id):
 # ─────────────────────────────────────────────────────────────
 @customers_bp.route('/customers/<int:customer_id>/send_portal_link', methods=['POST'])
 @login_required
+@module_required('customers', 'full')
 def send_portal_link(customer_id):
     from inventory_flask_app import mail
     from flask_mail import Message

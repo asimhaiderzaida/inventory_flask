@@ -6,7 +6,7 @@ from inventory_flask_app.models import TenantSettings, ProductProcessLog
 from datetime import datetime
 from inventory_flask_app.utils import get_now_for_tenant
 from inventory_flask_app.utils.mail_utils import send_reservation_confirmation, send_reservation_ready
-from inventory_flask_app.utils.utils import is_module_enabled
+from inventory_flask_app.utils.utils import is_module_enabled, module_required
 from sqlalchemy import or_, func
 from inventory_flask_app import csrf
 
@@ -78,6 +78,7 @@ def _instance_to_unit_dict(instance):
 
 @order_bp.route('/customer_orders')
 @login_required
+@module_required('reservations', 'view')
 def customer_orders():
     _require_order_module()
     customer_id = request.args.get('customer_id')
@@ -139,6 +140,7 @@ def customer_orders():
 
 @order_bp.route('/customer_orders/reserve', methods=['GET', 'POST'])
 @login_required
+@module_required('reservations', 'view')
 def reserve_product():
     _require_order_module()
     if 'pending_reserve_serials' not in session:
@@ -258,6 +260,7 @@ def reserve_product():
 
 @order_bp.route('/customer_orders/mark_delivered/<int:order_id>', methods=['POST'])
 @login_required
+@module_required('reservations', 'full')
 def mark_delivered(order_id):
     order = CustomerOrderTracking.query.join(ProductInstance).join(Product).filter(
         CustomerOrderTracking.id == order_id,
@@ -305,6 +308,7 @@ def mark_delivered(order_id):
 # --- Batch Move Route with Process Logging ---
 @order_bp.route('/customer_orders/batch_move', methods=['POST'])
 @login_required
+@module_required('reservations', 'full')
 def batch_move():
     serials = request.form.getlist('serials')  # List of serial numbers to move
     to_stage = request.form.get('to_stage')
@@ -349,6 +353,7 @@ def batch_move():
 # --- Batch Delivered Route ---
 @order_bp.route('/customer_orders/batch_delivered', methods=['POST'])
 @login_required
+@module_required('reservations', 'full')
 def batch_delivered():
     serials = request.form.getlist('serials')
     if not serials:
@@ -414,6 +419,7 @@ def batch_delivered():
 # --- Single Reservation Cancel Route — cancel by order ID ---
 @order_bp.route('/customer_orders/<int:order_id>/cancel', methods=['POST'])
 @login_required
+@module_required('reservations', 'full')
 def cancel_reservation(order_id):
     """Cancel a single reservation by ID. Returns JSON for AJAX callers."""
     order = CustomerOrderTracking.query.join(ProductInstance).join(Product).filter(
@@ -452,6 +458,7 @@ def cancel_reservation(order_id):
 # --- Batch Cancel Reservation Route — soft delete ---
 @order_bp.route('/customer_orders/batch_cancel_reservation', methods=['POST'])
 @login_required
+@module_required('reservations', 'full')
 def batch_cancel_reservation():
     serials = request.form.getlist('serials')
     if not serials:

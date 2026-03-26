@@ -11,7 +11,7 @@ from wtforms import StringField
 from wtforms.validators import DataRequired, Optional
 
 from inventory_flask_app.utils import get_now_for_tenant
-from inventory_flask_app.utils.utils import admin_or_supervisor_required
+from inventory_flask_app.utils.utils import admin_or_supervisor_required, module_required
 
 class VendorForm(FlaskForm):
     name = StringField('Vendor Name', validators=[DataRequired()])
@@ -29,6 +29,7 @@ vendors_bp = Blueprint('vendors_bp', __name__)
 
 @vendors_bp.route('/vendors/add', methods=['GET', 'POST'])
 @login_required
+@module_required('vendors', 'full')
 def add_vendor():
     from flask_login import current_user
     form = VendorForm()
@@ -90,6 +91,7 @@ def api_vendor_search():
 
 @vendors_bp.route('/vendors/center')
 @login_required
+@module_required('vendors', 'view')
 def vendor_center():
     from flask_login import current_user
     from sqlalchemy import func, case
@@ -224,6 +226,7 @@ def vendor_center():
 
 @vendors_bp.route('/vendors/<int:vendor_id>/profile')
 @login_required
+@module_required('vendors', 'view')
 def vendor_profile(vendor_id):
     from flask_login import current_user
     from inventory_flask_app.models import (
@@ -389,6 +392,7 @@ def vendor_profile(vendor_id):
 
 @vendors_bp.route('/vendors/<int:vendor_id>/notes/add', methods=['POST'])
 @login_required
+@module_required('vendors', 'full')
 def add_vendor_note(vendor_id):
     from flask_login import current_user
     from inventory_flask_app.models import VendorNote
@@ -409,6 +413,7 @@ def add_vendor_note(vendor_id):
 
 @vendors_bp.route('/vendors/<int:vendor_id>/notes/<int:note_id>/delete', methods=['POST'])
 @login_required
+@module_required('vendors', 'full')
 def delete_vendor_note(vendor_id, note_id):
     from flask_login import current_user
     from inventory_flask_app.models import VendorNote
@@ -423,6 +428,7 @@ def delete_vendor_note(vendor_id, note_id):
 # Add edit_vendor route
 @vendors_bp.route('/vendors/<int:vendor_id>/edit', methods=['GET', 'POST'])
 @login_required
+@module_required('vendors', 'full')
 def edit_vendor(vendor_id):
     from flask_login import current_user
     vendor = Vendor.query.filter_by(id=vendor_id, tenant_id=current_user.tenant_id).first_or_404()

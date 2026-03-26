@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import qrcode
 from io import BytesIO, StringIO
 import base64
-from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage, admin_required, admin_or_supervisor_required, safe_redirect_back
+from inventory_flask_app.utils.utils import get_instance_id, calc_duration_minutes, create_notification, sync_reservation_stage, admin_required, admin_or_supervisor_required, safe_redirect_back, module_required
 from inventory_flask_app.utils import get_now_for_tenant
 import csv
 
@@ -330,6 +330,7 @@ def bulk_cost_save():
 
 @stock_bp.route('/api/group_detail')
 @login_required
+@module_required('stock', 'view')
 def api_group_detail():
     # Revert to filtering by model and cpu instead of product_id
     model = request.args.get("model", "").strip()
@@ -482,6 +483,7 @@ def api_group_detail():
 # Stock Intake hub
 @stock_bp.route('/stock_intake')
 @login_required
+@module_required('stock', 'view')
 def stock_intake():
     from inventory_flask_app.models import PurchaseOrderItem
     pos = PurchaseOrder.query.filter_by(
@@ -505,6 +507,7 @@ def stock_intake():
 
 @stock_bp.route('/po_template_download')
 @login_required
+@module_required('stock', 'view')
 def po_template_download():
     from openpyxl import Workbook
     from flask import send_file
@@ -521,6 +524,7 @@ def po_template_download():
 
 @stock_bp.route('/purchase_order/create', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'full')
 def create_purchase_order():
     if request.method == 'POST':
         po_number = (request.form.get('po_number') or '').strip()
@@ -719,6 +723,7 @@ def delete_purchase_order(po_id):
 
 @stock_bp.route('/purchase_order/<int:po_id>')
 @login_required
+@module_required('stock', 'view')
 def view_purchase_order(po_id):
     """PO detail — shows all expected items and their receive status."""
     from inventory_flask_app.models import PurchaseOrderItem
@@ -745,6 +750,7 @@ def view_purchase_order(po_id):
 
 @stock_bp.route('/stock_receiving/select', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'view')
 def stock_receiving_select():
     # Direct-link shortcut: ?po_id=X skips the select form
     if request.method == 'GET' and request.args.get('po_id'):
@@ -796,6 +802,7 @@ def stock_receiving_select():
 
 @stock_bp.route('/stock_receiving/scan', methods=['GET'])
 @login_required
+@module_required('stock', 'view')
 def stock_receiving_scan():
     po_id = session.get('po_id')
     if not po_id:
@@ -931,6 +938,7 @@ def _build_scan_rows(scanned, serial_map, asset_map):
 
 @stock_bp.route('/stock_receiving/summary')
 @login_required
+@module_required('stock', 'view')
 def stock_receiving_summary():
     po_id = session.get('po_id')
     if not po_id:
@@ -1029,6 +1037,7 @@ def export_csv(data, columns, filename):
 
 @stock_bp.route('/stock_receiving/export/<category>')
 @login_required
+@module_required('stock', 'view')
 def stock_receiving_export(category):
     po_id = session.get('po_id')
     if not po_id:
@@ -1113,6 +1122,7 @@ def _auto_create_unit_cost(instance, po_item=None, po=None, purchase_cost_overri
 
 @stock_bp.route('/stock_receiving/confirm', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def stock_receiving_confirm():
     po_id       = session.get('po_id')
     scanned     = session.get('scanned', [])
@@ -1389,6 +1399,7 @@ def print_labels_batch():
 # ── Bulk status change ────────────────────────────────────────────────────────
 @stock_bp.route('/bulk_status_change', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def bulk_status_change():
     from sqlalchemy import or_, and_
     from inventory_flask_app.models import ProductProcessLog
@@ -1449,6 +1460,7 @@ def bulk_status_change():
 # ── Bulk move to bin ──────────────────────────────────────────────────────────
 @stock_bp.route('/bulk_move_to_bin', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def bulk_move_to_bin():
     from sqlalchemy import or_, and_
 
@@ -1500,6 +1512,7 @@ def bulk_move_to_bin():
 
 @stock_bp.route('/under_process', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'view')
 def under_process():
     status_filter = request.args.get('status')
     model_filter = request.args.get('model')
@@ -1807,6 +1820,7 @@ def _get_units_for_tab(user):
 # --- Tabbed Process Stage Management Route ---
 @stock_bp.route('/process_stage/manage', methods=['GET'])
 @login_required
+@module_required('stock', 'view')
 def process_stage_update():
     """
     Tabbed view for process stage management, check-in, and check-out.
@@ -1885,6 +1899,7 @@ def process_stage_update():
 
 @stock_bp.route('/instance/<int:instance_id>/view_edit', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'view')
 def view_edit_instance(instance_id):
     # --- Tenant scoping: only allow view/edit of ProductInstances for current tenant ---
     instance = ProductInstance.query.join(Product).filter(
@@ -2011,6 +2026,7 @@ def view_edit_instance(instance_id):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/instance/<int:instance_id>/reassign', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def reassign_instance(instance_id):
     from flask import abort
     from inventory_flask_app.models import User as UserModel
@@ -2071,6 +2087,7 @@ def reassign_instance(instance_id):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/instance/<int:instance_id>/force_checkout', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def force_checkout(instance_id):
     from flask import abort
     if current_user.role not in ('admin', 'supervisor'):
@@ -2115,6 +2132,7 @@ def force_checkout(instance_id):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/instance/<int:instance_id>/return_from_idle', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def return_from_idle(instance_id):
     instance = ProductInstance.query.join(Product).filter(
         ProductInstance.id == instance_id,
@@ -2152,6 +2170,7 @@ def return_from_idle(instance_id):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/instance/<int:instance_id>/mark_disputed', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def mark_disputed(instance_id):
     instance = ProductInstance.query.join(Product).filter(
         ProductInstance.id == instance_id,
@@ -2204,6 +2223,7 @@ def mark_disputed(instance_id):
 # ─────────────────────────────────────────────────────────────
 @stock_bp.route('/instance/<int:instance_id>/resolve_dispute', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def resolve_dispute(instance_id):
     from flask import abort
     if current_user.role not in ('admin', 'supervisor'):
@@ -2240,6 +2260,7 @@ def resolve_dispute(instance_id):
 # --- Unit history route ---
 @stock_bp.route('/unit_history/<serial>')
 @login_required
+@module_required('stock', 'view')
 def unit_history(serial):
     from sqlalchemy import or_
     instance = ProductInstance.query.join(Product).filter(
@@ -2257,6 +2278,7 @@ def unit_history(serial):
 # --- Read-only Unit Detail page ---
 @stock_bp.route('/instance/<int:instance_id>/view')
 @login_required
+@module_required('stock', 'view')
 def unit_detail(instance_id):
     from inventory_flask_app.models import (
         Return, SaleTransaction, Customer,
@@ -2458,6 +2480,7 @@ def delete_instance(instance_id):
 # --- Improved Check-in/Check-out route with assignment logic ---
 @stock_bp.route('/checkin_checkout', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def checkin_checkout():
     # Handles technician check-in / check-out actions from Processing page.
     action = (request.form.get("action") or "").strip()  # "check-in" or "check-out"
@@ -3016,6 +3039,7 @@ def add_product_page():
 
 @stock_bp.route('/bin_lookup', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'view')
 def bin_lookup():
     if request.method == 'POST':
         bin_code = request.form.get('bin_code', '').strip().upper()
@@ -3035,6 +3059,7 @@ def bin_lookup():
 
 @stock_bp.route('/bin_contents/<bin_code>')
 @login_required
+@module_required('stock', 'view')
 def bin_contents(bin_code):
     bin_code = bin_code.upper()
     location_id = request.args.get('location_id', type=int)
@@ -3108,6 +3133,7 @@ def bin_contents(bin_code):
 # --- Add Location Route ---
 @stock_bp.route('/location/add', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'full')
 def add_location():
     from flask_wtf.csrf import validate_csrf
     from wtforms.validators import ValidationError
@@ -3148,6 +3174,7 @@ def add_location():
 # --- Location Management ---
 @stock_bp.route('/locations')
 @login_required
+@module_required('stock', 'view')
 def manage_locations():
     locations = Location.query.filter_by(
         tenant_id=current_user.tenant_id
@@ -3207,6 +3234,7 @@ def manage_locations():
 # --- AJAX: create location on-the-fly ---
 @stock_bp.route('/locations/create', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def create_location_ajax():
     data = request.get_json() or {}
     name = (data.get('name') or '').strip().upper()
@@ -3225,6 +3253,7 @@ def create_location_ajax():
 
 @stock_bp.route('/locations/<int:location_id>/rename', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def rename_location(location_id):
     location = Location.query.filter_by(id=location_id, tenant_id=current_user.tenant_id).first_or_404()
     new_name = request.form.get('name', '').strip().upper()
@@ -3267,6 +3296,7 @@ def delete_location(location_id):
 
 @stock_bp.route('/location/<int:location_id>/bins')
 @login_required
+@module_required('stock', 'view')
 def manage_bins(location_id):
     location = Location.query.filter_by(id=location_id, tenant_id=current_user.tenant_id).first_or_404()
     bins = Bin.query.filter_by(location_id=location_id, tenant_id=current_user.tenant_id).order_by(Bin.name).all()
@@ -3297,6 +3327,7 @@ def manage_bins(location_id):
 
 @stock_bp.route('/location/<int:location_id>/bins/add', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def add_bin(location_id):
     location = Location.query.filter_by(id=location_id, tenant_id=current_user.tenant_id).first_or_404()
     name = request.form.get('name', '').strip().upper()
@@ -3322,6 +3353,7 @@ def add_bin(location_id):
 
 @stock_bp.route('/location/<int:location_id>/bins/<int:bin_id>/edit', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def edit_bin(location_id, bin_id):
     b = Bin.query.filter_by(id=bin_id, location_id=location_id, tenant_id=current_user.tenant_id).first_or_404()
     new_name = request.form.get('name', '').strip().upper()
@@ -3396,6 +3428,7 @@ def bin_qr_label(location_id, bin_id):
 # --- Location Contents (bins within a location) ---
 @stock_bp.route('/location/<int:location_id>/contents')
 @login_required
+@module_required('stock', 'view')
 def location_contents(location_id):
     location = Location.query.filter_by(id=location_id, tenant_id=current_user.tenant_id).first_or_404()
 
@@ -3458,6 +3491,7 @@ def location_contents(location_id):
 # --- Bin Autocomplete (uses Bin model, falls back to shelf_bin strings) ---
 @stock_bp.route('/bins/autocomplete')
 @login_required
+@module_required('stock', 'view')
 def bins_autocomplete():
     location_id = request.args.get('location_id', type=int)
     q = request.args.get('q', '').strip().upper()
@@ -3473,6 +3507,7 @@ def bins_autocomplete():
 # --- Bins for a location (JSON, used by dynamic dropdowns) ---
 @stock_bp.route('/bins/for_location')
 @login_required
+@module_required('stock', 'view')
 def bins_for_location():
     location_id = request.args.get('location_id', type=int)
     if not location_id:
@@ -3488,6 +3523,7 @@ def bins_for_location():
 # --- AJAX: create a bin on-the-fly from a dropdown ---
 @stock_bp.route('/bins/create', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def create_bin_ajax():
     data = request.get_json() or {}
     name = (data.get('name') or '').strip().upper()
@@ -3514,6 +3550,7 @@ def create_bin_ajax():
 # --- All Bins overview ---
 @stock_bp.route('/bins')
 @login_required
+@module_required('stock', 'view')
 def all_bins():
     from collections import defaultdict
     locations = Location.query.filter_by(
@@ -3558,6 +3595,7 @@ def all_bins():
 # --- Bin Detail: proper /stock/bin/<id> page ---
 @stock_bp.route('/bin/<int:bin_id>')
 @login_required
+@module_required('stock', 'view')
 def bin_detail(bin_id):
     b = Bin.query.filter_by(id=bin_id, tenant_id=current_user.tenant_id).first_or_404()
     status_filter = request.args.get('status', '')
@@ -3608,6 +3646,7 @@ def bin_detail(bin_id):
 # --- Bin Detail: AJAX move single unit ---
 @stock_bp.route('/bin/<int:bin_id>/move_unit', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def bin_move_unit(bin_id):
     Bin.query.filter_by(id=bin_id, tenant_id=current_user.tenant_id).first_or_404()
     data = request.get_json() or {}
@@ -3636,6 +3675,7 @@ def bin_move_unit(bin_id):
 # --- Bin Detail: bulk move ---
 @stock_bp.route('/bin/<int:bin_id>/bulk_move', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def bin_bulk_move(bin_id):
     b = Bin.query.filter_by(id=bin_id, tenant_id=current_user.tenant_id).first_or_404()
     instance_ids = request.form.getlist('instance_ids')
@@ -3789,6 +3829,7 @@ def export_grouped_summary():
     )
 @stock_bp.route('/group_view')
 @login_required
+@module_required('stock', 'view')
 def group_view_page():
     model = request.args.get("model", "").strip()
     cpu = request.args.get("cpu", "").strip()

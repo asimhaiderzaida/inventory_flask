@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 from inventory_flask_app import csrf
 from inventory_flask_app.models import db, Product, ProductInstance, Location, ProductProcessLog, Bin, Part, PartStock, PartMovement
 from inventory_flask_app.utils import get_now_for_tenant
-from inventory_flask_app.utils.utils import calc_duration_minutes
+from inventory_flask_app.utils.utils import calc_duration_minutes, module_required
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,7 @@ scanner_bp = Blueprint('scanner_bp', __name__, url_prefix='/stock')
 
 @scanner_bp.route('/scan')
 @login_required
+@module_required('stock', 'view')
 def scan_unit():
     locations = Location.query.filter_by(tenant_id=current_user.tenant_id).order_by(Location.name).all()
     return render_template('scanner.html', locations=locations)
@@ -22,6 +23,7 @@ def scan_unit():
 
 @scanner_bp.route('/api/lookup_unit')
 @login_required
+@module_required('stock', 'view')
 def lookup_unit():
     """Unified serial/asset lookup used by scanner and sale form (JSON).
 
@@ -79,6 +81,7 @@ def lookup_unit():
 
 @scanner_bp.route('/scan/move', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_move_unit():
     """Move a unit to a new location via the scanner page."""
     instance_id = request.form.get('instance_id', type=int)
@@ -141,6 +144,7 @@ def scan_move_unit():
 
 @scanner_bp.route('/scan/update_status', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_update_status():
     """Update status/stage of a unit via the scanner page."""
     instance_id = request.form.get('instance_id', type=int)
@@ -193,6 +197,7 @@ def scan_update_status():
 
 @scanner_bp.route('/api/lookup_bin')
 @login_required
+@module_required('stock', 'view')
 def lookup_bin():
     """Look up a bin by name — used by scanner for bin-code scanning."""
     q = (request.args.get('q') or '').strip().upper()
@@ -227,6 +232,7 @@ def lookup_bin():
 
 @scanner_bp.route('/api/lookup_part')
 @login_required
+@module_required('stock', 'view')
 def lookup_part():
     """Look up a Part by barcode, part_number, or name — universal scanner fallback."""
     q = (request.args.get('q') or '').strip()
@@ -297,6 +303,7 @@ def lookup_part():
 
 @scanner_bp.route('/scan/checkin', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_checkin():
     """Check a unit in for processing via scanner."""
     instance_id = request.form.get('instance_id', type=int)
@@ -331,6 +338,7 @@ def scan_checkin():
 
 @scanner_bp.route('/scan/checkout', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_checkout():
     """Check a unit out (mark processed) via scanner."""
     instance_id = request.form.get('instance_id', type=int)
@@ -367,6 +375,7 @@ def scan_checkout():
 
 @scanner_bp.route('/scan/mark_idle', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_mark_idle():
     """Mark a unit idle with an optional reason via scanner."""
     instance_id = request.form.get('instance_id', type=int)
@@ -406,6 +415,7 @@ def scan_mark_idle():
 
 @scanner_bp.route('/scan/batch_apply', methods=['POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_batch_apply():
     """Apply bulk status/location/bin updates to a list of serials (batch mode)."""
     data = request.get_json(silent=True)
@@ -501,6 +511,7 @@ def scan_batch_apply():
 
 @scanner_bp.route('/scan_move', methods=['GET', 'POST'])
 @login_required
+@module_required('stock', 'full')
 def scan_move():
     if 'batch_serials' not in session:
         session['batch_serials'] = []

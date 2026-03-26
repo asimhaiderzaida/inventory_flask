@@ -7,7 +7,7 @@ from inventory_flask_app.models import (
     Invoice, ProductProcessLog, Part, PartStock, PartMovement,
     PartSaleTransaction, PartSaleItem, Location, AccountReceivable, ARPayment,
 )
-from inventory_flask_app.utils.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import get_now_for_tenant, module_required
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,7 @@ def _restore_part_stock(part_id, location_id, bin_id, quantity, note, now):
 
 @returns_bp.route('/', methods=['GET'])
 @login_required
+@module_required('returns', 'view')
 def view_returns():
     from sqlalchemy.orm import joinedload
     tid = current_user.tenant_id
@@ -136,6 +137,7 @@ def view_returns():
 
 @returns_bp.route('/export', methods=['GET'])
 @login_required
+@module_required('returns', 'view')
 def export_returns():
     import csv
     import io
@@ -203,6 +205,7 @@ def export_returns():
 
 @returns_bp.route('/new/<int:instance_id>', methods=['GET', 'POST'])
 @login_required
+@module_required('returns', 'full')
 def create_return(instance_id):
     instance = ProductInstance.query.filter_by(
         id=instance_id, tenant_id=current_user.tenant_id
@@ -321,6 +324,7 @@ def create_return(instance_id):
 
 @returns_bp.route('/lookup', methods=['GET', 'POST'])
 @login_required
+@module_required('returns', 'full')
 def lookup_return():
     if request.method == 'POST':
         query_str = request.form.get('serial', '').strip().upper()
@@ -417,6 +421,7 @@ def lookup_return():
 
 @returns_bp.route('/part/lookup', methods=['GET', 'POST'])
 @login_required
+@module_required('returns', 'full')
 def part_lookup():
     if request.method == 'POST':
         query_str = request.form.get('query', '').strip()
@@ -455,6 +460,7 @@ def part_lookup():
 
 @returns_bp.route('/part/create', methods=['GET', 'POST'])
 @login_required
+@module_required('returns', 'full')
 def create_part_return():
     tid = current_user.tenant_id
     part_id = request.args.get('part_id', type=int) or request.form.get('part_id', type=int)
@@ -579,6 +585,7 @@ def create_part_return():
 
 @returns_bp.route('/credit-notes', methods=['GET'])
 @login_required
+@module_required('returns', 'view')
 def credit_notes():
     from sqlalchemy.orm import joinedload
     tid = current_user.tenant_id
@@ -636,6 +643,7 @@ def credit_notes():
 
 @returns_bp.route('/credit-notes/<int:cn_id>/apply', methods=['GET', 'POST'])
 @login_required
+@module_required('returns', 'full')
 def apply_credit_note(cn_id):
     from sqlalchemy.orm import joinedload
     tid = current_user.tenant_id

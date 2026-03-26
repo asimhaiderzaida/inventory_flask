@@ -13,6 +13,7 @@ from flask_login import login_required, current_user
 from inventory_flask_app import db
 from inventory_flask_app.models import CustomerOrder, Customer
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import module_required
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def _require_admin():
 
 @orders_bp.route('/')
 @login_required
+@module_required('orders', 'view')
 def index():
     tid  = current_user.tenant_id
     tab  = request.args.get('tab', 'open')
@@ -61,6 +63,7 @@ def index():
 
 @orders_bp.route('/export')
 @login_required
+@module_required('orders', 'view')
 def export_csv():
     tid = current_user.tenant_id
     tab = request.args.get('tab', 'all')
@@ -94,6 +97,7 @@ def export_csv():
 
 @orders_bp.route('/new', methods=['GET', 'POST'])
 @login_required
+@module_required('orders', 'full')
 def new_order():
     tid = current_user.tenant_id
     if request.method == 'POST':
@@ -152,6 +156,7 @@ def new_order():
 
 @orders_bp.route('/customer_search')
 @login_required
+@module_required('orders', 'view')
 def customer_search():
     tid = current_user.tenant_id
     q   = request.args.get('q', '').strip()
@@ -174,6 +179,7 @@ def customer_search():
 
 @orders_bp.route('/<int:order_id>')
 @login_required
+@module_required('orders', 'view')
 def detail(order_id):
     tid   = current_user.tenant_id
     order = CustomerOrder.query.filter_by(id=order_id, tenant_id=tid).first_or_404()
@@ -184,6 +190,7 @@ def detail(order_id):
 
 @orders_bp.route('/<int:order_id>/close', methods=['POST'])
 @login_required
+@module_required('orders', 'full')
 def close_order(order_id):
     tid   = current_user.tenant_id
     order = CustomerOrder.query.filter_by(id=order_id, tenant_id=tid).first_or_404()
@@ -199,6 +206,7 @@ def close_order(order_id):
 
 @orders_bp.route('/<int:order_id>/reopen', methods=['POST'])
 @login_required
+@module_required('orders', 'full')
 def reopen_order(order_id):
     tid   = current_user.tenant_id
     order = CustomerOrder.query.filter_by(id=order_id, tenant_id=tid).first_or_404()
@@ -214,6 +222,7 @@ def reopen_order(order_id):
 
 @orders_bp.route('/<int:order_id>/delete', methods=['POST'])
 @login_required
+@module_required('orders', 'full')
 def delete_order(order_id):
     _require_admin()
     tid   = current_user.tenant_id

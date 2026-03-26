@@ -8,6 +8,7 @@ from ..models import db, Customer, ProductInstance, SaleTransaction, Product, Te
 from sqlalchemy import or_
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import module_required
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ def sales_index():
 
 @sales_bp.route('/api/search_units')
 @login_required
+@module_required('sales', 'view')
 def search_units_api():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
@@ -60,6 +62,7 @@ def search_units_api():
 
 @sales_bp.route('/create_sale_form', methods=['GET'])
 @login_required
+@module_required('sales', 'view')
 def create_sale_form():
     customers = Customer.query.filter_by(tenant_id=current_user.tenant_id).all()
     serial_asset_pairs = list(zip(
@@ -89,6 +92,7 @@ def create_sale_form():
     )
 @sales_bp.route('/confirm_sale', methods=['POST'])
 @login_required
+@module_required('sales', 'full')
 def confirm_sale():
     try:
         from ..models import Invoice, SaleItem, Order
@@ -246,6 +250,7 @@ def confirm_sale():
 
 @sales_bp.route('/preview_invoice', methods=['POST'])
 @login_required
+@module_required('sales', 'view')
 def preview_invoice():
     logger.debug("Preview invoice data received")
     data = request.get_json()
@@ -318,6 +323,7 @@ def preview_invoice():
 
 @sales_bp.route('/sales/sold_units')
 @login_required
+@module_required('sales', 'view')
 def sold_units_view():
     from ..models import SaleItem
 
@@ -364,6 +370,7 @@ def sold_units_view():
 
 @sales_bp.route('/scan_add', methods=['POST'])
 @login_required
+@module_required('sales', 'full')
 def scan_add():
     from flask import jsonify
     data = request.get_json()
@@ -382,6 +389,7 @@ def scan_add():
 
 @sales_bp.route('/load_scanned_units', methods=['GET'])
 @login_required
+@module_required('sales', 'view')
 def load_scanned_units():
     from flask import jsonify
     scanned = session.get('scanned_sale', [])
@@ -390,6 +398,7 @@ def load_scanned_units():
 
 @sales_bp.route('/clear_scanned_units', methods=['POST'])
 @login_required
+@module_required('sales', 'full')
 def clear_scanned_units():
     session.pop('scanned_sale', None)
     return jsonify({"success": True})
@@ -398,6 +407,7 @@ def clear_scanned_units():
 # Excel export route for filtered sold units
 @sales_bp.route('/sales/export_sold_units')
 @login_required
+@module_required('sales', 'view')
 def export_sold_units():
     from openpyxl import Workbook
     from io import BytesIO

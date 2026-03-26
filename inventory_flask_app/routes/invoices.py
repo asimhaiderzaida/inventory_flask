@@ -9,6 +9,7 @@ from weasyprint import HTML as WeasyHTML
 from inventory_flask_app.models import TenantSettings
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import module_required
 
 logger = logging.getLogger(__name__)
 invoices_bp = Blueprint('invoices_bp', __name__)
@@ -94,6 +95,7 @@ def _render_pdf(invoice):
 # ─────────────────────────────────────────────────────────────
 @invoices_bp.route('/invoices/view/<int:invoice_id>')
 @login_required
+@module_required('sales', 'view')
 def view_invoice(invoice_id):
     invoice = Invoice.query.filter(
         Invoice.id == invoice_id,
@@ -131,6 +133,7 @@ def view_invoice(invoice_id):
 # ─────────────────────────────────────────────────────────────
 @invoices_bp.route('/download_invoice/<int:invoice_id>')
 @login_required
+@module_required('sales', 'view')
 def download_invoice(invoice_id):
     invoice = Invoice.query.filter(
         Invoice.id == invoice_id,
@@ -147,6 +150,7 @@ def download_invoice(invoice_id):
 # ─────────────────────────────────────────────────────────────
 @invoices_bp.route('/invoices/send/<int:invoice_id>', methods=['POST'])
 @login_required
+@module_required('sales', 'full')
 def send_invoice_email(invoice_id):
     from inventory_flask_app import mail
     from flask_mail import Message
@@ -237,6 +241,7 @@ def send_invoice_email(invoice_id):
 
 @invoices_bp.route('/invoices/regenerate/<order_number>')
 @login_required
+@module_required('sales', 'full')
 def generate_invoice_for_order(order_number):
     from inventory_flask_app.models import Order, SaleTransaction, SaleItem
 

@@ -10,7 +10,7 @@ from flask import session
 from inventory_flask_app import csrf
 from ..models import db, Part, PartStock, PartMovement, PartUsage, PartSale, PartSaleTransaction, PartSaleItem, Location, Bin, Vendor, Product, ProductInstance, Customer, SaleTransaction, Invoice, TenantSettings
 from ..utils.mail_utils import get_low_stock_parts, maybe_send_low_stock_email
-from ..utils.utils import generate_part_invoice_number, get_now_for_tenant, is_module_enabled
+from ..utils.utils import generate_part_invoice_number, get_now_for_tenant, is_module_enabled, module_required
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ def _vendor_display(part):
 
 @parts_bp.route('/')
 @login_required
+@module_required('parts', 'view')
 def parts_list():
     _require_parts_module()
     search = request.args.get('search', '').strip()
@@ -81,6 +82,7 @@ def parts_list():
 
 @parts_bp.route('/add', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def add_part():
     _require_parts_module()
     vendors = Vendor.query.filter_by(
@@ -147,6 +149,7 @@ def add_part():
 
 @parts_bp.route('/<int:part_id>/edit', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def edit_part(part_id):
     _require_parts_module()
     part = Part.query.filter_by(
@@ -221,6 +224,7 @@ def edit_part(part_id):
 
 @parts_bp.route('/<int:part_id>/delete', methods=['POST'])
 @login_required
+@module_required('parts', 'full')
 def delete_part(part_id):
     _require_parts_module()
     part = Part.query.filter_by(
@@ -247,6 +251,7 @@ def delete_part(part_id):
 
 @parts_bp.route('/stock_in', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def stock_in():
     preselect = request.args.get('part_id', type=int)
     search_query = request.args.get('search', '').strip()
@@ -351,6 +356,7 @@ def stock_in():
 
 @parts_bp.route('/ajax_add', methods=['POST'])
 @login_required
+@module_required('parts', 'full')
 def ajax_add_part():
     part_number = request.form.get('part_number', '').strip()
     name = request.form.get('name', '').strip()
@@ -393,6 +399,7 @@ def ajax_add_part():
 
 @parts_bp.route('/api/bins')
 @login_required
+@module_required('parts', 'view')
 def api_bins():
     """Return parts bins for a location with stock quantity summary."""
     location_id = request.args.get('location_id', type=int)
@@ -415,6 +422,7 @@ def api_bins():
 
 @parts_bp.route('/api/move_to_bin', methods=['POST'])
 @login_required
+@module_required('parts', 'full')
 def api_move_to_bin():
     """Move part stock from one location/bin to another (assign or relocate)."""
     data = request.get_json(silent=True) or {}
@@ -507,6 +515,7 @@ def _get_parts_with_location_stock(tenant_id):
 
 @parts_bp.route('/stock_out', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def stock_out():
     preselect = request.args.get('part_id', type=int)
     parts, part_summaries = _get_parts_with_location_stock(current_user.tenant_id)
@@ -571,6 +580,7 @@ def stock_out():
 
 @parts_bp.route('/consume', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def consume():
     preselect = request.args.get('part_id', type=int)
     parts, part_summaries = _get_parts_with_location_stock(current_user.tenant_id)
@@ -673,6 +683,7 @@ def consume():
 
 @parts_bp.route('/transfer', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def transfer():
     preselect = request.args.get('part_id', type=int)
     parts, part_summaries = _get_parts_with_location_stock(current_user.tenant_id)
@@ -759,6 +770,7 @@ def transfer():
 
 @parts_bp.route('/<int:part_id>')
 @login_required
+@module_required('parts', 'view')
 def part_detail(part_id):
     part = Part.query.filter_by(
         id=part_id, tenant_id=current_user.tenant_id
@@ -854,6 +866,7 @@ def part_detail(part_id):
 
 @parts_bp.route('/<int:part_id>/history')
 @login_required
+@module_required('parts', 'view')
 def part_history(part_id):
     part = Part.query.filter_by(
         id=part_id, tenant_id=current_user.tenant_id
@@ -900,6 +913,7 @@ def part_history(part_id):
 
 @parts_bp.route('/ajax_lookup_unit')
 @login_required
+@module_required('parts', 'view')
 def lookup_unit():
     serial = request.args.get('serial', '').strip()
     if not serial:
@@ -933,6 +947,7 @@ def lookup_unit():
 
 @parts_bp.route('/use', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def use():
     """Record a tech using a part on a specific unit.
 
@@ -1103,6 +1118,7 @@ def _get_sale_parts_data(tenant_id):
 
 @parts_bp.route('/sell', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def sell():
     _require_parts_module()
     parts, summaries = _get_sale_parts_data(current_user.tenant_id)
@@ -1276,6 +1292,7 @@ def sell():
 
 @parts_bp.route('/sale/customer', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def sale_customer():
     if not session.get(_SALE_SESSION_CART):
         flash('Your cart is empty. Please add items first.', 'warning')
@@ -1309,6 +1326,7 @@ def sale_customer():
 
 @parts_bp.route('/sale/invoice-type', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def sale_invoice_type():
     if not session.get(_SALE_SESSION_CART):
         return redirect(url_for('parts_bp.sell'))
@@ -1334,6 +1352,7 @@ def sale_invoice_type():
 
 @parts_bp.route('/api/sale-search')
 @login_required
+@module_required('parts', 'view')
 def api_sale_search():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
@@ -1371,6 +1390,7 @@ def api_sale_search():
 
 @parts_bp.route('/sale/payment', methods=['GET', 'POST'])
 @login_required
+@module_required('parts', 'full')
 def sale_payment():
     if not session.get(_SALE_SESSION_CART):
         return redirect(url_for('parts_bp.sell'))
@@ -1485,6 +1505,7 @@ def sale_payment():
 
 @parts_bp.route('/sale/<int:txn_id>')
 @login_required
+@module_required('parts', 'view')
 def sale_detail(txn_id):
     txn = PartSaleTransaction.query.filter_by(
         id=txn_id, tenant_id=current_user.tenant_id
@@ -1497,6 +1518,7 @@ def sale_detail(txn_id):
 
 @parts_bp.route('/sale/<int:txn_id>/pay', methods=['POST'])
 @login_required
+@module_required('parts', 'full')
 def sale_pay(txn_id):
     txn = PartSaleTransaction.query.filter_by(
         id=txn_id, tenant_id=current_user.tenant_id
@@ -1520,6 +1542,7 @@ def sale_pay(txn_id):
 
 @parts_bp.route('/sale/<int:txn_id>/invoice')
 @login_required
+@module_required('parts', 'view')
 def sale_invoice_pdf(txn_id):
     from flask import make_response
     from weasyprint import HTML as WeasyHTML
@@ -1540,6 +1563,7 @@ def sale_invoice_pdf(txn_id):
 
 @parts_bp.route('/sales')
 @login_required
+@module_required('parts', 'view')
 def sales_list():
     # Filters
     status_filter   = request.args.get('status', '')
@@ -1610,6 +1634,7 @@ def sales_list():
 
 @parts_bp.route('/api/search')
 @login_required
+@module_required('parts', 'view')
 def api_parts_search():
     _require_parts_module()
     q          = request.args.get('q', '').strip()
@@ -1694,6 +1719,7 @@ def api_parts_search():
 
 @parts_bp.route('/<int:part_id>/label')
 @login_required
+@module_required('parts', 'view')
 def part_label(part_id):
     _require_parts_module()
     part = Part.query.filter_by(
@@ -1709,6 +1735,7 @@ def part_label(part_id):
 
 @parts_bp.route('/labels')
 @login_required
+@module_required('parts', 'view')
 def parts_labels_bulk():
     _require_parts_module()
     ids_str = request.args.get('ids', '')
@@ -1739,6 +1766,7 @@ def parts_labels_bulk():
 
 @parts_bp.route('/<int:part_id>/stock_json')
 @login_required
+@module_required('parts', 'view')
 def part_stock_json(part_id):
     part = Part.query.filter_by(
         id=part_id, tenant_id=current_user.tenant_id
@@ -1760,6 +1788,7 @@ def part_stock_json(part_id):
 
 @parts_bp.route('/bin_management')
 @login_required
+@module_required('parts', 'view')
 def bin_management():
     _require_parts_module()
     unassigned_only = request.args.get('unassigned') == '1'
@@ -1804,6 +1833,7 @@ def bin_management():
 
 @parts_bp.route('/scan')
 @login_required
+@module_required('parts', 'view')
 def parts_scan():
     _require_parts_module()
     locations = Location.query.filter_by(tenant_id=current_user.tenant_id).order_by(Location.name).all()
@@ -1815,6 +1845,7 @@ def parts_scan():
 
 @parts_bp.route('/api/lookup')
 @login_required
+@module_required('parts', 'view')
 def api_part_lookup():
     _require_parts_module()
     q = request.args.get('q', '').strip()
@@ -1910,6 +1941,7 @@ def api_part_lookup():
 
 @parts_bp.route('/<int:part_id>/history/export')
 @login_required
+@module_required('parts', 'view')
 def part_history_export(part_id):
     import io, csv
     from flask import send_file
