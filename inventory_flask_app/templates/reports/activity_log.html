@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Activity Log{% endblock %}
+{% block page_title %}Activity Log{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Activity Log</h1>
+    <div class="page-subtitle">All unit actions across the system</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.activity_log_export', q=q_search, action=f_action, user_id=f_user, date_from=f_date_from, date_to=f_date_to) }}"
+       class="btn btn-ghost">
+      <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+    </a>
+    <a href="{{ url_for('reports_bp.reports_index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+  </div>
+</div>
+
+{# ── Filter bar ─────────────────────────────────────────────────── #}
+<div class="table-card animate-fade-up mb-3">
+  <form method="get" style="padding:1rem 1.25rem;">
+    <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;">
+
+      <div style="flex:2;min-width:180px;">
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:0.2rem;">Search</label>
+        <input type="text" name="q" value="{{ q_search }}" class="form-control form-control-sm"
+               placeholder="Serial, asset, or note…">
+      </div>
+
+      <div style="flex:1;min-width:140px;">
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:0.2rem;">Action</label>
+        <select name="action" class="form-select form-select-sm">
+          <option value="">All actions</option>
+          {% for a in action_list %}
+          <option value="{{ a }}" {% if a == f_action %}selected{% endif %}>{{ a | replace('_',' ') | title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex:1;min-width:140px;">
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:0.2rem;">User</label>
+        <select name="user_id" class="form-select form-select-sm">
+          <option value="">All users</option>
+          {% for u in users %}
+          <option value="{{ u.id }}" {% if f_user == u.id|string %}selected{% endif %}>
+            {{ u.full_name or u.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex:1;min-width:130px;">
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:0.2rem;">From</label>
+        <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
+      </div>
+
+      <div style="flex:1;min-width:130px;">
+        <label class="form-label" style="font-size:0.72rem;margin-bottom:0.2rem;">To</label>
+        <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
+      </div>
+
+      <div style="display:flex;gap:0.4rem;align-items:flex-end;">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel"></i> Apply
+        </button>
+        {% if q_search or f_action or f_user or f_date_from or f_date_to %}
+        <a href="{{ url_for('reports_bp.activity_log') }}" class="btn btn-ghost btn-sm">Clear</a>
+        {% endif %}
+      </div>
+
+    </div>
+  </form>
+</div>
+
+{# ── Summary count ──────────────────────────────────────────────── #}
+{% if total > 0 %}
+<div class="animate-fade-up" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;padding-left:0.25rem;">
+  {{ "{:,}".format(total) }} entr{{ 'y' if total == 1 else 'ies' }}
+  {% if q_search or f_action or f_user or f_date_from or f_date_to %} matching filters{% endif %}
+</div>
+{% endif %}
+
+{# ── Log table ──────────────────────────────────────────────────── #}
+<div class="table-card animate-fade-up">
+  {% if logs %}
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
+      <thead>
+        <tr>
+          <th style="min-width:130px;">Time</th>
+          <th style="min-width:100px;">User</th>
+          <th style="min-width:110px;">Serial</th>
+          <th style="min-width:120px;">Action</th>
+          <th style="min-width:160px;">From → To</th>
+          <th style="min-width:80px;">Duration</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        {# ── Action badge colors ── #}
+        {%- set _b = namespace(bg='#F9FAFB', col='#6B7280') -%}
+        {%- if log.action in ('check-in', 'checkin', 'scanner_check_in') -%}
+          {%- set _b.bg='#EFF6FF' -%}{%- set _b.col='#1D4ED8' -%}
+        {%- elif log.action in ('checkout', 'check_out', 'scanner_check_out') -%}
+          {%- set _b.bg='#ECFDF5' -%}{%- set _b.col='#065F46' -%}
+        {%- elif log.action in ('pipeline_move', 'stage_change_manual', 'stage_update') -%}
+          {%- set _b.bg='#ECFEFF' -%}{%- set _b.col='#0E7490' -%}
+        {%- elif log.action in ('mark_idle', 'returned_from_idle') -%}
+          {%- set _b.bg='#FFFBEB' -%}{%- set _b.col='#92400E' -%}
+        {%- elif log.action in ('marked_disputed', 'dispute_resolved', 'dispute') -%}
+          {%- set _b.bg='#FEF2F2' -%}{%- set _b.col='#991B1B' -%}
+        {%- elif log.action in ('return', 'returned') -%}
+          {%- set _b.bg='#F5F3FF' -%}{%- set _b.col='#5B21B6' -%}
+        {%- elif log.action in ('spec_update', 'edit') -%}
+          {%- set _b.bg='#F3F4F6' -%}{%- set _b.col='#374151' -%}
+        {%- elif log.action in ('scanner_status_update', 'scanner_batch', 'location_move', 'scan_move', 'scanner_move') -%}
+          {%- set _b.bg='#EEF2FF' -%}{%- set _b.col='#3730A3' -%}
+        {%- endif -%}
+
+        <tr>
+          {# Time #}
+          <td style="color:var(--text-muted);white-space:nowrap;"
+              title="{{ log.moved_at.strftime('%A, %d %B %Y at %H:%M:%S') if log.moved_at else '' }}">
+            {{ log.moved_at.strftime('%d %b %Y %H:%M') if log.moved_at else '—' }}
+          </td>
+
+          {# User #}
+          <td style="font-size:0.8rem;">
+            {% if log.user %}
+            {{ log.user.full_name or log.user.username }}
+            {% else %}
+            <span style="color:var(--text-muted);">System</span>
+            {% endif %}
+          </td>
+
+          {# Serial — link to unit #}
+          <td>
+            {% if log.product_instance %}
+            <a href="{{ url_for('stock_bp.view_edit_instance', instance_id=log.product_instance_id) }}"
+               style="font-family:monospace;font-size:0.8rem;color:var(--primary);text-decoration:none;"
+               title="{{ log.product_instance.asset or '' }}">
+              {{ log.product_instance.serial or log.product_instance.asset or '—' }}
+            </a>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          {# Action badge #}
+          <td>
+            {% if log.action %}
+            <span style="font-size:0.72rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:20px;
+                         background:{{ _b.bg }};color:{{ _b.col }};white-space:nowrap;">
+              {{ log.action | replace('_',' ') | title }}
+            </span>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          {# From → To #}
+          <td style="white-space:nowrap;">
+            {% if log.from_stage or log.to_stage %}
+            <span style="color:var(--text-muted);">{{ log.from_stage or '—' }}</span>
+            <i class="bi bi-arrow-right" style="font-size:0.7rem;margin:0 0.2rem;color:var(--text-muted);"></i>
+            <span style="font-weight:500;">{{ log.to_stage or '—' }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          {# Duration #}
+          <td style="white-space:nowrap;">
+            {% if log.duration_minutes is not none and log.duration_minutes > 0 %}
+              {%- set dm = log.duration_minutes | int -%}
+              {%- set dur_str = format_duration(dm) -%}
+              {%- if dm < 60 %}
+              <span style="color:var(--color-success);font-weight:500;">{{ dur_str }}</span>
+              {% elif dm < 480 %}
+              <span style="color:var(--color-warning);font-weight:500;">{{ dur_str }}</span>
+              {% else %}
+              <span style="color:var(--color-danger);font-weight:500;">{{ dur_str }}</span>
+              {% endif %}
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          {# Note #}
+          <td style="max-width:260px;color:var(--text-secondary);"
+              title="{{ log.note or '' }}">
+            {% if log.note %}
+            {{ log.note[:60] }}{% if log.note|length > 60 %}…{% endif %}
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Pagination #}
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-top:1px solid var(--border);">
+    <span style="font-size:0.78rem;color:var(--text-muted);">
+      Showing {{ (page-1)*per_page + 1 }}–{{ [page*per_page, total] | min }} of {{ "{:,}".format(total) }} entries
+    </span>
+    <div style="display:flex;gap:0.25rem;">
+      {% if page > 1 %}
+      <a href="{{ url_for('reports_bp.activity_log', page=page-1, q=q_search, action=f_action, user_id=f_user, date_from=f_date_from, date_to=f_date_to) }}"
+         class="btn btn-ghost btn-sm">&#8592; Prev</a>
+      {% endif %}
+      <span style="font-size:0.78rem;color:var(--text-muted);padding:0.25rem 0.5rem;align-self:center;">
+        {{ page }}&thinsp;/&thinsp;{{ total_pages }}
+      </span>
+      {% if page < total_pages %}
+      <a href="{{ url_for('reports_bp.activity_log', page=page+1, q=q_search, action=f_action, user_id=f_user, date_from=f_date_from, date_to=f_date_to) }}"
+         class="btn btn-ghost btn-sm">Next &#8594;</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% else %}
+  {# Empty state #}
+  <div class="empty-state" style="padding:3rem 0;">
+    <i class="bi bi-clock-history"></i>
+    <p>No activity found{% if q_search or f_action or f_user or f_date_from %} matching your filters{% endif %}</p>
+    {% if q_search or f_action or f_user or f_date_from or f_date_to %}
+    <a href="{{ url_for('reports_bp.activity_log') }}" class="btn btn-ghost btn-sm mt-2">Clear filters</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

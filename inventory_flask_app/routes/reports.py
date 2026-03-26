@@ -1715,3 +1715,159 @@ def parts_usage_export():
         as_attachment=True,
         download_name='parts_usage.csv'
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity / Audit Log — full tenant-scoped browse of ProductProcessLog
+# ─────────────────────────────────────────────────────────────────────────────
+def _build_activity_query(tid):
+    """Return a base query + applied filters from request.args for the activity log."""
+    from inventory_flask_app.models import ProductProcessLog, ProductInstance, Product
+    from sqlalchemy.orm import joinedload as _jl
+
+    q_search   = request.args.get('q', '').strip()
+    f_action   = request.args.get('action', '').strip()
+    f_user     = request.args.get('user_id', '').strip()
+    f_date_from = request.args.get('date_from', '').strip()
+    f_date_to   = request.args.get('date_to', '').strip()
+
+    query = (
+        ProductProcessLog.query
+        .join(ProductInstance, ProductProcessLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid)
+        .options(
+            _jl(ProductProcessLog.product_instance).joinedload(ProductInstance.product),
+            _jl(ProductProcessLog.user),
+        )
+    )
+
+    if q_search:
+        from inventory_flask_app.utils.utils import escape_like
+        esc = escape_like(q_search)
+        query = query.filter(
+            or_(
+                ProductInstance.serial.ilike(f'%{esc}%'),
+                ProductInstance.asset.ilike(f'%{esc}%'),
+                ProductProcessLog.note.ilike(f'%{esc}%'),
+            )
+        )
+
+    if f_action:
+        query = query.filter(ProductProcessLog.action == f_action)
+
+    if f_user:
+        try:
+            query = query.filter(ProductProcessLog.moved_by == int(f_user))
+        except ValueError:
+            pass
+
+    if f_date_from:
+        try:
+            query = query.filter(ProductProcessLog.moved_at >= datetime.strptime(f_date_from, '%Y-%m-%d'))
+        except ValueError:
+            pass
+    if f_date_to:
+        try:
+            query = query.filter(
+                ProductProcessLog.moved_at < datetime.strptime(f_date_to, '%Y-%m-%d') + timedelta(days=1)
+            )
+        except ValueError:
+            pass
+
+    return query
+
+
+@reports_bp.route('/reports/activity_log')
+@login_required
+@module_required('reports', 'view')
+def activity_log():
+    """Browse all ProductProcessLog entries for the tenant."""
+    from inventory_flask_app.models import ProductProcessLog, ProductInstance, Product, User
+
+    tid     = current_user.tenant_id
+    page    = request.args.get('page', 1, type=int)
+    per_page = 50
+
+    query = _build_activity_query(tid)
+
+    # Distinct action types for dropdown
+    action_types = (
+        db.session.query(ProductProcessLog.action)
+        .join(ProductInstance, ProductProcessLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductProcessLog.action.isnot(None))
+        .distinct()
+        .order_by(ProductProcessLog.action)
+        .all()
+    )
+    action_list = [r[0] for r in action_types if r[0]]
+
+    # Users who appear in the log
+    uid_rows = (
+        db.session.query(ProductProcessLog.moved_by)
+        .join(ProductInstance, ProductProcessLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductProcessLog.moved_by.isnot(None))
+        .distinct()
+        .all()
+    )
+    user_ids = [r[0] for r in uid_rows if r[0]]
+    users = User.query.filter(User.id.in_(user_ids)).order_by(User.username).all() if user_ids else []
+
+    total       = query.count()
+    logs        = query.order_by(ProductProcessLog.moved_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template('reports/activity_log.html',
+        logs=logs,
+        page=page,
+        per_page=per_page,
+        total=total,
+        total_pages=total_pages,
+        q_search=request.args.get('q', '').strip(),
+        f_action=request.args.get('action', '').strip(),
+        f_user=request.args.get('user_id', '').strip(),
+        f_date_from=request.args.get('date_from', '').strip(),
+        f_date_to=request.args.get('date_to', '').strip(),
+        action_list=action_list,
+        users=users,
+    )
+
+
+@reports_bp.route('/reports/activity_log/export')
+@login_required
+@module_required('reports', 'view')
+def activity_log_export():
+    """CSV export of the filtered activity log (no pagination)."""
+    from inventory_flask_app.models import ProductProcessLog
+
+    tid   = current_user.tenant_id
+    query = _build_activity_query(tid)
+    logs  = query.order_by(ProductProcessLog.moved_at.desc()).limit(10000).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Timestamp', 'User', 'Serial', 'Asset', 'Action',
+                     'From Stage', 'To Stage', 'Duration (min)', 'Note'])
+    for log in logs:
+        inst = log.product_instance
+        writer.writerow([
+            log.moved_at.strftime('%Y-%m-%d %H:%M:%S') if log.moved_at else '',
+            (log.user.full_name or log.user.username) if log.user else 'System',
+            inst.serial if inst else '',
+            inst.asset if inst else '',
+            log.action or '',
+            log.from_stage or '',
+            log.to_stage or '',
+            log.duration_minutes if log.duration_minutes is not None else '',
+            log.note or '',
+        ])
+    output.seek(0)
+
+    return send_file(
+        io.BytesIO(output.getvalue().encode()),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='activity_log.csv',
+    )
