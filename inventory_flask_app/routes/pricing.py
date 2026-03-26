@@ -1,4 +1,5 @@
 import logging
+import traceback
 from decimal import Decimal
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
@@ -364,15 +365,19 @@ def bulk_update():
         )
     }
 
-    updated = 0
-    for u in updates:
-        inst = instances.get(u.get('instance_id'))
-        if inst and u.get('asking_price') is not None:
-            inst.asking_price = Decimal(str(u['asking_price']))
-            updated += 1
-
-    db.session.commit()
-    return jsonify(ok=True, updated=updated)
+    try:
+        updated = 0
+        for u in updates:
+            inst = instances.get(u.get('instance_id'))
+            if inst and u.get('asking_price') is not None:
+                inst.asking_price = Decimal(str(u['asking_price']))
+                updated += 1
+        db.session.commit()
+        return jsonify(ok=True, updated=updated)
+    except Exception as e:
+        db.session.rollback()
+        logger.error('bulk_update error: %s', traceback.format_exc())
+        return jsonify(ok=False, error=str(e)), 500
 
 
 @pricing_bp.route('/bulk/apply_suggested', methods=['POST'])

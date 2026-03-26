@@ -25,6 +25,12 @@
       <i class="bi bi-tag"></i> Set Pricing
     </a>
     {% endif %}
+    {% if current_user.role in ('admin', 'supervisor') %}
+    <button class="btn btn-ghost" style="color:var(--color-danger);"
+            onclick="deletePO({{ po.id }}, '{{ po.po_number|e }}')">
+      <i class="bi bi-trash"></i> Delete PO
+    </button>
+    {% endif %}
     <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('stock_bp.stock_intake') }}'" class="btn btn-ghost">
       <i class="bi bi-arrow-left"></i> Stock Intake
     </a>
@@ -168,4 +174,105 @@
   {% endif %}
 
 </div>
+
+{# ── Delete PO Modal ── #}
+<div class="modal fade" id="poDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title" style="font-size:1rem;font-weight:700;">Delete PO <span id="poDeleteNumber" style="font-family:monospace;"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="poDeleteBody"></div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);gap:0.5rem;">
+        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-ghost" id="btnDeletePOOnly" style="color:var(--color-warning);">
+          <i class="bi bi-unlink me-1"></i>Keep Units, Delete PO
+        </button>
+        <button type="button" class="btn btn-ghost" id="btnDeletePOAll" style="color:var(--color-danger);">
+          <i class="bi bi-trash me-1"></i>Delete PO + Units
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  let _activePOId = null;
+  let _poModal = null;
+
+  window.deletePO = async function (poId, poNumber) {
+    _activePOId = poId;
+    document.getElementById('poDeleteNumber').textContent = poNumber;
+
+    try {
+      const resp = await fetch(`/stock/purchase_order/${poId}/delete_preview`);
+      const d = await resp.json();
+
+      const body = document.getElementById('poDeleteBody');
+      const btnAll = document.getElementById('btnDeletePOAll');
+
+      if (!d.has_received) {
+        // No units received — only option is to delete the PO record
+        body.innerHTML = `
+          <p style="margin:0;">This PO has <strong>${d.total_expected}</strong> expected item(s) but no units have been received yet.</p>
+          <p style="margin:0.75rem 0 0;font-size:0.85rem;color:var(--text-muted);">Deleting will permanently remove the PO and its expected item list.</p>`;
+        btnAll.style.display = 'none';
+        document.getElementById('btnDeletePOOnly').textContent = 'Delete PO';
+        document.getElementById('btnDeletePOOnly').innerHTML = '<i class="bi bi-trash me-1"></i>Delete PO';
+      } else {
+        // Units have been received
+        const unsold = d.received_units - d.sold_units;
+        body.innerHTML = `
+          <p style="margin:0;">This PO has <strong>${d.received_units}</strong> received unit(s)${d.sold_units > 0 ? ` (${d.sold_units} already sold)` : ''}.</p>
+          <div style="margin:0.75rem 0;padding:0.75rem;background:var(--surface-2);border-radius:var(--radius-md);font-size:0.85rem;">
+            <p style="margin:0 0 0.4rem;font-weight:600;"><i class="bi bi-unlink me-1"></i>Keep Units, Delete PO</p>
+            <p style="margin:0;color:var(--text-secondary);">Removes the PO record. All ${d.received_units} unit(s) remain in inventory, unlinked from this PO.</p>
+          </div>
+          <div style="padding:0.75rem;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius-md);font-size:0.85rem;">
+            <p style="margin:0 0 0.4rem;font-weight:600;color:var(--color-danger);"><i class="bi bi-trash me-1"></i>Delete PO + Units</p>
+            <p style="margin:0;color:var(--text-secondary);">${unsold > 0 ? `Permanently deletes <strong>${unsold} unsold unit(s)</strong> and all their records. ` : ''}${d.sold_units > 0 ? `${d.sold_units} sold unit(s) will be kept but unlinked.` : 'All units are unsold and will be permanently deleted.'}</p>
+          </div>`;
+        btnAll.style.display = '';
+        document.getElementById('btnDeletePOOnly').innerHTML = '<i class="bi bi-unlink me-1"></i>Keep Units, Delete PO';
+      }
+    } catch (e) {
+      document.getElementById('poDeleteBody').innerHTML = '<p style="color:var(--color-danger);">Failed to load PO info.</p>';
+    }
+
+    _poModal = new bootstrap.Modal(document.getElementById('poDeleteModal'));
+    _poModal.show();
+  };
+
+  async function executePODelete(mode) {
+    if (!_activePOId) return;
+    try {
+      const resp = await fetch(`/stock/purchase_order/${_activePOId}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ mode }),
+      });
+      const d = await resp.json();
+      if (d.ok) {
+        _poModal?.hide();
+        showToast(`PO ${d.po_number} deleted.`, 'success');
+        setTimeout(() => { window.location = '/stock/stock_intake'; }, 1200);
+      } else {
+        showToast(d.error || 'Delete failed.', 'danger');
+      }
+    } catch (e) {
+      showToast('Network error.', 'danger');
+    }
+  }
+
+  document.getElementById('btnDeletePOOnly').addEventListener('click', () => executePODelete('po_only'));
+  document.getElementById('btnDeletePOAll').addEventListener('click', () => executePODelete('delete_all'));
+});
+</script>
 {% endblock %}

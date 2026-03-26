@@ -127,25 +127,31 @@
             <input class="form-check-input row-check" type="checkbox" value="{{ inst.id }}">
           </td>
           <td class="fw-medium">{{ inst.serial or inst.id }}</td>
-          <td class="text-muted small">{{ inst.product.make }} {{ inst.product.model }}</td>
+          <td class="text-muted small">
+            {%- set _mk = (inst.product.make or '')|trim -%}
+            {%- set _mo = (inst.product.model or '')|trim -%}
+            {%- if _mk and _mo.lower().startswith(_mk.lower()) -%}{{ _mo }}
+            {%- else -%}{{ (_mk + ' ' + _mo)|trim }}
+            {%- endif -%}
+          </td>
           <td><span class="status-pill status-{{ inst.status }}">{{ inst.status.replace('_', ' ') }}</span></td>
           <td>
             {% if uc and uc.total_cost %}
-              ${{ "%.2f"|format(uc.total_cost|float) }}
+              AED {{ "%.2f"|format(uc.total_cost|float) }}
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>
             {% if uc and uc.suggested_price %}
-              <span class="text-success fw-medium">${{ "%.2f"|format(uc.suggested_price|float) }}</span>
+              <span class="text-success fw-medium">AED {{ "%.2f"|format(uc.suggested_price|float) }}</span>
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>
             <div class="input-group input-group-sm" style="max-width:130px;">
-              <span class="input-group-text">$</span>
+              <span class="input-group-text">AED</span>
               <input type="number" step="0.01" min="0"
                      class="form-control asking-input"
                      data-instance="{{ inst.id }}"
@@ -185,7 +191,7 @@
   const selActions = document.getElementById('selActions');
   const btnApply   = document.getElementById('btnApplySuggested2');
   const btnSave    = document.getElementById('btnSaveAll2');
-  const csrfToken  = document.querySelector('[name="csrf_token"]')?.value || '';
+  const csrfToken  = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
   function getChecked() {
     return [...document.querySelectorAll('.row-check:checked')].map(el => parseInt(el.value));

@@ -86,16 +86,11 @@
     background: var(--surface);
     border-top: 2px solid var(--border);
     padding: 0.75rem 2rem;
-    display: flex;
+    display: none;
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-    transform: translateY(100%);
-    transition: transform 0.25s ease, left 0.25s ease;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-  }
-  .sticky-toolbar.toolbar-visible {
-    transform: translateY(0);
   }
   body.sidebar-collapsed .sticky-toolbar {
     left: var(--sidebar-collapsed);
@@ -196,7 +191,6 @@
 {% endblock %}
 
 {% block content %}
-<script>const SAVE_URL = "{{ url_for('stock_bp.bulk_price_save') }}";</script>
 <!-- Page header -->
 <div class="page-header animate-fade-up">
   <div>
@@ -267,23 +261,25 @@
       <table class="table table-sm align-middle mb-0" style="min-width:720px;table-layout:fixed;">
         <colgroup>
           <col style="width:36px;">
-          <col style="width:15%;">
-          <col style="width:15%;">
-          <col style="width:35%;">
-          <col style="width:12%;">
+          <col style="width:14%;">
           <col style="width:13%;">
+          <col style="width:28%;">
           <col style="width:10%;">
+          <col style="width:10%;">
+          <col style="width:11%;">
+          <col style="width:9%;">
         </colgroup>
         <thead>
           <tr>
             <th style="width:36px;">
-              <input type="checkbox" id="selectAll" class="form-check-input" title="Select all">
+              <input type="checkbox" id="selectAllChk" class="form-check-input" title="Select all">
             </th>
             <th>Serial / Asset</th>
             <th>Model</th>
             <th>Specs</th>
             <th>Status</th>
-            <th style="text-align:right;">Price (AED)</th>
+            <th class="text-end">Cost (AED)</th>
+            <th class="text-end">Price (AED)</th>
             <th style="text-align:center;">Action</th>
           </tr>
         </thead>
@@ -291,7 +287,7 @@
           {% for i in instances %}
           <tr id="row-{{ i.id }}" class="unit-row{% if i.asking_price %} has-price{% endif %}">
             <td>
-              <input type="checkbox" id="cb-{{ i.id }}" class="form-check-input unit-cb"
+              <input type="checkbox" id="cb-{{ i.id }}" class="form-check-input unit-checkbox"
                      value="{{ i.id }}"
                      data-serial="{{ i.serial }}"
                      data-model="{{ (i.product.model if i.product else None) | nonan }}">
@@ -328,6 +324,14 @@
             <td>
               <span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>
             </td>
+            <td class="text-end cost-value"
+                data-cost="{{ i.unit_cost.purchase_cost|float if i.unit_cost and i.unit_cost.purchase_cost else 0 }}">
+              {% if i.unit_cost and i.unit_cost.purchase_cost %}
+                <span class="text-muted" style="font-family:monospace;font-size:0.84rem;">{{ "{:,.0f}".format(i.unit_cost.purchase_cost|float) }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
             <td style="text-align:right;">
               <span class="price-cell {% if i.asking_price %}has-value{% else %}no-value{% endif %}"
                     id="price-{{ i.id }}">
@@ -335,15 +339,14 @@
               </span>
             </td>
             <td style="text-align:center;">
-              <button type="button" class="row-action-btn" title="Select &amp; set price"
-                      onclick="(function(btn){var cb=btn.closest('tr').querySelector('.unit-cb');if(!cb.checked){cb.checked=true;cb.dispatchEvent(new Event('change',{bubbles:true}));}})(this); openPriceModal();">
+              <button type="button" class="row-action-btn js-row-edit" title="Select &amp; set price">
                 <i class="bi bi-pencil-square"></i>
               </button>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7">
+            <td colspan="8">
               <div class="empty-state" style="padding:2.5rem 0;">
                 <i class="bi bi-tag"></i>
                 <p>No units found for this filter.</p>
@@ -358,50 +361,126 @@
 </div>
 
 <!-- ── Sticky selection toolbar ── -->
-<div class="sticky-toolbar" id="stickyToolbar">
+<div class="sticky-toolbar" id="selectionToolbar">
   <span class="toolbar-count-badge">
     <i class="bi bi-check2-square"></i>
     <span id="toolbarCount">0</span> selected
   </span>
-  <button class="toolbar-set-btn" onclick="openPriceModal()">
+  <button type="button" class="btn btn-sm btn-outline-secondary js-toolbar-set-cost">
+    <i class="bi bi-calculator"></i> Set Cost
+  </button>
+  <button type="button" class="toolbar-set-btn js-toolbar-set">
     <i class="bi bi-tag"></i> Set Price
   </button>
-  <button class="toolbar-clear-btn" onclick="openClearModal()">
+  <button type="button" class="toolbar-clear-btn js-toolbar-clear">
     <i class="bi bi-x-circle"></i> Clear Price
   </button>
-  <button class="toolbar-deselect-btn" onclick="deselectAll()">
+  <button type="button" class="toolbar-deselect-btn js-deselect-all">
     <i class="bi bi-x-lg"></i> Deselect All
   </button>
 </div>
 
 <!-- ── Set Price Modal ── -->
-<div class="modal fade" id="priceModal" tabindex="-1" aria-labelledby="priceModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
-    <div class="modal-content" style="border-radius:var(--radius-xl);border:1px solid var(--border);overflow:hidden;">
-      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1.1rem 1.5rem;">
-        <h5 class="modal-title fw-semibold" id="priceModalLabel">
-          <i class="bi bi-tag me-2" style="color:var(--primary);"></i>Set Asking Price
-        </h5>
+<div class="modal fade" id="setPriceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:1rem 1.5rem;">
+        <h6 class="modal-title fw-semibold">
+          <i class="bi bi-tags me-2" style="color:var(--primary);"></i>Set Asking Price
+        </h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="padding:1.5rem;">
-        <p id="priceModalDesc" style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:1.1rem;"></p>
-        <label class="form-label fw-semibold" style="font-size:0.84rem;">Price (AED)</label>
-        <div class="input-group input-group-lg">
-          <span class="input-group-text" style="background:var(--surface-2);font-weight:600;font-size:0.9rem;">AED</span>
-          <input type="number" id="priceInput" class="form-control"
-                 min="0" step="0.01" placeholder="0.00"
-                 style="font-family:monospace;font-size:1.25rem;font-weight:700;letter-spacing:0.02em;">
+      <div class="modal-body" style="padding:1.25rem 1.5rem;">
+
+        <!-- Rule selector -->
+        <div class="btn-group w-100 mb-3" role="group">
+          <input type="radio" class="btn-check" name="priceRule" id="ruleFixed" value="fixed" checked>
+          <label class="btn btn-outline-primary btn-sm" for="ruleFixed">Fixed Price</label>
+          <input type="radio" class="btn-check" name="priceRule" id="ruleMargin" value="margin">
+          <label class="btn btn-outline-primary btn-sm" for="ruleMargin">Cost + Margin %</label>
+          <input type="radio" class="btn-check" name="priceRule" id="ruleMarkup" value="markup">
+          <label class="btn btn-outline-primary btn-sm" for="ruleMarkup">Cost + Fixed AED</label>
         </div>
-        <div style="font-size:0.76rem;color:var(--text-muted);margin-top:0.5rem;">
-          <i class="bi bi-keyboard me-1"></i>Press <kbd style="background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:0.05rem 0.35rem;font-size:0.7rem;">Enter</kbd> to apply
+
+        <!-- Fixed Price -->
+        <div id="fixedPriceSection">
+          <label class="form-label small fw-bold">Price for all selected units</label>
+          <div class="input-group input-group-lg">
+            <span class="input-group-text" style="background:var(--surface-2);font-weight:600;">AED</span>
+            <input type="number" id="modalPriceInput" class="form-control"
+                   placeholder="0.00" step="0.01" min="0"
+                   style="font-family:monospace;font-size:1.15rem;font-weight:700;">
+          </div>
+          <div class="form-text">Same price applied to every selected unit.</div>
+        </div>
+
+        <!-- Margin % -->
+        <div id="marginSection" style="display:none;">
+          <label class="form-label small fw-bold">Profit Margin</label>
+          <div class="input-group">
+            <input type="number" id="marginInput" class="form-control"
+                   placeholder="25" step="0.5" min="0" max="500" value="25">
+            <span class="input-group-text">%</span>
+          </div>
+          <div class="form-text">Price = Total Cost × (1 + margin%). Units without cost are skipped.</div>
+          <div id="marginPreview" class="mt-2 p-2 rounded small" style="background:var(--surface-2);min-height:2rem;"></div>
+        </div>
+
+        <!-- Fixed Markup -->
+        <div id="markupSection" style="display:none;">
+          <label class="form-label small fw-bold">Fixed Markup Amount</label>
+          <div class="input-group">
+            <span class="input-group-text">AED</span>
+            <input type="number" id="markupInput" class="form-control"
+                   placeholder="500" step="1" min="0">
+          </div>
+          <div class="form-text">Price = Total Cost + AED amount. Units without cost are skipped.</div>
+          <div id="markupPreview" class="mt-2 p-2 rounded small" style="background:var(--surface-2);min-height:2rem;"></div>
+        </div>
+
+        <!-- Round up -->
+        <div class="mt-3 pt-3 border-top d-flex align-items-center gap-2 flex-wrap">
+          <div class="form-check mb-0">
+            <input type="checkbox" class="form-check-input" id="roundUpCheck">
+            <label class="form-check-label small" for="roundUpCheck">Round up to nearest</label>
+          </div>
+          <select id="roundSelect" class="form-select form-select-sm" style="width:auto;">
+            <option value="50">AED 50</option>
+            <option value="100" selected>AED 100</option>
+            <option value="500">AED 500</option>
+          </select>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:0.9rem 1.5rem;gap:0.5rem;">
+        <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="modalSaveBtn">
+          <i class="bi bi-check2 me-1"></i>Apply to Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Set Cost Modal ── -->
+<div class="modal fade" id="setCostModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-calculator me-1"></i>Set Purchase Cost</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small fw-semibold">Cost per unit (AED)</label>
+        <div class="input-group">
+          <span class="input-group-text">AED</span>
+          <input type="number" id="modalCostInput" class="form-control"
+                 placeholder="0.00" step="0.01" min="0">
         </div>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
-        <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="confirmPriceBtn" onclick="savePrice()">
-          <i class="bi bi-check-lg me-1"></i>Apply to Selected
-        </button>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="modalCostSaveBtn">Save Cost</button>
       </div>
     </div>
   </div>
@@ -426,7 +505,7 @@
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border);padding:1rem 1.5rem;gap:0.5rem;">
         <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-danger" id="confirmClearBtn" onclick="clearPrice()">
+        <button type="button" class="btn btn-danger" id="confirmClearBtn">
           <i class="bi bi-x-lg me-1"></i>Clear Prices
         </button>
       </div>
@@ -438,182 +517,332 @@
 
 {% block extra_scripts %}
 <script>
-(function () {
-  'use strict';
+document.addEventListener('DOMContentLoaded', function() {
 
-  const CSRF = '{{ csrf_token() }}';
-  const selectedIds = new Set();
-  const toolbar     = document.getElementById('stickyToolbar');
+  // ── Bootstrap guard ───────────────────────────────────────
+  if (typeof bootstrap === 'undefined') {
+    console.error('[BulkPrice] Bootstrap not loaded!');
+    return;
+  }
 
-  /* ── Update toolbar visibility and counts ── */
+  // ── DOM refs ──────────────────────────────────────────────
+  var modal        = document.getElementById('setPriceModal');
+  var priceInput   = document.getElementById('modalPriceInput');
+  var saveBtn      = document.getElementById('modalSaveBtn');
+  var toolbar      = document.getElementById('selectionToolbar');
+  var toolbarCount = document.getElementById('toolbarCount');
+  var selectAll    = document.getElementById('selectAllChk');
+  var SAVE_URL     = "{{ url_for('stock_bp.bulk_price_save') }}";
+  var COST_URL     = "{{ url_for('stock_bp.bulk_cost_save') }}";
+
+  console.log('[BulkPrice] Modal element:', modal);
+
+  if (!modal) {
+    console.error('[BulkPrice] setPriceModal not found in DOM');
+    return;
+  }
+
+  var bsModal = new bootstrap.Modal(modal);
+
+  // ── Checkbox handling ─────────────────────────────────────
+  function getChecked() {
+    return Array.from(document.querySelectorAll('.unit-checkbox:checked'))
+                .map(function(cb) { return cb.value; });
+  }
+
   function updateToolbar() {
-    const n = selectedIds.size;
-    document.getElementById('toolbarCount').textContent   = n;
-    document.getElementById('toolbarN').textContent       = n;
-    document.getElementById('toolbarSelectedText').style.display = n ? 'inline' : 'none';
-
-    const label = n
-      ? n + ' unit' + (n !== 1 ? 's' : '') + ' selected'
-      : '{{ instances|length }} unit{{ "s" if instances|length != 1 else "" }}';
-    document.getElementById('selectedCount').textContent = label;
-
-    toolbar.classList.toggle('toolbar-visible', n > 0);
-  }
-
-  /* ── Select all checkbox ── */
-  document.getElementById('selectAll').addEventListener('change', function () {
-    document.querySelectorAll('.unit-cb').forEach(function (cb) {
-      cb.checked = this.checked;
-      const row = cb.closest('tr');
-      if (this.checked) {
-        selectedIds.add(+cb.value);
-        row.classList.add('row-selected');
-      } else {
-        selectedIds.delete(+cb.value);
-        row.classList.remove('row-selected');
-      }
-    }.bind(this));
-    updateToolbar();
-  });
-
-  /* ── Per-row checkboxes ── */
-  document.addEventListener('change', function (e) {
-    if (!e.target.classList.contains('unit-cb')) return;
-    const id  = +e.target.value;
-    const row = e.target.closest('tr');
-    if (e.target.checked) {
-      selectedIds.add(id);
-      row.classList.add('row-selected');
-    } else {
-      selectedIds.delete(id);
-      row.classList.remove('row-selected');
+    var checked = getChecked();
+    if (toolbar) {
+      toolbar.style.display = checked.length > 0 ? 'flex' : 'none';
     }
-    const allCbs = document.querySelectorAll('.unit-cb');
-    document.getElementById('selectAll').checked =
-      allCbs.length > 0 && Array.from(allCbs).every(function (c) { return c.checked; });
-    updateToolbar();
+    if (toolbarCount) {
+      toolbarCount.textContent = checked.length;
+    }
+  }
+
+  // Row checkboxes
+  document.querySelectorAll('.unit-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      var row = cb.closest('tr');
+      if (row) row.classList.toggle('row-selected', cb.checked);
+      // sync select-all state
+      if (selectAll) {
+        var all = document.querySelectorAll('.unit-checkbox');
+        selectAll.checked = all.length > 0 && Array.from(all).every(function(c) { return c.checked; });
+      }
+      updateToolbar();
+    });
   });
 
-  /* ── Deselect all ── */
-  function deselectAll() {
-    document.querySelectorAll('.unit-cb').forEach(function (cb) {
-      cb.checked = false;
-      cb.closest('tr').classList.remove('row-selected');
+  // Select all checkbox
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      document.querySelectorAll('.unit-checkbox').forEach(function(cb) {
+        cb.checked = selectAll.checked;
+        var row = cb.closest('tr');
+        if (row) row.classList.toggle('row-selected', cb.checked);
+      });
+      updateToolbar();
     });
-    selectedIds.clear();
-    document.getElementById('selectAll').checked = false;
-    updateToolbar();
   }
-  window.deselectAll = deselectAll;
 
-  /* ── Open price modal ── */
-  function openPriceModal() {
-    const n = selectedIds.size;
-    if (!n) return;
-    document.getElementById('priceModalDesc').textContent =
-      'Set the asking price for ' + n + ' selected unit' + (n !== 1 ? 's' : '') + '.';
-    document.getElementById('priceInput').value = '';
-    const m = new bootstrap.Modal(document.getElementById('priceModal'));
-    m.show();
-    document.getElementById('priceModal').addEventListener('shown.bs.modal', function () {
-      document.getElementById('priceInput').focus();
+  // ── Open modal ────────────────────────────────────────────
+  function openModal(ids) {
+    if (!ids || ids.length === 0) {
+      alert('Please select at least one unit first.');
+      return;
+    }
+    saveBtn.dataset.ids = ids.join(',');
+    // Reset inputs
+    priceInput.value = '';
+    document.getElementById('marginInput').value = '25';
+    document.getElementById('markupInput').value = '';
+    document.getElementById('marginPreview').innerHTML = '';
+    document.getElementById('markupPreview').innerHTML = '';
+    // Reset to fixed rule
+    document.getElementById('ruleFixed').checked = true;
+    document.getElementById('fixedPriceSection').style.display = 'block';
+    document.getElementById('marginSection').style.display = 'none';
+    document.getElementById('markupSection').style.display = 'none';
+    bsModal.show();
+    modal.addEventListener('shown.bs.modal', function() {
+      priceInput.focus();
     }, { once: true });
   }
-  window.openPriceModal = openPriceModal;
 
-  /* ── Open clear modal ── */
-  function openClearModal() {
-    const n = selectedIds.size;
-    if (!n) return;
-    document.getElementById('clearModalDesc').textContent =
-      'Remove asking price from ' + n + ' selected unit' + (n !== 1 ? 's' : '') + '?';
-    new bootstrap.Modal(document.getElementById('clearModal')).show();
+  // ── Toolbar Set Price button ──────────────────────────────
+  var toolbarSetBtn = document.querySelector('.js-toolbar-set');
+  console.log('[BulkPrice] toolbarSetBtn:', toolbarSetBtn);
+  if (toolbarSetBtn) {
+    toolbarSetBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      openModal(getChecked());
+    });
   }
-  window.openClearModal = openClearModal;
 
-  /* ── Save price ── */
-  function savePrice() {
-    const price = parseFloat(document.getElementById('priceInput').value);
-    if (isNaN(price) || price < 0) { showToast('Enter a valid price.', 'warning'); return; }
-    const btn = document.getElementById('confirmPriceBtn');
-    setButtonLoading(btn, true);
-
-    fetch(SAVE_URL, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: price }),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      setButtonLoading(btn, false);
-      bootstrap.Modal.getInstance(document.getElementById('priceModal')).hide();
-      if (data.success) {
-        showToast(
-          'Price set to AED ' + data.price.toFixed(2) +
-          ' for ' + data.count + ' unit' + (data.count !== 1 ? 's' : '') + '.',
-          'success'
-        );
-        selectedIds.forEach(function (id) {
-          const cell = document.getElementById('price-' + id);
-          if (cell) {
-            cell.textContent    = data.price.toFixed(2);
-            cell.style.fontWeight = '700';
-            cell.style.color      = 'var(--color-success)';
-            cell.classList.remove('no-value');
-            cell.classList.add('has-value');
-            /* Flash animation */
-            cell.classList.remove('price-flash');
-            void cell.offsetWidth; /* reflow to restart */
-            cell.classList.add('price-flash');
-          }
-        });
-      } else {
-        showToast(data.message || 'Failed to update prices.', 'danger');
-      }
-    })
-    .catch(function () { setButtonLoading(btn, false); showToast('Network error.', 'danger'); });
-  }
-  window.savePrice = savePrice;
-
-  /* ── Clear price ── */
-  function clearPrice() {
-    const btn = document.getElementById('confirmClearBtn');
-    setButtonLoading(btn, true);
-
-    fetch(SAVE_URL, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instance_ids: Array.from(selectedIds), price: null, clear: true }),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      setButtonLoading(btn, false);
-      bootstrap.Modal.getInstance(document.getElementById('clearModal')).hide();
-      if (data.success) {
-        showToast('Price cleared for ' + data.count + ' unit' + (data.count !== 1 ? 's' : '') + '.', 'success');
-        selectedIds.forEach(function (id) {
-          const cell = document.getElementById('price-' + id);
-          if (cell) {
-            cell.textContent    = 'Enter price\u2026';
-            cell.style.fontWeight = '400';
-            cell.style.color      = '';
-            cell.classList.remove('has-value');
-            cell.classList.add('no-value');
-          }
-        });
-      } else {
-        showToast(data.message || 'Failed to clear prices.', 'danger');
-      }
-    })
-    .catch(function () { setButtonLoading(btn, false); showToast('Network error.', 'danger'); });
-  }
-  window.clearPrice = clearPrice;
-
-  /* ── Enter key in price input submits ── */
-  document.getElementById('priceInput').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); savePrice(); }
+  // ── Row pencil buttons ────────────────────────────────────
+  var pencilBtns = document.querySelectorAll('.js-row-edit');
+  console.log('[BulkPrice] pencil buttons found:', pencilBtns.length);
+  pencilBtns.forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var row = btn.closest('tr');
+      var cb  = row ? row.querySelector('.unit-checkbox') : null;
+      if (!cb) return;
+      cb.checked = true;
+      row.classList.add('row-selected');
+      updateToolbar();
+      openModal([cb.value]);
+    });
   });
 
-}());
+  // ── Rule tab switching ────────────────────────────────────
+  document.querySelectorAll('input[name="priceRule"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      document.getElementById('fixedPriceSection').style.display =
+        this.value === 'fixed'  ? 'block' : 'none';
+      document.getElementById('marginSection').style.display =
+        this.value === 'margin' ? 'block' : 'none';
+      document.getElementById('markupSection').style.display =
+        this.value === 'markup' ? 'block' : 'none';
+      if (this.value === 'margin') { updateMarginPreview(); }
+      if (this.value === 'markup') { updateMarkupPreview(); }
+    });
+  });
+
+  // ── Preview helpers ───────────────────────────────────────
+  function updateMarginPreview() {
+    var margin  = parseFloat(document.getElementById('marginInput').value) || 0;
+    var preview = document.getElementById('marginPreview');
+    var lines = [], count = 0;
+    document.querySelectorAll('.unit-checkbox:checked').forEach(function(cb) {
+      if (count >= 3) return;
+      var costEl = cb.closest('tr') ? cb.closest('tr').querySelector('.cost-value') : null;
+      var cost   = costEl ? parseFloat(costEl.dataset.cost || 0) : 0;
+      if (cost > 0) {
+        lines.push('<strong>' + cb.value + '</strong>: AED ' +
+                   Math.round(cost * (1 + margin / 100)).toLocaleString());
+        count++;
+      }
+    });
+    preview.innerHTML = lines.length
+      ? '<i class="bi bi-eye me-1"></i>' + lines.join(' &bull; ')
+      : '<span class="text-muted">No units with cost data selected</span>';
+  }
+
+  function updateMarkupPreview() {
+    var markup  = parseFloat(document.getElementById('markupInput').value) || 0;
+    var preview = document.getElementById('markupPreview');
+    var lines = [], count = 0;
+    document.querySelectorAll('.unit-checkbox:checked').forEach(function(cb) {
+      if (count >= 3) return;
+      var costEl = cb.closest('tr') ? cb.closest('tr').querySelector('.cost-value') : null;
+      var cost   = costEl ? parseFloat(costEl.dataset.cost || 0) : 0;
+      if (cost > 0) {
+        lines.push('<strong>' + cb.value + '</strong>: AED ' +
+                   Math.round(cost + markup).toLocaleString());
+        count++;
+      }
+    });
+    preview.innerHTML = lines.length
+      ? '<i class="bi bi-eye me-1"></i>' + lines.join(' &bull; ')
+      : '<span class="text-muted">No units with cost data selected</span>';
+  }
+
+  document.getElementById('marginInput').addEventListener('input', updateMarginPreview);
+  document.getElementById('markupInput').addEventListener('input', updateMarkupPreview);
+
+  // ── Modal Save button ─────────────────────────────────────
+  saveBtn.addEventListener('click', function() {
+    var ids  = (saveBtn.dataset.ids || '').split(',').filter(Boolean);
+    if (ids.length === 0) { alert('No units selected.'); return; }
+
+    var rule    = document.querySelector('input[name="priceRule"]:checked').value;
+    var roundUp = document.getElementById('roundUpCheck').checked;
+    var roundTo = parseInt(document.getElementById('roundSelect').value) || 100;
+    var payload = { instance_ids: ids, rule: rule, round_up: roundUp, round_to: roundTo };
+
+    if (rule === 'fixed') {
+      var price = parseFloat(priceInput.value);
+      if (!price || isNaN(price) || price < 0) { alert('Please enter a valid price.'); return; }
+      payload.price = price;
+    } else if (rule === 'margin') {
+      var margin = parseFloat(document.getElementById('marginInput').value);
+      if (isNaN(margin) || margin < 0) { alert('Please enter a valid margin %.'); return; }
+      payload.margin = margin;
+    } else if (rule === 'markup') {
+      var markup = parseFloat(document.getElementById('markupInput').value);
+      if (isNaN(markup) || markup < 0) { alert('Please enter a valid markup amount.'); return; }
+      payload.markup = markup;
+    }
+
+    fetch(SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      bsModal.hide();
+      if (data.success) {
+        if (data.skipped) {
+          alert(data.message);
+        }
+        window.location.reload();
+      } else {
+        alert('Error: ' + (data.error || data.message || 'Unknown error'));
+      }
+    })
+    .catch(function(err) {
+      console.error('[BulkPrice] save error:', err);
+      alert('Network error. Please try again.');
+    });
+  });
+
+  // Enter key on any price/margin/markup input fires save
+  [priceInput,
+   document.getElementById('marginInput'),
+   document.getElementById('markupInput')
+  ].forEach(function(inp) {
+    if (inp) inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveBtn.click(); }
+    });
+  });
+
+  // ── Toolbar Clear Price button ────────────────────────────
+  var clearBtn = document.querySelector('.js-toolbar-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var ids = getChecked();
+      if (ids.length === 0) { alert('Please select units first.'); return; }
+      if (!confirm('Clear price for ' + ids.length + ' unit(s)?')) return;
+      fetch(SAVE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instance_ids: ids, price: null })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) window.location.reload();
+        else alert('Error: ' + (data.error || data.message || 'Unknown error'));
+      })
+      .catch(function(err) { console.error('[BulkPrice] clear error:', err); });
+    });
+  }
+
+  // ── Set Cost modal ────────────────────────────────────────
+  var costModalEl  = document.getElementById('setCostModal');
+  var costInput    = document.getElementById('modalCostInput');
+  var costSaveBtn  = document.getElementById('modalCostSaveBtn');
+  var bsCostModal  = costModalEl ? new bootstrap.Modal(costModalEl) : null;
+
+  var toolbarCostBtn = document.querySelector('.js-toolbar-set-cost');
+  if (toolbarCostBtn && bsCostModal) {
+    toolbarCostBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var ids = getChecked();
+      if (ids.length === 0) { alert('Please select at least one unit.'); return; }
+      costSaveBtn.dataset.ids = ids.join(',');
+      costInput.value = '';
+      bsCostModal.show();
+      costModalEl.addEventListener('shown.bs.modal', function() {
+        costInput.focus();
+      }, { once: true });
+    });
+  }
+
+  if (costSaveBtn) {
+    costSaveBtn.addEventListener('click', function() {
+      var cost = costInput ? costInput.value.trim() : '';
+      var ids  = (costSaveBtn.dataset.ids || '').split(',').filter(Boolean);
+      if (!cost || isNaN(parseFloat(cost))) {
+        alert('Please enter a valid cost.');
+        return;
+      }
+      fetch(COST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instance_ids: ids, cost: parseFloat(cost) })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        bsCostModal.hide();
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert('Error: ' + (data.error || data.message || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        console.error('[BulkPrice] cost save error:', err);
+        alert('Network error. Please try again.');
+      });
+    });
+    costInput && costInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); costSaveBtn.click(); }
+    });
+  }
+
+  // ── Deselect All button ───────────────────────────────────
+  var deselectBtn = document.querySelector('.js-deselect-all');
+  if (deselectBtn) {
+    deselectBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.unit-checkbox').forEach(function(cb) {
+        cb.checked = false;
+        var row = cb.closest('tr');
+        if (row) row.classList.remove('row-selected');
+      });
+      if (selectAll) selectAll.checked = false;
+      updateToolbar();
+    });
+  }
+
+  // init
+  updateToolbar();
+  console.log('[BulkPrice] init complete');
+
+}); // end DOMContentLoaded
 </script>
 {% endblock %}

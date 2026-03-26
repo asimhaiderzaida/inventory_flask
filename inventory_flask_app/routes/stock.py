@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 logger = logging.getLogger(__name__)
 from flask_login import login_required, current_user
 from inventory_flask_app import csrf
-from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location, Bin, PartStock, Part
+from inventory_flask_app.models import db, Product, ProductInstance, PurchaseOrder, Vendor, Location, Bin, PartStock, Part, UnitCost
 from inventory_flask_app.models import CustomerOrderTracking, ProductProcessLog
 from flask import jsonify
 from sqlalchemy.orm import aliased, joinedload
@@ -198,42 +198,127 @@ def bulk_price_editor():
 @login_required
 @admin_or_supervisor_required
 def bulk_price_save():
+    import math as _math
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'message': 'No data'}), 400
 
     instance_ids = data.get('instance_ids', [])
-    clear        = data.get('clear', False)
-    price_raw    = data.get('price')
-
     if not instance_ids:
         return jsonify({'success': False, 'message': 'No units selected'}), 400
 
-    if clear:
-        price = None
-    else:
-        try:
-            price = float(str(price_raw).strip())
-            if price < 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            return jsonify({'success': False, 'message': 'Invalid price value'}), 400
+    rule     = data.get('rule', 'fixed')   # 'fixed' | 'margin' | 'markup' | None
+    round_up = data.get('round_up', False)
+    round_to = int(data.get('round_to', 100) or 100)
 
-    # Scope to tenant, unsold only
-    updated = ProductInstance.query.join(Product).filter(
-        ProductInstance.id.in_(instance_ids),
-        Product.tenant_id == current_user.tenant_id,
-        ProductInstance.is_sold == False,
-    ).all()
+    def apply_rounding(price):
+        if not round_up or round_to <= 0:
+            return price
+        return float(_math.ceil(price / round_to) * round_to)
 
-    if not updated:
+    # Clear path: rule is None or price key exists and is None
+    is_clear = (rule is None) or (rule == 'fixed' and data.get('price') is None)
+
+    # Pre-load tenant-scoped instances
+    instances = {
+        inst.id: inst
+        for inst in ProductInstance.query.join(Product).filter(
+            ProductInstance.id.in_([int(i) for i in instance_ids]),
+            Product.tenant_id == current_user.tenant_id,
+            ProductInstance.is_sold == False,
+        ).all()
+    }
+
+    if not instances:
         return jsonify({'success': False, 'message': 'No matching units found'}), 404
 
-    for inst in updated:
-        inst.asking_price = price
-    db.session.commit()
+    updated = skipped = 0
 
-    return jsonify({'success': True, 'count': len(updated), 'price': price})
+    for iid in instance_ids:
+        inst = instances.get(int(iid))
+        if inst is None:
+            continue
+
+        if is_clear:
+            inst.asking_price = None
+            updated += 1
+
+        elif rule == 'fixed':
+            try:
+                price = float(data['price'])
+                if price < 0:
+                    raise ValueError
+            except (KeyError, TypeError, ValueError):
+                return jsonify({'success': False, 'message': 'Invalid price value'}), 400
+            inst.asking_price = apply_rounding(price)
+            updated += 1
+
+        elif rule in ('margin', 'markup'):
+            uc = inst.unit_cost
+            if not uc or not uc.purchase_cost or float(uc.purchase_cost) <= 0:
+                skipped += 1
+                continue
+            total_cost = float(uc.total_cost or uc.purchase_cost)
+
+            if rule == 'margin':
+                margin = float(data.get('margin', 25))
+                price  = total_cost * (1 + margin / 100)
+            else:  # markup
+                markup = float(data.get('markup', 0))
+                price  = total_cost + markup
+
+            inst.asking_price = apply_rounding(price)
+            updated += 1
+
+    db.session.commit()
+    msg = f'{updated} updated'
+    if skipped:
+        msg += f', {skipped} skipped (no cost data)'
+    return jsonify({'success': True, 'updated': updated, 'skipped': skipped, 'message': msg})
+
+
+@stock_bp.route('/bulk_cost/save', methods=['POST'])
+@login_required
+@admin_or_supervisor_required
+def bulk_cost_save():
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data received'}), 400
+
+    instance_ids = data.get('instance_ids', [])
+    cost_raw     = data.get('cost')
+
+    if not instance_ids:
+        return jsonify({'success': False, 'error': 'No units selected'}), 400
+
+    try:
+        cost = float(cost_raw) if cost_raw is not None else 0.0
+        if cost < 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid cost value'}), 400
+
+    updated = 0
+    for iid in instance_ids:
+        try:
+            inst = db.session.get(ProductInstance, int(iid))
+        except (ValueError, TypeError):
+            continue
+        if not inst or inst.product.tenant_id != current_user.tenant_id:
+            continue
+        uc = UnitCost.query.filter_by(instance_id=inst.id).first()
+        if not uc:
+            uc = UnitCost(
+                instance_id=inst.id,
+                tenant_id=current_user.tenant_id,
+                margin_percent=25,
+            )
+            db.session.add(uc)
+        uc.purchase_cost = cost
+        updated += 1
+
+    db.session.commit()
+    return jsonify({'success': True, 'updated': updated})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -560,6 +645,76 @@ def create_purchase_order():
     vendors   = Vendor.query.filter_by(tenant_id=current_user.tenant_id).all()
     locations = Location.query.filter_by(tenant_id=current_user.tenant_id).all()
     return render_template('create_purchase_order.html', vendors=vendors, locations=locations)
+
+
+@stock_bp.route('/purchase_order/<int:po_id>/delete_preview')
+@login_required
+@admin_or_supervisor_required
+def po_delete_preview(po_id):
+    """AJAX GET: return delete-impact summary for a PO."""
+    from inventory_flask_app.models import PurchaseOrderItem
+    po = PurchaseOrder.query.filter_by(
+        id=po_id, tenant_id=current_user.tenant_id
+    ).first_or_404()
+
+    instances = ProductInstance.query.filter_by(po_id=po.id).all()
+    received_units = len(instances)
+    sold_units = sum(1 for i in instances if i.is_sold)
+    total_expected = PurchaseOrderItem.query.filter_by(po_id=po.id).count()
+
+    return jsonify(
+        po_number=po.po_number,
+        received_units=received_units,
+        sold_units=sold_units,
+        total_expected=total_expected,
+        has_received=received_units > 0,
+    )
+
+
+@stock_bp.route('/purchase_order/<int:po_id>/delete', methods=['POST'])
+@login_required
+@admin_or_supervisor_required
+def delete_purchase_order(po_id):
+    """JSON POST: delete a PO. mode='po_only' detaches units; mode='delete_all' removes unsold units."""
+    import traceback as _tb
+    from inventory_flask_app.models import PurchaseOrderItem, POCostSettings
+
+    po = PurchaseOrder.query.filter_by(
+        id=po_id, tenant_id=current_user.tenant_id
+    ).first_or_404()
+
+    data = request.get_json() or {}
+    mode = data.get('mode', 'po_only')
+
+    try:
+        instances = ProductInstance.query.filter_by(po_id=po.id).all()
+
+        if mode == 'delete_all':
+            for inst in instances:
+                if inst.is_sold:
+                    inst.po_id = None  # keep sold units, just detach
+                else:
+                    # Remove related records before deleting instance
+                    UnitCost.query.filter_by(instance_id=inst.id).delete()
+                    ProductProcessLog.query.filter_by(product_instance_id=inst.id).delete()
+                    CustomerOrderTracking.query.filter_by(product_instance_id=inst.id).delete()
+                    db.session.delete(inst)
+        else:
+            # po_only: detach all instances from this PO
+            for inst in instances:
+                inst.po_id = None
+
+        # Delete PO-level records
+        PurchaseOrderItem.query.filter_by(po_id=po.id).delete()
+        POCostSettings.query.filter_by(po_id=po.id).delete()
+        db.session.delete(po)
+        db.session.commit()
+
+        return jsonify(ok=True, po_number=po.po_number)
+    except Exception as e:
+        db.session.rollback()
+        logger.error('delete_purchase_order error: %s', _tb.format_exc())
+        return jsonify(ok=False, error=str(e)), 500
 
 
 @stock_bp.route('/purchase_order/<int:po_id>')
@@ -2097,28 +2252,185 @@ def unit_history(serial):
 @stock_bp.route('/instance/<int:instance_id>/view')
 @login_required
 def unit_detail(instance_id):
-    from inventory_flask_app.models import Return, SaleTransaction, Customer
+    from inventory_flask_app.models import (
+        Return, SaleTransaction, Customer,
+        CustomerOrderTracking, ShopifySyncLog,
+    )
+
     instance = ProductInstance.query.join(Product).filter(
         ProductInstance.id == instance_id,
-        Product.tenant_id == current_user.tenant_id
+        Product.tenant_id == current_user.tenant_id,
     ).first_or_404()
+
+    # ── Existing data for bottom detail cards ────────────────
     logs = (ProductProcessLog.query
             .filter_by(product_instance_id=instance.id)
             .order_by(ProductProcessLog.moved_at.desc())
             .all())
     instance_returns = (Return.query
-                        .filter_by(instance_id=instance.id, tenant_id=current_user.tenant_id)
+                        .filter_by(instance_id=instance.id,
+                                   tenant_id=current_user.tenant_id)
                         .order_by(Return.return_date.desc())
                         .all())
     sale = (SaleTransaction.query
             .filter_by(product_instance_id=instance.id)
             .join(Customer)
             .first())
+
+    # ── Build unified timeline ───────────────────────────────
+    def _ts(dt):
+        """Normalise any datetime to naive UTC for safe comparison."""
+        if dt is None:
+            return datetime.min
+        if getattr(dt, 'tzinfo', None) is not None:
+            return dt.replace(tzinfo=None)
+        return dt
+
+    timeline = []
+
+    # A) Process logs
+    for log in logs:
+        action = (log.action or '').lower()
+        if action in ('checkin', 'check_in'):
+            icon, bg, color, ring = 'bi-box-arrow-in-down', '#eff6ff', '#1d4ed8', '#bfdbfe'
+        elif action in ('checkout', 'check_out'):
+            icon, bg, color, ring = 'bi-box-arrow-up', '#f5f3ff', '#6d28d9', '#ddd6fe'
+        elif 'move' in action:
+            icon, bg, color, ring = 'bi-arrows-move', '#fef3c7', '#d97706', '#fde68a'
+        elif 'disput' in action:
+            icon, bg, color, ring = 'bi-exclamation-triangle', '#fff7ed', '#ea580c', '#fed7aa'
+        else:
+            icon, bg, color, ring = 'bi-arrow-right-circle', 'var(--surface-2)', 'var(--text-secondary)', 'var(--border)'
+
+        if log.action:
+            title = log.action.replace('_', ' ').title()
+        elif log.from_stage or log.to_stage:
+            title = f"Stage: {log.from_stage or '—'} → {log.to_stage or '—'}"
+        else:
+            title = 'Process Log'
+
+        parts = []
+        if log.from_stage or log.to_stage:
+            parts.append(f"{log.from_stage or '—'} → {log.to_stage or '—'}")
+        if log.from_team or log.to_team:
+            parts.append(f"{log.from_team or '—'} → {log.to_team or '—'}")
+        if log.note:
+            parts.append(log.note)
+
+        timeline.append({
+            'ts': log.moved_at,
+            'icon': icon, 'bg': bg, 'color': color, 'ring': ring,
+            'title': title,
+            'detail': ' • '.join(parts),
+            'user_str': log.user.username if log.user else None,
+            'duration_minutes': log.duration_minutes,
+        })
+
+    # B) Reservation events
+    reservations = (CustomerOrderTracking.query
+                    .filter_by(product_instance_id=instance.id)
+                    .order_by(CustomerOrderTracking.reserved_date.desc())
+                    .all())
+    for res in reservations:
+        cname = res.customer.name if res.customer else 'Customer'
+        timeline.append({
+            'ts': res.reserved_date,
+            'icon': 'bi-lock', 'bg': '#fffbeb', 'color': '#d97706', 'ring': '#fde68a',
+            'title': f'Reserved for {cname}',
+            'detail': f'Status: {res.status}',
+            'user_str': res.reserved_by.username if res.reserved_by else None,
+            'duration_minutes': None,
+        })
+        if res.cancelled_at:
+            timeline.append({
+                'ts': res.cancelled_at,
+                'icon': 'bi-x-circle', 'bg': '#fee2e2', 'color': '#dc2626', 'ring': '#fca5a5',
+                'title': f'Reservation Cancelled — {cname}',
+                'detail': '',
+                'user_str': res.cancelled_by.username if res.cancelled_by else None,
+                'duration_minutes': None,
+            })
+
+    # C) Sale events
+    all_sales = (SaleTransaction.query
+                 .filter_by(product_instance_id=instance.id)
+                 .all())
+    for s in all_sales:
+        cname = s.customer.name if s.customer else ''
+        detail_parts = [f'AED {s.price_at_sale:,.2f}']
+        if s.payment_method:
+            detail_parts.append(s.payment_method.title())
+        if cname:
+            detail_parts.append(cname)
+        timeline.append({
+            'ts': s.date_sold,
+            'icon': 'bi-cart-check', 'bg': '#d1fae5', 'color': '#059669', 'ring': '#a7f3d0',
+            'title': 'Sold' + (f' — {cname}' if cname else ''),
+            'detail': ' • '.join(detail_parts),
+            'user_str': s.user.username if s.user else None,
+            'duration_minutes': None,
+        })
+
+    # D) Return events
+    for ret in instance_returns:
+        detail_parts = []
+        if ret.reason:
+            detail_parts.append(f'Reason: {ret.reason}')
+        if ret.condition:
+            detail_parts.append(f'Condition: {ret.condition}')
+        if ret.refund_amount:
+            detail_parts.append(f'Refund: AED {float(ret.refund_amount):,.2f}')
+        timeline.append({
+            'ts': ret.return_date,
+            'icon': 'bi-arrow-return-left', 'bg': '#fee2e2', 'color': '#dc2626', 'ring': '#fca5a5',
+            'title': 'Unit Returned',
+            'detail': ' • '.join(detail_parts),
+            'user_str': None,
+            'duration_minutes': None,
+        })
+
+    # E) Received / stock-in event
+    po_label = (f'PO: {instance.po.po_number}' if instance.po else 'Direct Import')
+    loc_label = (f' • Location: {instance.location.name}' if instance.location else '')
+    timeline.append({
+        'ts': instance.created_at,
+        'icon': 'bi-box-arrow-in-down', 'bg': '#f3f4f6', 'color': '#6b7280', 'ring': '#d1d5db',
+        'title': 'Unit Received into Stock',
+        'detail': po_label + loc_label,
+        'user_str': None,
+        'duration_minutes': None,
+    })
+
+    # F) Shopify events (best-effort — serial text match in log details)
+    try:
+        shopify_logs = (ShopifySyncLog.query
+                        .filter(
+                            ShopifySyncLog.tenant_id == current_user.tenant_id,
+                            ShopifySyncLog.details.contains(instance.serial),
+                        )
+                        .order_by(ShopifySyncLog.created_at.desc())
+                        .limit(10)
+                        .all())
+        for slog in shopify_logs:
+            timeline.append({
+                'ts': slog.created_at,
+                'icon': 'bi-shop', 'bg': '#ecfdf5', 'color': '#0d9488', 'ring': '#99f6e4',
+                'title': f'Shopify: {slog.action or "Event"}',
+                'detail': (slog.details or '')[:120],
+                'user_str': None,
+                'duration_minutes': None,
+            })
+    except Exception:
+        pass
+
+    timeline.sort(key=lambda x: _ts(x['ts']), reverse=True)
+
     return render_template('stock/unit_detail.html',
                            instance=instance,
                            logs=logs,
                            instance_returns=instance_returns,
-                           sale=sale)
+                           sale=sale,
+                           timeline=timeline)
 
 
 # Delete ProductInstance route

@@ -8,7 +8,7 @@
   <title>{% block title %}{{ settings.company_name or settings.dashboard_name or 'PCMart' }}{% endblock %} — {{ settings.company_name or settings.dashboard_name or 'Inventory' }}</title>
 
   <!-- Bootstrap 5 -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <!-- Inter font -->
@@ -1235,11 +1235,33 @@
         </a>
 
         {% if current_user.can_access('accounting') %}
-        <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
-           class="sidebar-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
-          <i class="bi bi-tags nav-icon"></i>
-          <span class="sidebar-label">Smart Pricing</span>
-        </a>
+        {% set pricing_active = ep.startswith('pricing_bp') or ep == 'stock_bp.bulk_price_editor' %}
+        <div class="nav-group-header {% if pricing_active %}active-group{% endif %}">
+          <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
+             class="nav-group-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
+            <i class="bi bi-tags nav-group-icon"></i>
+            <span class="sidebar-label">Pricing</span>
+          </a>
+          <button class="nav-group-toggle"
+                  data-target="pricing-body"
+                  data-auto-expand="{{ 'true' if pricing_active else 'false' }}"
+                  aria-expanded="false"
+                  title="Expand Pricing">
+            <i class="bi bi-chevron-right sidebar-chevron"></i>
+          </button>
+        </div>
+        <div class="collapse-section collapsed" id="pricing-body">
+          <a href="{{ url_for('pricing_bp.pricing_dashboard') }}"
+             class="sidebar-link {% if ep.startswith('pricing_bp') %}active{% endif %}">
+            <i class="bi bi-graph-up nav-icon"></i>
+            <span class="sidebar-label">Smart Pricing</span>
+          </a>
+          <a href="{{ url_for('stock_bp.bulk_price_editor') }}"
+             class="sidebar-link {% if ep == 'stock_bp.bulk_price_editor' %}active{% endif %}">
+            <i class="bi bi-pencil-square nav-icon"></i>
+            <span class="sidebar-label">Quick Price Editor</span>
+          </a>
+        </div>
         {% endif %}
 
         <!-- ── PROCESSING ─────────────────────────────────── -->
@@ -1741,7 +1763,7 @@
 {% endwith %}
 
 <!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmIddf8SRpSmN3j0T5yrHqHpGCoa" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════

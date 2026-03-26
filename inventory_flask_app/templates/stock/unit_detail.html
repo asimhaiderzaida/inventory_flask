@@ -98,7 +98,7 @@
 
         {# Age in stock #}
         {% if instance.created_at %}
-        {% set age_days = ((now_utc - instance.created_at).days) if now_utc is defined else none %}
+        {% set age_days = (now_utc.replace(tzinfo=none) - instance.created_at).days %}
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;flex-wrap:wrap;padding:0.4rem 0;">
           <span style="font-size:0.78rem;color:var(--text-muted);">Received</span>
           <span style="font-size:0.82rem;color:var(--text-secondary);" title="{{ instance.created_at.strftime('%Y-%m-%d %H:%M') }}">
@@ -119,161 +119,45 @@
           <span style="font-weight:400;margin-left:0.5rem;">(newest first)</span>
         </h6>
 
-        {% if not logs and not sale and not instance_returns %}
+        {% if not timeline %}
         <div class="empty-state" style="padding:2rem 0;">
-          <i class="bi bi-clock"></i>
+          <i class="bi bi-clock-history"></i>
           <p>No history recorded yet.</p>
         </div>
         {% else %}
-
-        {# Build unified event list from logs, sale, returns #}
         <div style="position:relative;">
-          {# Timeline line #}
+          {# Vertical connector line #}
           <div style="position:absolute;left:18px;top:0;bottom:0;width:2px;background:var(--border);z-index:0;"></div>
 
-          {# --- Sale event --- #}
-          {% if sale %}
+          {% for ev in timeline %}
           <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
-            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:#d1fae5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:1rem;border:2px solid #fff;box-shadow:0 0 0 2px #a7f3d0;">
-              <i class="bi bi-cart-check"></i>
+            {# Icon circle #}
+            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:{{ ev.bg }};color:{{ ev.color }};display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:2px solid #fff;box-shadow:0 0 0 2px {{ ev.ring }};">
+              <i class="bi {{ ev.icon }}"></i>
             </div>
-            <div style="flex:1;padding-top:0.15rem;">
+            {# Content #}
+            <div style="flex:1;padding-top:0.1rem;">
               <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
-                Sold to {{ sale.customer.name }}
+                {{ ev.title }}
               </div>
+              {% if ev.detail %}
               <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
-                Price: <strong style="color:var(--color-success);">${{ '%.2f'|format(sale.price_at_sale) }}</strong>
-                {% if sale.payment_method %}&nbsp;&bull;&nbsp;{{ sale.payment_method | title }}{% endif %}
-                {% if sale.invoice %}
-                  &nbsp;&bull;&nbsp;<a href="{{ url_for('invoices_bp.view_invoice', invoice_id=sale.invoice_id) }}" style="font-size:0.78rem;">Invoice #{{ sale.invoice.invoice_number or sale.invoice_id }}</a>
-                {% endif %}
+                {{ ev.detail }}
               </div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
-                {{ sale.date_sold.strftime('%Y-%m-%d %H:%M') if sale.date_sold else '—' }}
-                {% if sale.user %}&nbsp;&bull;&nbsp;by {{ sale.user.username }}{% endif %}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-
-          {# --- Return events --- #}
-          {% for ret in instance_returns %}
-          <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
-            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:1rem;border:2px solid #fff;box-shadow:0 0 0 2px #fca5a5;">
-              <i class="bi bi-arrow-return-left"></i>
-            </div>
-            <div style="flex:1;padding-top:0.15rem;">
-              <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
-                Return — {{ ret.reason or 'No reason given' }}
-              </div>
-              <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
-                Condition: <strong>{{ ret.condition or '—' }}</strong>
-                {% if ret.action %}&nbsp;&bull;&nbsp;Action: {{ ret.action }}{% endif %}
-                {% if ret.refund_amount %}&nbsp;&bull;&nbsp;Refund: <span style="color:var(--color-danger);">-${{ '%.2f'|format(ret.refund_amount) }}</span>{% endif %}
-              </div>
-              {% if ret.action_taken %}
-              <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ ret.action_taken }}</div>
               {% endif %}
-              {% if ret.credit_note_number %}
-              <div style="font-size:0.78rem;color:var(--primary);margin-top:0.1rem;"><i class="bi bi-file-text me-1"></i>Credit Note: {{ ret.credit_note_number }}</div>
+              {% if ev.duration_minutes %}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
+                <i class="bi bi-stopwatch me-1"></i>Duration: {{ ev.duration_minutes }} min
+                {%- if ev.duration_minutes >= 60 %} ({{ (ev.duration_minutes / 60) | round(1) }} hr){% endif %}
+              </div>
               {% endif %}
               <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
-                {{ ret.return_date.strftime('%Y-%m-%d %H:%M') if ret.return_date else '—' }}
+                {{ ev.ts.strftime('%d %b %Y %H:%M') if ev.ts else '—' }}
+                {% if ev.user_str %}&nbsp;&bull;&nbsp;<i class="bi bi-person"></i> {{ ev.user_str }}{% endif %}
               </div>
             </div>
           </div>
           {% endfor %}
-
-          {# --- Process log events --- #}
-          {% for log in logs %}
-          {% set is_checkin = log.action in ('checkin', 'check_in') %}
-          {% set is_checkout = log.action in ('checkout', 'check_out') %}
-          {% set is_sale = log.action and 'sale' in log.action %}
-          {% set is_return = log.action and 'return' in log.action %}
-          {% set is_move = log.action and 'move' in log.action %}
-          {% set is_dispute = log.action and 'disput' in log.action %}
-
-          {# Choose icon + color #}
-          {% if is_checkin %}
-            {% set ev_icon = 'bi-box-arrow-in-down' %}
-            {% set ev_bg = '#eff6ff' %}{% set ev_color = '#1d4ed8' %}{% set ev_ring = '#bfdbfe' %}
-          {% elif is_checkout %}
-            {% set ev_icon = 'bi-box-arrow-up' %}
-            {% set ev_bg = '#f5f3ff' %}{% set ev_color = '#6d28d9' %}{% set ev_ring = '#ddd6fe' %}
-          {% elif is_sale %}
-            {% set ev_icon = 'bi-cart' %}
-            {% set ev_bg = '#d1fae5' %}{% set ev_color = '#059669' %}{% set ev_ring = '#a7f3d0' %}
-          {% elif is_return %}
-            {% set ev_icon = 'bi-arrow-return-left' %}
-            {% set ev_bg = '#fee2e2' %}{% set ev_color = '#dc2626' %}{% set ev_ring = '#fca5a5' %}
-          {% elif is_move %}
-            {% set ev_icon = 'bi-arrows-move' %}
-            {% set ev_bg = '#fef3c7' %}{% set ev_color = '#d97706' %}{% set ev_ring = '#fde68a' %}
-          {% elif is_dispute %}
-            {% set ev_icon = 'bi-exclamation-triangle' %}
-            {% set ev_bg = '#fff7ed' %}{% set ev_color = '#ea580c' %}{% set ev_ring = '#fed7aa' %}
-          {% else %}
-            {% set ev_icon = 'bi-arrow-right-circle' %}
-            {% set ev_bg = 'var(--surface-2)' %}{% set ev_color = 'var(--text-secondary)' %}{% set ev_ring = 'var(--border)' %}
-          {% endif %}
-
-          <div style="position:relative;display:flex;gap:1rem;margin-bottom:1.25rem;z-index:1;">
-            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:{{ ev_bg }};color:{{ ev_color }};display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:2px solid #fff;box-shadow:0 0 0 2px {{ ev_ring }};">
-              <i class="bi {{ ev_icon }}"></i>
-            </div>
-            <div style="flex:1;padding-top:0.15rem;">
-              {# Description line #}
-              <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
-                {% if log.action %}
-                  {{ log.action | replace('_', ' ') | title }}
-                {% elif log.from_stage or log.to_stage %}
-                  Stage: {{ log.from_stage or '—' }} → {{ log.to_stage or '—' }}
-                {% else %}
-                  Process Log
-                {% endif %}
-              </div>
-
-              {# Stage / team detail #}
-              {% if log.from_stage or log.to_stage %}
-              <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.15rem;">
-                {% if log.from_stage and log.to_stage %}
-                  {{ log.from_stage }} <i class="bi bi-arrow-right" style="font-size:0.7rem;"></i> {{ log.to_stage }}
-                {% elif log.to_stage %}
-                  → {{ log.to_stage }}
-                {% elif log.from_stage %}
-                  {{ log.from_stage }} →
-                {% endif %}
-                {% if log.from_team or log.to_team %}
-                  &nbsp;&bull;&nbsp;
-                  {% if log.from_team and log.to_team %}{{ log.from_team }} → {{ log.to_team }}
-                  {% elif log.to_team %}→ {{ log.to_team }}
-                  {% else %}{{ log.from_team }} →{% endif %}
-                {% endif %}
-              </div>
-              {% endif %}
-
-              {# Note #}
-              {% if log.note %}
-              <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">{{ log.note }}</div>
-              {% endif %}
-
-              {# Duration #}
-              {% if log.duration_minutes %}
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
-                <i class="bi bi-stopwatch me-1"></i>Duration: {{ log.duration_minutes }} min
-                {%- if log.duration_minutes >= 60 %} ({{ (log.duration_minutes / 60) | round(1) }} hr){% endif %}
-              </div>
-              {% endif %}
-
-              {# Meta: date + user #}
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.1rem;">
-                {{ log.moved_at.strftime('%Y-%m-%d %H:%M') if log.moved_at else '—' }}
-                {% if log.user %}&nbsp;&bull;&nbsp;{{ log.user.username }}{% endif %}
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-
         </div>
         {% endif %}
       </div>
