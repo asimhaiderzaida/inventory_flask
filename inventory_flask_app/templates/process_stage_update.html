@@ -232,7 +232,7 @@
           <span style="background:rgba(99,102,241,0.1);color:#6366f1;border-radius:20px;padding:0.1rem 0.55rem;font-size:0.72rem;font-weight:700;">{{ my_units|length }} units</span>
         </span>
       </div>
-      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form">
+      <form method="post" action="{{ url_for('stock_bp.checkin_checkout') }}" id="my-inprocess-form-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="tab" value="under_process">
         <div style="overflow-x:auto;">

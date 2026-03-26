@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from ..models import db, Customer
-from inventory_flask_app.utils.utils import admin_or_supervisor_required, module_required
+from inventory_flask_app.utils.utils import admin_or_supervisor_required, module_required, escape_like
 
 logger = logging.getLogger(__name__)
 customers_bp = Blueprint('customers_bp', __name__)
@@ -81,8 +81,8 @@ def api_customer_search():
         .filter(
             Customer.tenant_id == current_user.tenant_id,
             or_(
-                Customer.name.ilike(f'%{q}%'),
-                Customer.phone.ilike(f'%{q}%'),
+                Customer.name.ilike(f'%{escape_like(q)}%'),
+                Customer.phone.ilike(f'%{escape_like(q)}%'),
             )
         )
         .order_by(Customer.name)
@@ -121,10 +121,10 @@ def customer_center():
     if search:
         query = query.filter(
             or_(
-                Customer.name.ilike(f'%{search}%'),
-                Customer.phone.ilike(f'%{search}%'),
-                Customer.email.ilike(f'%{search}%'),
-                Customer.company.ilike(f'%{search}%'),
+                Customer.name.ilike(f'%{escape_like(search)}%'),
+                Customer.phone.ilike(f'%{escape_like(search)}%'),
+                Customer.email.ilike(f'%{escape_like(search)}%'),
+                Customer.company.ilike(f'%{escape_like(search)}%'),
             )
         )
 
@@ -252,23 +252,28 @@ def customer_profile(customer_id):
     sales_data = []
 
     # ── Lifetime stats (always computed) ─────────────────────
-    all_sales = (SaleTransaction.query
-                 .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
-                 .join(Product, ProductInstance.product_id == Product.id)
-                 .filter(
-                     SaleTransaction.customer_id == customer.id,
-                     Product.tenant_id == current_user.tenant_id,
-                 )
-                 .order_by(SaleTransaction.date_sold.asc())
-                 .all())
-    total_units_sold = len(all_sales)
-    total_spent = sum(float(s.price_at_sale or 0) for s in all_sales)
-    first_purchase = all_sales[0].date_sold if all_sales else None
-    last_purchase  = all_sales[-1].date_sold if all_sales else None
-
-    # Order count via distinct order_ids
-    order_ids = list({s.order_id for s in all_sales if s.order_id})
-    total_orders = len(order_ids)
+    from sqlalchemy import func as _func
+    _stats_row = (
+        db.session.query(
+            _func.count(SaleTransaction.id).label('total_units'),
+            _func.coalesce(_func.sum(SaleTransaction.price_at_sale), 0).label('total_spent'),
+            _func.min(SaleTransaction.date_sold).label('first_purchase'),
+            _func.max(SaleTransaction.date_sold).label('last_purchase'),
+            _func.count(_func.distinct(SaleTransaction.order_id)).label('total_orders'),
+        )
+        .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(
+            SaleTransaction.customer_id == customer.id,
+            Product.tenant_id == current_user.tenant_id,
+        )
+        .first()
+    )
+    total_units_sold = _stats_row.total_units or 0
+    total_spent = float(_stats_row.total_spent or 0)
+    first_purchase = _stats_row.first_purchase
+    last_purchase = _stats_row.last_purchase
+    total_orders = _stats_row.total_orders or 0
     avg_order_value = (total_spent / total_orders) if total_orders else 0
 
     # ── Units / Sales History view ───────────────────────────
@@ -574,7 +579,18 @@ def export_customer_sales(customer_id):
     tenant_settings = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
     settings = {s.key: s.value for s in tenant_settings}
 
-    sales = SaleTransaction.query.filter_by(customer_id=customer.id).order_by(SaleTransaction.date_sold.desc()).all()
+    from sqlalchemy.orm import joinedload as _jl
+    from inventory_flask_app.models import ProductInstance as _PI, Product as _Prod
+    sales = (
+        SaleTransaction.query
+        .filter_by(customer_id=customer.id)
+        .options(
+            _jl(SaleTransaction.product_instance)
+            .joinedload(_PI.product)
+        )
+        .order_by(SaleTransaction.date_sold.desc())
+        .all()
+    )
 
     wb = Workbook()
     ws = wb.active

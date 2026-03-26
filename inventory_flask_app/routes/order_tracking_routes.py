@@ -148,17 +148,21 @@ def reserve_product():
     if 'pending_reserve_customer_id' not in session:
         session['pending_reserve_customer_id'] = ""
     customers = Customer.query.filter_by(tenant_id=current_user.tenant_id).all()
-    available_instances = ProductInstance.query.join(Product).filter(
-        Product.tenant_id == current_user.tenant_id,
-        ProductInstance.is_sold == False
-    ).all()
 
-    serial_map = {}
-    for inst in available_instances:
-        if inst.serial:
-            serial_map[inst.serial] = inst
-        if inst.asset:
-            serial_map[inst.asset] = inst
+    def _lookup_serial(serial_or_asset):
+        """Find a single unsold instance by serial or asset tag."""
+        return (
+            ProductInstance.query.join(Product)
+            .filter(
+                Product.tenant_id == current_user.tenant_id,
+                ProductInstance.is_sold == False,
+                db.or_(
+                    ProductInstance.serial == serial_or_asset,
+                    ProductInstance.asset == serial_or_asset,
+                )
+            )
+            .first()
+        )
 
     if request.method == 'POST':
         session['pending_reserve_customer_id'] = request.form.get('customer_id') or session.get('pending_reserve_customer_id', '')
@@ -179,7 +183,7 @@ def reserve_product():
                 asset = request.form.get('asset')
                 if not serial:
                     flash("Please enter or scan a serial.", "warning")
-                elif serial not in serial_map:
+                elif not _lookup_serial(serial):
                     flash(f"Serial {serial} not found in available stock.", "danger")
                 elif serial in session['pending_reserve_serials']:
                     flash(f"Serial {serial} already added for reservation.", "warning")
@@ -206,7 +210,11 @@ def reserve_product():
             if not customer_id or not session['pending_reserve_serials']:
                 flash("Please select a customer and add at least one serial.", "danger")
             else:
-                reserved_instances = [serial_map[s] for s in session['pending_reserve_serials'] if s in serial_map]
+                reserved_instances = []
+                for s in session['pending_reserve_serials']:
+                    inst = _lookup_serial(s)
+                    if inst:
+                        reserved_instances.append(inst)
                 for instance in reserved_instances:
                     order = CustomerOrderTracking(
                         customer_id=customer_id,
@@ -245,13 +253,16 @@ def reserve_product():
                 session.modified = True
                 return redirect(url_for('order_bp.reserve_product'))
 
-    preview_instances = [serial_map[s] for s in session['pending_reserve_serials'] if s in serial_map]
+    preview_instances = []
+    for s in session['pending_reserve_serials']:
+        inst = _lookup_serial(s)
+        if inst:
+            preview_instances.append(inst)
     scanned_count = len(session['pending_reserve_serials'])
 
     return render_template(
         'reserve_product.html',
         customers=customers,
-        instances=available_instances,
         preview_instances=preview_instances,
         pending_serials=session['pending_reserve_serials'],
         selected_customer_id=session.get('pending_reserve_customer_id', ''),

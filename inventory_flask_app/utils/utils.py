@@ -9,6 +9,11 @@ from flask import abort, redirect, request, url_for
 from urllib.parse import urlparse
 
 
+def escape_like(val):
+    """Escape SQL LIKE wildcards in user input to prevent injection."""
+    return (val or '').replace('%', r'\%').replace('_', r'\_')
+
+
 def safe_redirect_back(fallback='dashboard_bp.main_dashboard', **kwargs):
     """Redirect to the HTTP Referer only if it is on the same host.
     Prevents open-redirect attacks via a forged Referer header.
@@ -306,7 +311,7 @@ def get_now_for_tenant():
         tz_name = current_user.tenant.timezone or 'UTC'
         return datetime.now(pytz.timezone(tz_name))
     except Exception:
-        return datetime.utcnow()
+        return datetime.now(pytz.UTC)
 
 
 def format_duration(minutes):
@@ -328,7 +333,7 @@ def calc_duration_minutes(since_dt):
     """Return minutes elapsed since `since_dt` (a datetime). Returns None if since_dt is None."""
     if since_dt is None:
         return None
-    now = datetime.utcnow()
+    now = datetime.now(pytz.UTC).replace(tzinfo=None)
     # Make both naive for subtraction
     if hasattr(since_dt, 'utcoffset') and since_dt.utcoffset() is not None:
         since_naive = since_dt.replace(tzinfo=None) - since_dt.utcoffset()

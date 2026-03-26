@@ -1,6 +1,6 @@
 import logging
 import traceback
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
@@ -61,23 +61,38 @@ def _ensure_unit_cost(instance):
 def pricing_dashboard():
     tid = current_user.tenant_id
 
-    # Totals
+    # Aggregate KPIs — single query instead of loading all rows
+    from sqlalchemy import func as _func
+    _agg = (
+        db.session.query(
+            _func.count(UnitCost.id).label('count'),
+            _func.coalesce(_func.sum(UnitCost.total_cost), 0).label('total_cost'),
+            _func.coalesce(_func.sum(UnitCost.suggested_price), 0).label('total_suggested'),
+            _func.count(_func.nullif(UnitCost.purchase_cost, 0)).label('has_purchase'),
+        )
+        .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
+        .filter(UnitCost.tenant_id == tid, ProductInstance.is_sold == False)
+        .first()
+    )
+    total_units_priced = _agg.count or 0
+    total_cost_value = float(_agg.total_cost or 0)
+    total_suggested = float(_agg.total_suggested or 0)
+    units_no_purchase_cost_agg = total_units_priced - (_agg.has_purchase or 0)
+
+    # Per-row logic for at-risk / below-cost lists (capped at 500 rows)
     all_costs = (
         UnitCost.query
         .filter_by(tenant_id=tid)
         .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
         .filter(ProductInstance.is_sold == False)
+        .limit(500)
         .all()
     )
-
-    total_units_priced  = len(all_costs)
-    total_cost_value    = sum(float(uc.total_cost or 0) for uc in all_costs)
-    total_suggested     = sum(float(uc.suggested_price or 0) for uc in all_costs)
 
     # At-risk: asking_price < suggested_price (or no asking price set)
     at_risk = []
     units_below_cost = []
-    units_no_purchase_cost = 0
+    units_no_purchase_cost = units_no_purchase_cost_agg
     total_at_asking = 0.0
     units_with_asking = 0
     margin_values = []
@@ -88,9 +103,6 @@ def pricing_dashboard():
         suggested = float(uc.suggested_price or 0)
         total = float(uc.total_cost or 0)
         purchase = float(uc.purchase_cost or 0)
-
-        if purchase == 0:
-            units_no_purchase_cost += 1
 
         if asking > 0:
             total_at_asking += asking
@@ -170,12 +182,16 @@ def po_pricing(po_id):
     )
 
     if request.method == 'POST':
-        settings.shipping_mode    = request.form.get('shipping_mode', 'shared')
-        settings.total_shipping   = Decimal(request.form.get('total_shipping') or 0)
-        settings.shipping_per_unit = Decimal(request.form.get('shipping_per_unit') or 0)
-        settings.duty_type        = request.form.get('duty_type', 'percent')
-        settings.duty_value       = Decimal(request.form.get('duty_value') or 0)
-        settings.default_margin   = Decimal(request.form.get('default_margin') or 25)
+        try:
+            settings.shipping_mode    = request.form.get('shipping_mode', 'shared')
+            settings.total_shipping   = Decimal(request.form.get('total_shipping') or 0)
+            settings.shipping_per_unit = Decimal(request.form.get('shipping_per_unit') or 0)
+            settings.duty_type        = request.form.get('duty_type', 'percent')
+            settings.duty_value       = Decimal(request.form.get('duty_value') or 0)
+            settings.default_margin   = Decimal(request.form.get('default_margin') or 25)
+        except (InvalidOperation, ValueError, TypeError):
+            flash('Invalid number entered.', 'danger')
+            return redirect(url_for('pricing_bp.po_pricing', po_id=po.id))
 
         if not settings.id:
             db.session.add(settings)
@@ -243,15 +259,19 @@ def unit_pricing(instance_id):
     uc = _ensure_unit_cost(inst)
 
     if request.method == 'POST':
-        uc.purchase_cost    = Decimal(request.form.get('purchase_cost') or 0)
-        uc.shipping_cost    = Decimal(request.form.get('shipping_cost') or 0)
-        uc.duty_amount      = Decimal(request.form.get('duty_amount') or 0)
-        uc.repair_cost      = Decimal(request.form.get('repair_cost') or 0)
-        uc.ram_upgrade_cost = Decimal(request.form.get('ram_upgrade_cost') or 0)
-        uc.ssd_upgrade_cost = Decimal(request.form.get('ssd_upgrade_cost') or 0)
-        uc.other_cost       = Decimal(request.form.get('other_cost') or 0)
+        try:
+            uc.purchase_cost    = Decimal(request.form.get('purchase_cost') or 0)
+            uc.shipping_cost    = Decimal(request.form.get('shipping_cost') or 0)
+            uc.duty_amount      = Decimal(request.form.get('duty_amount') or 0)
+            uc.repair_cost      = Decimal(request.form.get('repair_cost') or 0)
+            uc.ram_upgrade_cost = Decimal(request.form.get('ram_upgrade_cost') or 0)
+            uc.ssd_upgrade_cost = Decimal(request.form.get('ssd_upgrade_cost') or 0)
+            uc.other_cost       = Decimal(request.form.get('other_cost') or 0)
+            uc.margin_percent   = Decimal(request.form.get('margin_percent') or 25)
+        except (InvalidOperation, ValueError, TypeError):
+            flash('Invalid number entered. Please check your values.', 'danger')
+            return redirect(url_for('pricing_bp.unit_pricing', instance_id=inst.id))
         uc.other_cost_note  = request.form.get('other_cost_note', '').strip() or None
-        uc.margin_percent   = Decimal(request.form.get('margin_percent') or 25)
         uc.calculate()
 
         if request.form.get('apply_to_asking'):

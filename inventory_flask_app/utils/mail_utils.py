@@ -1,7 +1,7 @@
 """Mail utility functions: low-stock alerts, SLA alerts, reservation emails."""
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def _log_communication(customer_id, tenant_id, comm_type, subject, sent_by_id=No
             type=comm_type,
             subject=subject,
             sent_by=sent_by_id,
-            sent_at=datetime.utcnow(),
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         db.session.add(entry)
         db.session.commit()
@@ -125,7 +125,7 @@ def send_reservation_confirmation(customer, units, tenant_id):
                 f"Dear {customer.name},\n\n"
                 f"Your reservation has been confirmed for {len(units)} unit(s):\n\n"
                 f"{unit_lines}\n\n"
-                f"Reserved on: {datetime.utcnow().strftime('%d %b %Y')}\n\n"
+                f"Reserved on: {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%d %b %Y')}\n\n"
                 f"We will notify you when your unit(s) are ready for pickup. "
                 f"If you have any questions, please contact us.\n"
             )
@@ -271,7 +271,7 @@ def maybe_send_low_stock_email(tenant_id):
     notif_setting = TenantSettings.query.filter_by(
         tenant_id=tenant_id, key='low_stock_last_notified'
     ).first()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if notif_setting and notif_setting.value:
         try:
             last_sent = datetime.fromisoformat(notif_setting.value)
@@ -360,7 +360,7 @@ def get_overdue_units(tenant_id):
         .all()
     )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     overdue = []
     for unit in units:
         stage = (unit.process_stage or '').strip()
@@ -420,7 +420,7 @@ def maybe_send_sla_alert(tenant_id):
     cooldown = TenantSettings.query.filter_by(
         tenant_id=tenant_id, key='sla_alert_last_sent_at'
     ).first()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if cooldown and cooldown.value:
         try:
             last = datetime.fromisoformat(cooldown.value)

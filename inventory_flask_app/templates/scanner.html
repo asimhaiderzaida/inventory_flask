@@ -777,6 +777,12 @@
   let currentUnit = null;
   let scanTimeout = null;
   const CSRF = '{{ csrf_token() }}';
+  const URLS = {
+    viewInstance: '{{ url_for("stock_bp.view_edit_instance", instance_id=0) }}'.replace('/0/', '/{id}/'),
+    returnLookup: '{{ url_for("returns_bp.lookup_return") }}',
+    createSale:   '{{ url_for("sales_bp.create_sale_form") }}',
+    reserveProduct: '{{ url_for("order_bp.reserve_product") }}',
+  };
   const STATUS_LABELS = {
     'unprocessed':  '{{ get_status_label("unprocessed") }}',
     'under_process':'{{ get_status_label("under_process") }}',
@@ -971,8 +977,8 @@
     let html = '';
 
     if (d.is_sold) {
-      html += `<a href="/stock/instance/${iid}/view_edit" class="scanner-btn scanner-btn-outline" target="_blank"><i class="bi bi-receipt"></i> View Sale</a>`;
-      html += `<a href="/returns/lookup?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-arrow-return-left"></i> Process Return</a>`;
+      html += `<a href="${URLS.viewInstance.replace('{id}', iid)}" class="scanner-btn scanner-btn-outline" target="_blank"><i class="bi bi-receipt"></i> View Sale</a>`;
+      html += `<a href="${URLS.returnLookup}?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-arrow-return-left"></i> Process Return</a>`;
     } else {
       // Move Location — always available for non-sold
       html += `<button class="scanner-btn scanner-btn-primary" onclick="openMoveModal()"><i class="bi bi-geo-alt"></i> Move Location</button>`;
@@ -985,8 +991,8 @@
         html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Stage</button>`;
         html += `<button class="scanner-btn scanner-btn-outline" onclick="openIdleModal()"><i class="bi bi-pause-circle"></i> Mark Idle</button>`;
       } else if (status === 'processed') {
-        html += `<a href="/sales/create?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-cart-plus"></i> Create Sale</a>`;
-        html += `<a href="/customer_orders/reserve?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-bookmark"></i> Reserve</a>`;
+        html += `<a href="${URLS.createSale}?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-cart-plus"></i> Create Sale</a>`;
+        html += `<a href="${URLS.reserveProduct}?serial=${sn}" class="scanner-btn scanner-btn-outline"><i class="bi bi-bookmark"></i> Reserve</a>`;
         html += `<button class="scanner-btn scanner-btn-outline" onclick="openStatusModal()"><i class="bi bi-arrow-repeat"></i> Update Status</button>`;
       } else if (status === 'idle') {
         html += `<button class="scanner-btn scanner-btn-success" onclick="doCheckin()"><i class="bi bi-play-circle"></i> Return to Processing</button>`;

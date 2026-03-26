@@ -8,6 +8,7 @@ from ..models import db, Customer, ProductInstance, SaleTransaction, Product, Te
 from sqlalchemy import or_
 from inventory_flask_app import csrf
 from inventory_flask_app.utils import get_now_for_tenant
+from inventory_flask_app.utils.utils import escape_like
 from inventory_flask_app.utils.utils import module_required
 
 logger = logging.getLogger(__name__)
@@ -37,9 +38,9 @@ def search_units_api():
             ProductInstance.is_sold == False,
             ProductInstance.status != 'idle',
             db.or_(
-                ProductInstance.serial.ilike(f'%{q}%'),
-                ProductInstance.asset.ilike(f'%{q}%'),
-                Product.model.ilike(f'%{q}%'),
+                ProductInstance.serial.ilike(f'%{escape_like(q)}%'),
+                ProductInstance.asset.ilike(f'%{escape_like(q)}%'),
+                Product.model.ilike(f'%{escape_like(q)}%'),
             )
         )
         .options(db.joinedload(ProductInstance.product))
