@@ -753,7 +753,7 @@ def send_portal_link(customer_id):
         return jsonify(success=False, message='Customer has no email address on file.'), 422
 
     data = request.get_json() or {}
-    portal_url = data.get('url') or url_for(
+    portal_url = url_for(
         'customers_bp.customer_portal', token=customer.portal_token, _external=True
     )
 

@@ -327,7 +327,7 @@
   <div class="col-6 col-lg-3">
     <a href="{{ url_for('stock_bp.under_process') }}" class="kpi-card db-primary">
       <div class="kpi-icon"><i class="bi bi-box-seam"></i></div>
-      <div class="kpi-value" id="kpi-inventory">{{ total_inventory }}</div>
+      <div class="kpi-value" id="kpi-inventory-tech">{{ total_inventory }}</div>
       <div class="kpi-label">Total Inventory (units)</div>
       <div class="kpi-trend flat" style="margin-top:.4rem;">
         <i class="bi bi-box-arrow-in-down"></i> {{ unprocessed }} unprocessed
@@ -338,7 +338,7 @@
   <div class="col-6 col-lg-3">
     <a href="{{ url_for('stock_bp.under_process') }}" class="kpi-card db-primary">
       <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
-      <div class="kpi-value" id="kpi-under-process">{{ under_process }}</div>
+      <div class="kpi-value" id="kpi-under-process-tech">{{ under_process }}</div>
       <div class="kpi-label">{{ get_status_label('under_process') }}</div>
       <div class="kpi-trend flat" style="margin-top:.4rem;">
         <i class="bi bi-person-gear"></i> Across all techs
@@ -371,7 +371,7 @@
   <div class="col-6 col-lg-3">
     <div class="kpi-card db-green">
       <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
-      <div class="kpi-value" id="kpi-revenue">{{ '{:,.0f}'.format(revenue_this_month) }}</div>
+      <div class="kpi-value" id="kpi-revenue-sales">{{ '{:,.0f}'.format(revenue_this_month) }}</div>
       <div class="kpi-label">Revenue This Month ({{ currency }})</div>
       {% if revenue_trend is not none %}
       <div class="kpi-trend {{ 'up' if revenue_trend >= 0 else 'down' }}">
@@ -386,7 +386,7 @@
   <div class="col-6 col-lg-3">
     <a href="{{ url_for('sales_bp.sold_units_view') }}" class="kpi-card db-green">
       <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
-      <div class="kpi-value" id="kpi-sold">{{ units_sold_this_month }}</div>
+      <div class="kpi-value" id="kpi-sold-sales">{{ units_sold_this_month }}</div>
       <div class="kpi-label">Units Sold This Month</div>
       {% if sales_trend is not none %}
       <div class="kpi-trend {{ 'up' if sales_trend >= 0 else 'down' }}">
@@ -421,7 +421,7 @@
   <div class="col-6 col-lg-3">
     <div class="kpi-card {{ 'db-amber' if outstanding_ar > 0 else 'db-green' }}">
       <div class="kpi-icon"><i class="bi bi-file-earmark-check"></i></div>
-      <div class="kpi-value" id="kpi-ar">{{ '{:,.0f}'.format(outstanding_ar) }}</div>
+      <div class="kpi-value" id="kpi-ar-sales">{{ '{:,.0f}'.format(outstanding_ar) }}</div>
       <div class="kpi-label">Outstanding AR ({{ currency }})</div>
       <div class="kpi-trend flat" style="margin-top:.4rem;">
         <i class="bi bi-exclamation-circle"></i> Unpaid invoices
@@ -1060,7 +1060,7 @@
 {% endif %}{# end sales reservations panel #}
 
 {# ── Chart.js ──────────────────────────────────────────────────────────────── #}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const ALL_LABELS  = {{ sales_chart.labels  | tojson }};
 const ALL_SALES   = {{ sales_chart.sales   | tojson }};
@@ -1237,6 +1237,18 @@ function refreshStats() {
           const el = document.getElementById(i);
           if (el) el.textContent = d[key];
         });
+      }
+      // Also update role-specific variant IDs
+      const altMap = {
+        'total_inventory':       'kpi-inventory-tech',
+        'under_process':         'kpi-under-process-tech',
+        'revenue_this_month':    'kpi-revenue-sales',
+        'units_sold_this_month': 'kpi-sold-sales',
+      };
+      for (const [key, id] of Object.entries(altMap)) {
+        if (d[key] === undefined) continue;
+        const el = document.getElementById(id);
+        if (el) el.textContent = key === 'revenue_this_month' ? Math.round(d[key]).toLocaleString() : d[key];
       }
       // AR formatted
       const arEl = document.getElementById('ops-ar');

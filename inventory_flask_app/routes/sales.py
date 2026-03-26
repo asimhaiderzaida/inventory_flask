@@ -108,11 +108,16 @@ def confirm_sale():
         instances = []
         dropped_serials = []
         for serial, asset in serial_asset_pairs:
-            instance = ProductInstance.query.join(Product).filter(
-                ProductInstance.serial == serial,
-                ProductInstance.asset == asset,
-                Product.tenant_id == current_user.tenant_id
-            ).first()
+            instance = (
+                ProductInstance.query.join(Product)
+                .filter(
+                    ProductInstance.serial == serial,
+                    ProductInstance.asset == asset,
+                    Product.tenant_id == current_user.tenant_id
+                )
+                .with_for_update()
+                .first()
+            )
             if instance:
                 instances.append(instance)
             else:
@@ -135,7 +140,12 @@ def confirm_sale():
                 return jsonify({"success": False, "error": "All units must have a price greater than 0"})
 
         now = get_now_for_tenant()
-        order_number = f"ORD-{now.strftime('%Y%m%d%H%M%S')}"
+        import random, string
+        for _attempt in range(5):
+            _suffix = ''.join(random.choices(string.digits, k=4))
+            order_number = f"ORD-{now.strftime('%Y%m%d%H%M%S')}-{_suffix}"
+            if not Order.query.filter_by(order_number=order_number, tenant_id=current_user.tenant_id).first():
+                break
         new_order = Order(
             order_number=order_number,
             customer_id=customer.id,
@@ -160,6 +170,7 @@ def confirm_sale():
                 )
                 sale.order_id = new_order.id
                 instance.is_sold = True
+                instance.status = 'sold'
                 db.session.add(sale)
                 sale_transactions.append(sale)
 

@@ -360,7 +360,7 @@ class ProductInstance(db.Model):
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    order_number = db.Column(db.String(50), nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id', ondelete='CASCADE'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     tenant_id = db.Column(
@@ -373,6 +373,10 @@ class Order(db.Model):
     user = db.relationship('User')
     tenant = db.relationship('Tenant')
     sale_transactions = db.relationship('SaleTransaction', backref='order')
+
+    __table_args__ = (
+        db.UniqueConstraint('order_number', 'tenant_id', name='uq_order_number_tenant'),
+    )
 
 class SaleTransaction(db.Model):
     __table_args__ = (
