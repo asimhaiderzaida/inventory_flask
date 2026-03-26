@@ -1916,7 +1916,7 @@ Identified and corrected the "Alienware Alienware m18 R1 AMD" bad listing direct
 
 ---
 
-### Next Session TODO
+### Next Session TODO (Shopify)
 
 - [ ] Set up SSL/HTTPS on server (needs domain name → Let's Encrypt)
 - [ ] Re-run Register Webhooks once HTTPS is live
@@ -1924,3 +1924,251 @@ Identified and corrected the "Alienware Alienware m18 R1 AMD" bad listing direct
 - [ ] Add `read_customers`/`write_customers` scope to Shopify custom app (for auto customer creation)
 - [ ] Bulk publish button in group_view.html / instance_table.html
 - [ ] Admin settings page Shopify section
+- [ ] Shopify webhooks tenant routing still needs fixing
+
+---
+
+## Session — 26 March 2026 (Smart Pricing, Security Audit, UX Improvements)
+
+### App Stats at End of Session
+| Metric | Value |
+|--------|-------|
+| Total routes | ~250 |
+| Blueprints | 20 |
+| DB Tables | 42 |
+| Security issues fixed (cumulative) | 70 |
+| Migration | `d9c40de175a2` (index sync) |
+
+---
+
+### 1. Sidebar Reorganisation
+
+Restructured the global sidebar (`base.html`) into labelled sections for a professional navigation hierarchy:
+
+| Section | Items |
+|---|---|
+| INVENTORY | Stock List, Purchase Orders, Locations |
+| PROCESSING | Pipeline, My Work, Process Stages |
+| SALES | Sales, Orders, Invoices, Customer Portal |
+| PARTS | Parts Inventory |
+| PEOPLE | Customers, Vendors |
+| FINANCE | Accounting |
+| ANALYTICS | Reports, Dashboard |
+| INTEGRATIONS | Shopify |
+| ADMIN | Settings, Users |
+
+---
+
+### 2. Smart Pricing System
+
+#### New Models
+- **`UnitCost`** — full cost breakdown per `ProductInstance`: purchase cost, repair cost, shipping, labour, other costs, overhead %; auto-calculates `total_cost`
+- **`POCostSettings`** — PO-level defaults (shipping per unit, labour, overhead %) that auto-fill onto units received
+
+#### Auto-fill on Receiving
+When a unit is scanned in during PO receiving, purchase cost is populated from `PurchaseOrderItem` or PO-level cost settings via `UnitCost` creation.
+
+#### SQLAlchemy Event Auto-recalculate
+`UnitCost` uses `@event.listens_for` on `before_insert` and `before_update` to auto-recalculate `total_cost` whenever any cost field changes — no manual trigger needed.
+
+#### Pricing Rules (per unit)
+| Rule | Behaviour |
+|---|---|
+| `margin_pct` | `price = total_cost / (1 - margin%)` |
+| `fixed_markup` | `price = total_cost + markup_amount` |
+| `fixed_price` | Manual price, no auto-calc |
+| `round_up` | Rounds calculated price up to nearest £X |
+
+#### Bulk Pricing Editor (`/pricing/bulk`)
+- Grid view: all unsold units with cost columns and price columns side-by-side
+- Inline edit for purchase cost, selling price
+- Apply pricing rule across selection
+- KPI cards: units with no cost, units with no price, avg margin
+
+#### Pricing Dashboard (`/pricing/`)
+- Summary KPIs: total inventory value at cost, total at price, margin %, units missing cost/price
+- Accessible from sidebar under ANALYTICS
+
+**New blueprint:** `pricing_bp` at `/pricing/`
+**Files:** `routes/pricing.py`, `templates/pricing/bulk_pricing.html`, `templates/pricing/pricing_dashboard.html`
+
+---
+
+### 3. Stock Intake Improvements
+
+- **Excel import template**: added optional `cost` column; mapped to `UnitCost.purchase_cost` on import
+- **PO receiving summary**: per-model cost table shows average cost per model group after scan session
+- **Manual Add Single Unit**: fixed field name mismatch that was silently dropping the form submission
+- **Orphan JSON API endpoint** (`/stock/api/instances`) removed — was unreachable and untested
+
+**Files:** `routes/stock.py`, `templates/stock_intake.html`
+
+---
+
+### 4. PO Management — Delete Flow
+
+New two-step delete for Purchase Orders:
+
+1. **Preview** (`GET /stock/purchase_order/<id>/delete_preview`) — shows impact: how many units will be affected, their current status breakdown, and two options:
+   - **Delete PO + all units** — removes PO and all linked `ProductInstance` records
+   - **Delete PO, keep units** — removes PO record only; units stay in inventory unlinked
+2. **Confirm** (`POST /stock/purchase_order/<id>/delete`) — executes chosen option with tenant safety check
+
+**Files:** `routes/stock.py`, `templates/view_purchase_order.html`
+
+---
+
+### 5. Security Hardening — Deep Audit (70 issues fixed)
+
+Four rounds of deep audit work completed across the session:
+
+#### Critical / High
+- Multi-tenant unique constraints enforced at DB level (`UniqueConstraint` with `tenant_id`)
+- XSS vulnerabilities patched (`Markup()` wrapping removed; templates use `{{ }}` not `{{ | safe }}` where untrusted)
+- Role-based access control completed on all admin/staff routes
+- `datetime.utcnow()` eliminated everywhere — replaced with `get_now_for_tenant()` (timezone-aware)
+- Customer portal token given 30-day TTL; expired tokens return 403
+
+#### Medium
+- Custom per-user permission system built (`UserPermission` model) — granular overrides on top of role
+- Shopify webhook tenant routing fixed (webhook lookup now uses `X-Shopify-Shop-Domain` header)
+- All `print()` debug statements replaced with `logger`
+
+#### Low / Informational
+- 403 and 404 error pages added (`templates/errors/403.html`, `templates/errors/404.html`)
+- Flask error handlers registered in `__init__.py`
+- Dead routes and orphan endpoints cleaned up
+
+---
+
+### 6. Backup & Factory Reset (Admin)
+
+New admin-only tools under `/admin/`:
+
+#### Download Backup
+- `GET /admin/backup/download` — generates ZIP containing 9 CSV files:
+  `instances.csv`, `products.csv`, `purchase_orders.csv`, `customers.csv`, `vendors.csv`, `sales.csv`, `invoices.csv`, `parts.csv`, `users.csv`
+- Tenant-scoped: only exports current tenant's data
+
+#### Factory Reset
+- `GET /admin/factory_reset` — confirmation page with checkboxes for each data category
+- User must type `DELETE` or `RESET` to confirm
+- `POST /admin/factory_reset` — selectively wipes checked categories; preserves tenant + user accounts by default
+
+**Files:** `routes/admin.py`, `templates/admin/backup.html`, `templates/admin/factory_reset.html`
+
+---
+
+### 7. Unit History Timeline
+
+Rebuilt unit detail page (`/stock/instance/<id>`) history section as a full timeline:
+
+Sources merged into a single chronological feed:
+- `ProductProcessLog` — stage and team changes
+- `CustomerOrderTracking` — reservation, cancellation, delivery events
+- `SaleItem` — sold event with price
+- `Return` — return event with reason
+- `ShopifySyncLog` — listed / unlisted / order events
+
+Each event has: timestamp, icon, colour-coded type badge, actor name, and detail text.
+
+**Files:** `routes/stock.py`, `templates/stock/unit_detail.html`
+
+---
+
+### 8. Quick Price Editor — Bug Fixes
+
+The Quick Price Editor (`/stock/bulk_price`) had multiple broken JS interactions:
+
+| Bug | Fix |
+|---|---|
+| Bootstrap CDN integrity check failing — blocked all JS | Removed `integrity=` + `crossorigin=` attributes from CDN `<script>` tags in `base.html` |
+| Set Price modal not submitting | Fixed JS event binding; was attaching before DOM ready |
+| Set Cost modal not working | Same fix; also wired to correct `bulk_cost_save` endpoint |
+| Clear Price button | Fixed — was sending wrong field key |
+| Pricing rules not applying | Connected rule selector to save payload |
+
+**Files:** `templates/bulk_price_editor.html`, `templates/base.html`
+
+---
+
+### 9. Orders Module
+
+New lightweight order entry system for tracking incoming customer demand:
+
+#### New Model — `CustomerOrder`
+Fields: `customer_id`, `tenant_id`, `product_description` (free text), `qty`, `unit_price`, `delivery_date`, `status` (`open`/`closed`), `notes`, `created_at`
+
+#### Routes
+| Method | URL | Purpose |
+|---|---|---|
+| GET | `/orders/` | List all open/closed orders |
+| GET/POST | `/orders/new` | Create order |
+| GET/POST | `/orders/<id>/edit` | Edit order |
+| POST | `/orders/<id>/close` | Mark closed |
+| POST | `/orders/<id>/delete` | Delete |
+
+- Added to sidebar under **SALES** section
+- Simple table view with open/closed filter tabs
+
+**Files:** `routes/order_routes.py`, `templates/orders/order_list.html`, `templates/orders/order_form.html`
+
+---
+
+### 10. Processing Improvements
+
+- **Stage tracking → Order Tracker**: when a unit advances to `processed`, linked `CustomerOrderTracking` records are updated automatically
+- **Customer portal**: processing stages now visible to customers on their portal page (shows current stage name + last updated)
+- **Pipeline vs My Work**: visually distinguished — Pipeline shows all in-flight units across team; My Work shows units assigned to current user with priority sort
+
+---
+
+### 11. Database — Index Sync Migration
+
+`flask db check` detected name drift between model index names and live DB. Generated and applied migration:
+
+| Change | Index | Table |
+|---|---|---|
+| Dropped | `ix_product_tenant_id` | `product` |
+| Dropped | `ix_pi_bin_id_perf` | `product_instance` |
+| Dropped | `ix_pi_location_id_perf` | `product_instance` |
+| Created | `ix_pi_bin_id` | `product_instance` |
+| Created | `ix_pi_location_id` | `product_instance` |
+
+**Migration:** `d9c40de175a2_sync_index_names.py`
+`flask db check` → **"No new upgrade operations detected"** after upgrade.
+
+---
+
+### Current Status
+
+| Area | Status |
+|---|---|
+| Core inventory (stock, POs, processing) | Stable |
+| Smart pricing | Complete |
+| Security audit | Complete (70 issues fixed) |
+| Shopify integration | Partial — webhooks need HTTPS + re-registration |
+| Accounting module | Pending — waiting for accountant discussion |
+| Dashboard enhancements | In progress |
+| SSL/HTTPS | Not yet — needs domain name |
+
+---
+
+### Pending / Next Session
+
+- [ ] Dashboard enhancement (KPI improvements, charts)
+- [ ] Full accounting module (after accountant discussion)
+- [ ] Shopify: re-register webhooks once HTTPS live
+- [ ] Shopify: fix tenant routing in webhook handler
+- [ ] Set up SSL (Let's Encrypt, needs domain)
+- [ ] Bulk publish button on inventory/group view pages
+- [ ] Admin settings — Shopify section
+
+---
+
+### Resume Command
+
+To resume work in the next session, read this file and the memory index at:
+`/home/pcmart/.claude/projects/-home-pcmart-inventory-flask/memory/MEMORY.md`
+
+Then run: `flask db check` to confirm DB is in sync, and `git log --oneline -10` to see recent commits.
