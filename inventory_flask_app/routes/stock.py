@@ -1393,7 +1393,23 @@ def print_labels_batch():
             "qr_b64": qr_b64,
             "printed_time": get_now_for_tenant(),
         })
-    return render_template("batch_print_labels.html", batch_labels=batch_labels)
+    from inventory_flask_app.models import TenantSettings
+    _tid = current_user.tenant_id
+    _label_rows = TenantSettings.query.filter(
+        TenantSettings.tenant_id == _tid,
+        TenantSettings.key.like('label_%')
+    ).all()
+    label_config = {r.key: r.value for r in _label_rows}
+    _extra = {r.key: r.value for r in TenantSettings.query.filter(
+        TenantSettings.tenant_id == _tid,
+        TenantSettings.key.in_(['dashboard_logo', 'company_name'])
+    ).all()}
+    return render_template("batch_print_labels.html",
+        batch_labels=batch_labels,
+        label_config=label_config,
+        logo_path=_extra.get('dashboard_logo'),
+        company_name=_extra.get('company_name', ''),
+    )
 
 
 # ── Bulk status change ────────────────────────────────────────────────────────
@@ -2934,11 +2950,26 @@ def print_label(instance_id):
     img.save(buffered, format="PNG")
     qr_b64 = base64.b64encode(buffered.getvalue()).decode()
 
+    from inventory_flask_app.models import TenantSettings
+    _tid = current_user.tenant_id
+    _label_rows = TenantSettings.query.filter(
+        TenantSettings.tenant_id == _tid,
+        TenantSettings.key.like('label_%')
+    ).all()
+    label_config = {r.key: r.value for r in _label_rows}
+    _extra = {r.key: r.value for r in TenantSettings.query.filter(
+        TenantSettings.tenant_id == _tid,
+        TenantSettings.key.in_(['dashboard_logo', 'company_name'])
+    ).all()}
+
     return render_template(
         "print_label.html",
         instance=instance,
         qr_b64=qr_b64,
-        printed_time=datetime.now()
+        printed_time=datetime.now(),
+        label_config=label_config,
+        logo_path=_extra.get('dashboard_logo'),
+        company_name=_extra.get('company_name', ''),
     )
 
 @stock_bp.route('/batch_update_status', methods=['POST'])

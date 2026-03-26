@@ -170,6 +170,64 @@ def upload_logo():
     return redirect(url_for('admin_bp.admin_settings'))
 
 
+@admin_bp.route('/admin/label_template', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def label_template():
+    """Configure barcode/QR label layout."""
+    tid = current_user.tenant_id
+
+    defaults = {
+        'label_format': 'qr',
+        'label_width_mm': '50',
+        'label_height_mm': '30',
+        'label_show_logo': 'false',
+        'label_show_serial': 'true',
+        'label_show_asset': 'true',
+        'label_show_model': 'true',
+        'label_show_make': 'false',
+        'label_show_cpu': 'false',
+        'label_show_ram': 'false',
+        'label_show_grade': 'false',
+        'label_show_location': 'false',
+        'label_show_company_name': 'true',
+        'label_font_size': '9',
+        'label_code_size': '120',
+        'label_title_text': '',
+    }
+
+    rows = TenantSettings.query.filter(
+        TenantSettings.tenant_id == tid,
+        TenantSettings.key.like('label_%')
+    ).all()
+    current_cfg = {r.key: r.value for r in rows}
+    config = {**defaults, **current_cfg}
+
+    if request.method == 'POST':
+        for key in defaults:
+            if key.startswith('label_show_'):
+                val = 'true' if request.form.get(key) else 'false'
+            else:
+                val = request.form.get(key, '').strip()
+            setting = TenantSettings.query.filter_by(tenant_id=tid, key=key).first()
+            if setting:
+                setting.value = val
+            else:
+                db.session.add(TenantSettings(tenant_id=tid, key=key, value=val))
+        db.session.commit()
+        flash('Label template saved.', 'success')
+        return redirect(url_for('admin_bp.label_template'))
+
+    # Retrieve logo path for preview
+    logo_row = TenantSettings.query.filter_by(tenant_id=tid, key='dashboard_logo').first()
+    logo_path = logo_row.value if logo_row else None
+    company_row = TenantSettings.query.filter_by(tenant_id=tid, key='company_name').first()
+    company_name = company_row.value if company_row else ''
+
+    return render_template('admin_label_template.html',
+                           config=config, logo_path=logo_path, company_name=company_name)
+
+
 @admin_bp.route('/admin/self_test', methods=['GET'])
 @login_required
 @admin_required

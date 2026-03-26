@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% block title %}Label Template{% endblock %}
+{% block page_title %}Label Template{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Label Template</h1>
+    <div class="page-subtitle">Configure barcode and QR code label layout</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('admin_bp.label_template') }}?preview=1" target="_blank" class="btn btn-ghost">
+      <i class="bi bi-eye"></i> Preview
+    </a>
+    <a href="{{ url_for('admin_bp.admin_settings') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Settings
+    </a>
+  </div>
+</div>
+
+<form method="POST" id="labelForm">
+  {{ csrf_token() if csrf_token is defined }}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-4 animate-fade-up">
+
+    {# ── LEFT: Config form ─────────────────────────────────────── #}
+    <div class="col-12 col-lg-7">
+
+      {# Section 1: Code Format #}
+      <div class="table-card mb-3">
+        <div style="padding:1rem 1.25rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">
+          Code Format
+        </div>
+        <div style="padding:1.25rem;">
+          <div class="mb-3">
+            <div class="d-flex gap-4 flex-wrap">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="label_format" id="fmt_qr"
+                       value="qr" {% if config.label_format != 'barcode128' %}checked{% endif %}
+                       onchange="updatePreview()">
+                <label class="form-check-label" for="fmt_qr">
+                  <i class="bi bi-qr-code me-1"></i>QR Code
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="label_format" id="fmt_bc"
+                       value="barcode128" {% if config.label_format == 'barcode128' %}checked{% endif %}
+                       onchange="updatePreview()">
+                <label class="form-check-label" for="fmt_bc">
+                  <i class="bi bi-upc me-1"></i>Barcode (Code 128)
+                </label>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="label_code_size">Code Size (px): <strong id="codesize-val">{{ config.label_code_size }}</strong></label>
+            <input type="range" class="form-range" name="label_code_size" id="label_code_size"
+                   min="60" max="200" value="{{ config.label_code_size }}"
+                   oninput="document.getElementById('codesize-val').textContent=this.value;updatePreview()">
+            <div class="d-flex justify-content-between" style="font-size:0.72rem;color:var(--text-muted);">
+              <span>60</span><span>200</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Section 2: Label Size & Typography #}
+      <div class="table-card mb-3">
+        <div style="padding:1rem 1.25rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">
+          Label Size &amp; Typography
+        </div>
+        <div style="padding:1.25rem;">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label" for="label_width_mm">Width (mm)</label>
+              <input type="number" class="form-control" name="label_width_mm" id="label_width_mm"
+                     min="20" max="200" value="{{ config.label_width_mm }}"
+                     oninput="updatePreview()">
+            </div>
+            <div class="col-4">
+              <label class="form-label" for="label_height_mm">Height (mm)</label>
+              <input type="number" class="form-control" name="label_height_mm" id="label_height_mm"
+                     min="10" max="120" value="{{ config.label_height_mm }}"
+                     oninput="updatePreview()">
+            </div>
+            <div class="col-4">
+              <label class="form-label" for="label_font_size">Font Size (pt)</label>
+              <input type="number" class="form-control" name="label_font_size" id="label_font_size"
+                     min="6" max="14" value="{{ config.label_font_size }}"
+                     oninput="updatePreview()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Section 3: Fields #}
+      <div class="table-card mb-3">
+        <div style="padding:1rem 1.25rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">
+          Fields to Show
+        </div>
+        <div style="padding:1.25rem;">
+          <div class="row g-2">
+            {% set field_checks = [
+              ('label_show_serial',       'Serial Number',  true),
+              ('label_show_asset',        'Asset Tag',      true),
+              ('label_show_model',        'Model',          true),
+              ('label_show_company_name', 'Company Name',   true),
+              ('label_show_make',         'Make / Brand',   false),
+              ('label_show_cpu',          'CPU / Processor',false),
+              ('label_show_ram',          'RAM',            false),
+              ('label_show_grade',        'Grade',          false),
+              ('label_show_location',     'Location / Bin', false),
+            ] %}
+            {% for fname, flabel, fdefault in field_checks %}
+            <div class="col-6 col-md-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox"
+                       name="{{ fname }}" id="{{ fname }}"
+                       {% if config.get(fname, 'true' if fdefault else 'false') == 'true' %}checked{% endif %}
+                       onchange="updatePreview()">
+                <label class="form-check-label" for="{{ fname }}">{{ flabel }}</label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {# Section 4: Extras #}
+      <div class="table-card mb-3">
+        <div style="padding:1rem 1.25rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">
+          Extras
+        </div>
+        <div style="padding:1.25rem;">
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="label_show_logo" id="label_show_logo"
+                   {% if config.label_show_logo == 'true' %}checked{% endif %}
+                   onchange="updatePreview()">
+            <label class="form-check-label" for="label_show_logo">
+              Show company logo
+              {% if not logo_path %}<span class="text-muted" style="font-size:0.78rem;">(no logo uploaded yet — go to Settings)</span>{% endif %}
+            </label>
+          </div>
+          <div>
+            <label class="form-label" for="label_title_text">Custom title line <span class="text-muted" style="font-size:0.78rem;">(optional — printed above code)</span></label>
+            <input type="text" class="form-control" name="label_title_text" id="label_title_text"
+                   maxlength="60" value="{{ config.label_title_text or '' }}"
+                   placeholder="e.g. Refurbished IT Equipment" oninput="updatePreview()">
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>Save Template
+        </button>
+        <a href="{{ url_for('admin_bp.admin_settings') }}" class="btn btn-ghost">Cancel</a>
+      </div>
+
+    </div>{# /col-lg-7 #}
+
+    {# ── RIGHT: Live preview ───────────────────────────────────── #}
+    <div class="col-12 col-lg-5">
+      <div style="position:sticky;top:80px;">
+        <div class="table-card">
+          <div style="padding:1rem 1.25rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">
+            Live Preview
+          </div>
+          <div id="preview-panel"
+               style="padding:1.5rem;background:var(--surface-2);display:flex;align-items:center;justify-content:center;min-height:160px;">
+            <!-- Rendered by JS -->
+          </div>
+          <div style="padding:0.5rem 1.25rem 0.75rem;font-size:0.72rem;color:var(--text-muted);">
+            Sample data — actual label content comes from each unit.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>{# /row #}
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<style>
+  .preview-label {
+    background: #fff;
+    border: 1px solid #aaa;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000;
+    box-sizing: border-box;
+    padding: 0;
+    gap: 0;
+    transition: all .2s;
+  }
+  .preview-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9f9f9;
+    border-right: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+  .preview-qr-placeholder {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    border: 2px solid #333;
+    border-radius: 1px;
+  }
+  .preview-qr-placeholder span {
+    aspect-ratio: 1;
+    background: #333;
+  }
+  .preview-qr-placeholder span.w {
+    background: #fff;
+  }
+  .preview-bc-placeholder {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+  }
+  .preview-bc-bar {
+    background: #333;
+    width: 3px;
+  }
+  .preview-bc-bar.thin { width: 1.5px; }
+  .preview-bc-bar.gap  { background: transparent; }
+  .preview-text-block {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    padding: 4px 6px;
+    gap: 1px;
+  }
+  .prev-title { font-weight: 800; }
+  .prev-co    { color: #444; font-weight: 600; }
+  .prev-name  { font-weight: 700; }
+  .prev-spec  { color: #333; }
+  .prev-id    { font-family: 'Courier New', monospace; font-weight: 700; }
+  .prev-date  { color: #888; }
+  .prev-div   { border: none; border-top: 1px solid #eee; margin: 1px 0; }
+</style>
+<script>
+(function () {
+  const SAMPLE = {
+    serial: 'SN123456ABC',
+    asset:  'AT-00987',
+    model:  'Latitude 5420',
+    make:   'Dell',
+    cpu:    'i5-1145G7',
+    ram:    '16GB',
+    grade:  'A',
+    location: 'BIN-A3',
+    company: {{ company_name | tojson }},
+    logo:    {{ (logo_path or '') | tojson }},
+  };
+
+  function val(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+  function checked(id) {
+    const el = document.getElementById(id);
+    return el ? el.checked : false;
+  }
+  function fmtSelected() {
+    const el = document.querySelector('input[name="label_format"]:checked');
+    return el ? el.value : 'qr';
+  }
+
+  function makeQrPlaceholder(sizePx) {
+    const pattern = [1,0,1,1,0, 0,1,0,1,1, 1,1,0,0,1, 0,1,1,0,1, 1,0,1,0,0];
+    const div = document.createElement('div');
+    div.className = 'preview-qr-placeholder';
+    div.style.width = sizePx + 'px';
+    div.style.height = sizePx + 'px';
+    pattern.forEach(function(v) {
+      const s = document.createElement('span');
+      if (!v) s.classList.add('w');
+      div.appendChild(s);
+    });
+    return div;
+  }
+
+  function makeBcPlaceholder(height) {
+    const seq = [3,1,2,1,3,1,1,2,2,1,1,1,3,1,2,1,1,2,3,1,2];
+    const div = document.createElement('div');
+    div.className = 'preview-bc-placeholder';
+    div.style.height = height + 'px';
+    seq.forEach(function(w, i) {
+      const bar = document.createElement('div');
+      bar.className = 'preview-bc-bar' + (w === 1 ? ' thin' : '') + (i % 2 === 1 ? ' gap' : '');
+      bar.style.height = (i % 3 === 0 ? height : height * 0.8) + 'px';
+      div.appendChild(bar);
+    });
+    return div;
+  }
+
+  function addRow(container, cls, text, fs) {
+    if (!text) return;
+    const d = document.createElement('div');
+    d.className = cls;
+    d.style.fontSize = fs + 'pt';
+    d.style.whiteSpace = 'nowrap';
+    d.style.overflow = 'hidden';
+    d.style.textOverflow = 'ellipsis';
+    d.textContent = text;
+    container.appendChild(d);
+  }
+
+  function addDivider(container) {
+    const hr = document.createElement('div');
+    hr.className = 'prev-div';
+    container.appendChild(hr);
+  }
+
+  window.updatePreview = function () {
+    const fmt     = fmtSelected();
+    const wMm     = parseFloat(val('label_width_mm'))  || 50;
+    const hMm     = parseFloat(val('label_height_mm')) || 30;
+    const fs      = parseInt(val('label_font_size'))   || 9;
+    const codePx  = parseInt(val('label_code_size'))   || 120;
+    const title   = val('label_title_text');
+
+    const SCALE = 3.0;
+    const wPx = Math.round(wMm * SCALE);
+    const hPx = Math.round(hMm * SCALE);
+    const codeSc = Math.min(codePx * 0.45, hPx - 8);
+
+    const label = document.createElement('div');
+    label.className = 'preview-label';
+    label.style.width  = wPx + 'px';
+    label.style.height = hPx + 'px';
+
+    // Code block
+    const codeDiv = document.createElement('div');
+    codeDiv.className = 'preview-code';
+    codeDiv.style.width  = (codeSc + 10) + 'px';
+    codeDiv.style.height = hPx + 'px';
+    if (fmt === 'barcode128') {
+      codeDiv.appendChild(makeBcPlaceholder(Math.round(codeSc * 0.75)));
+    } else {
+      codeDiv.appendChild(makeQrPlaceholder(Math.round(codeSc)));
+    }
+    label.appendChild(codeDiv);
+
+    // Text block
+    const textDiv = document.createElement('div');
+    textDiv.className = 'preview-text-block';
+
+    if (title) addRow(textDiv, 'prev-title', title, fs + 1);
+
+    if (checked('label_show_logo') && SAMPLE.logo) {
+      const img = document.createElement('img');
+      img.src = SAMPLE.logo;
+      img.style.maxHeight = '12px';
+      img.style.maxWidth  = '40px';
+      img.style.objectFit = 'contain';
+      img.style.display   = 'block';
+      textDiv.appendChild(img);
+    }
+
+    if (checked('label_show_company_name') && SAMPLE.company) {
+      addRow(textDiv, 'prev-co', SAMPLE.company, fs - 1);
+    }
+
+    const nameParts = [];
+    if (checked('label_show_make')) nameParts.push(SAMPLE.make);
+    if (checked('label_show_model')) nameParts.push(SAMPLE.model);
+    if (nameParts.length) addRow(textDiv, 'prev-name', nameParts.join(' '), fs);
+
+    const specs = [];
+    if (checked('label_show_cpu')) specs.push(SAMPLE.cpu);
+    if (checked('label_show_ram')) specs.push(SAMPLE.ram);
+    if (specs.length) addRow(textDiv, 'prev-spec', specs.join(' | '), Math.max(fs - 1, 6));
+
+    if (checked('label_show_grade')) addRow(textDiv, 'prev-spec', 'Grade: ' + SAMPLE.grade, Math.max(fs - 1, 6));
+    if (checked('label_show_location')) addRow(textDiv, 'prev-spec', 'Loc: ' + SAMPLE.location, Math.max(fs - 1, 6));
+
+    addDivider(textDiv);
+
+    if (checked('label_show_serial')) addRow(textDiv, 'prev-id', 'SN: ' + SAMPLE.serial, Math.max(fs - 1, 6));
+    if (checked('label_show_asset'))  addRow(textDiv, 'prev-id', 'AT: ' + SAMPLE.asset,  Math.max(fs - 1, 6));
+
+    addRow(textDiv, 'prev-date', 'Printed ' + new Date().toLocaleDateString(), Math.max(fs - 3, 5));
+
+    label.appendChild(textDiv);
+
+    const panel = document.getElementById('preview-panel');
+    panel.innerHTML = '';
+    panel.appendChild(label);
+  };
+
+  // Initial render
+  updatePreview();
+})();
+</script>
+{% endblock %}

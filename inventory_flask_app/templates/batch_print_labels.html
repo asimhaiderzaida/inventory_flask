@@ -1,119 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Batch Print Labels</title>
   <meta charset="utf-8">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  {%- set lc = label_config if label_config is defined else {} -%}
+  {%- set fmt        = lc.get('label_format', 'qr') -%}
+  {%- set w_mm       = lc.get('label_width_mm',  '101.6') -%}
+  {%- set h_mm       = lc.get('label_height_mm', '25.4') -%}
+  {%- set fsize      = lc.get('label_font_size',  '9') | int -%}
+  {%- set code_px    = lc.get('label_code_size',  '80') | int -%}
+  {%- set show_logo  = lc.get('label_show_logo',    'false') == 'true' -%}
+  {%- set show_co    = lc.get('label_show_company_name', 'true')  == 'true' -%}
+  {%- set show_sn    = lc.get('label_show_serial',  'true')  == 'true' -%}
+  {%- set show_at    = lc.get('label_show_asset',   'true')  == 'true' -%}
+  {%- set show_mdl   = lc.get('label_show_model',   'true')  == 'true' -%}
+  {%- set show_make  = lc.get('label_show_make',    'false') == 'true' -%}
+  {%- set show_cpu   = lc.get('label_show_cpu',     'false') == 'true' -%}
+  {%- set show_ram   = lc.get('label_show_ram',     'false') == 'true' -%}
+  {%- set show_grade = lc.get('label_show_grade',   'false') == 'true' -%}
+  {%- set show_loc   = lc.get('label_show_location','false') == 'true' -%}
+  {%- set title_text = lc.get('label_title_text',   '') -%}
   <style>
     @media print {
-      body {
-        margin: 0;
-        background: #fff !important;
-      }
+      body { margin: 0; background: #fff !important; }
       .label-container {
-        width: 4in;
-        height: 1in;
+        width: {{ w_mm }}mm;
+        height: {{ h_mm }}mm;
         page-break-after: always;
         border: none !important;
         box-shadow: none !important;
       }
       .d-print-none { display: none !important; }
     }
-    body {
-      background: #fff;
-    }
+    body { background: #f3f4f6; }
     .label-container {
-      width: 4in;
-      height: 1in;
-      border: 1px solid #ddd;
+      width: {{ w_mm }}mm;
+      height: {{ h_mm }}mm;
+      border: 1px solid #ccc;
       display: flex;
       flex-direction: row;
       align-items: center;
-      font-size: 12px;
-      padding: 0.08in 0.13in;
+      font-size: {{ fsize }}pt;
+      padding: 1.5mm 2mm 1.5mm 1.5mm;
       background: #fff;
-      margin: 15px auto;
+      margin: 12px auto;
       page-break-after: always;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      gap: 2mm;
+      overflow: hidden;
+      box-sizing: border-box;
     }
-    .label-qr {
-      flex: 0 0 0.85in;
+    .label-code {
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin-right: 0.18in;
     }
-    .label-serial {
-      font-size: 11px;
-      font-weight: 600;
-      margin-top: 4px;
-      letter-spacing: 1.3px;
+    .label-code img {
+      display: block;
     }
     .label-main {
       flex: 1 1 auto;
       display: flex;
       flex-direction: column;
       justify-content: center;
+      overflow: hidden;
+      gap: 0.3mm;
     }
-    .label-model {
-      font-size: 15px;
-      font-weight: bold;
-      margin-bottom: 2px;
-      letter-spacing: 1.5px;
-    }
-    .label-field {
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 1px;
-    }
-    .label-specs {
-      font-size: 12px;
-      margin-bottom: 1px;
-    }
-    .label-small {
-      font-size: 10px;
-      color: #888;
-      margin-top: 2px;
-    }
-    .print-all-btns {
-      text-align: center;
-      margin: 20px 0 30px 0;
-    }
+    .lbl-title  { font-size: {{ fsize + 1 }}pt; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lbl-co     { font-size: {{ fsize - 1 }}pt; font-weight: 600; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lbl-name   { font-size: {{ fsize }}pt; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lbl-specs  { font-size: {{ [fsize - 1, 6] | max }}pt; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lbl-id     { font-size: {{ [fsize - 1, 6] | max }}pt; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lbl-date   { font-size: {{ [fsize - 3, 5] | max }}pt; color: #888; white-space: nowrap; }
+    .lbl-div    { border: none; border-top: 0.2mm solid #ddd; margin: 0.3mm 0; }
+    .label-logo img { max-height: 5mm; max-width: 18mm; object-fit: contain; display: block; margin-bottom: 0.3mm; }
+    .print-all-btns { text-align: center; margin: 20px 0 30px; }
   </style>
+  {% if fmt == 'barcode128' %}
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  {% endif %}
 </head>
 <body>
 <div class="print-all-btns d-print-none">
-  <button onclick="window.print()" class="btn btn-primary btn-lg w-100 mt-2"><i class="bi bi-printer"></i> Print All Labels</button>
-  <a href="javascript:history.back()" class="btn btn-secondary btn-lg w-100 mt-2">Back</a>
+  <button onclick="window.print()" class="btn btn-primary btn-lg mt-2">
+    <i class="bi bi-printer"></i> Print All Labels
+  </button>
+  <a href="javascript:history.back()" class="btn btn-secondary btn-lg mt-2">Back</a>
+  <p class="text-muted mt-2" style="font-size:0.82rem;">{{ batch_labels | length }} label{{ 's' if batch_labels|length != 1 }}</p>
 </div>
 
 {% for label in batch_labels %}
+{%- set inst = label.instance -%}
+{%- set prod = inst.product -%}
 <div class="label-container">
-  <div class="label-qr">
-    <img src="data:image/png;base64,{{ label.qr_b64 }}" alt="QR Code" width="80" height="80">
-    <div class="label-serial">
-      SN: <code>{{ label.instance.serial }}</code><br>
-      AT: <b>{{ label.instance.asset }}</b>
-    </div>
+
+  <!-- Code block -->
+  <div class="label-code">
+    {% if fmt == 'barcode128' %}
+    <svg class="barcode-svg" data-serial="{{ inst.serial }}"></svg>
+    {% else %}
+    <img src="data:image/png;base64,{{ label.qr_b64 }}" alt="QR"
+         style="width:{{ code_px }}px;height:{{ code_px }}px;">
+    {% endif %}
   </div>
+
+  <!-- Text block -->
   <div class="label-main">
-    <div class="label-field">{{ label.instance.product.item_name | nonan }}</div>
-    <div class="label-model">
-      {{ label.instance.product.model | nonan }}
+
+    {%- if title_text %}
+    <div class="lbl-title">{{ title_text }}</div>
+    {%- endif %}
+
+    {%- if show_logo and logo_path %}
+    <div class="label-logo"><img src="{{ logo_path }}" alt="logo"></div>
+    {%- endif %}
+
+    {%- if show_co and company_name %}
+    <div class="lbl-co">{{ company_name }}</div>
+    {%- endif %}
+
+    {%- if show_mdl or show_make %}
+    <div class="lbl-name">
+      {%- if show_make and prod and (prod.make | nonan) != '—' %}{{ prod.make }} {% endif %}
+      {%- if show_mdl and prod %}{{ prod.item_name | nonan }}{% endif %}
     </div>
-    <div class="label-field">
-      {{ label.instance.product.cpu | nonan }} | {{ label.instance.product.ram | nonan }} | {{ label.instance.product.disk1size | nonan }}
-    </div>
-    <div class="label-specs">
-      GPU: {{ label.instance.product.gpu1 | nonan }} | Screen: {{ label.instance.product.display | nonan }}<br>
-      Grade: {{ label.instance.product.grade | nonan }}
-    </div>
-    <div class="label-small">
-      Printed: {{ label.printed_time.strftime('%d-%b-%Y %H:%M') }}
-    </div>
+    {%- endif %}
+
+    {%- set specs = [] %}
+    {%- if show_cpu and prod and (prod.cpu | nonan) != '—' %}{% set specs = specs + [prod.cpu] %}{% endif %}
+    {%- if show_ram and prod and (prod.ram | nonan) != '—' %}{% set specs = specs + [prod.ram] %}{% endif %}
+    {%- if specs %}
+    <div class="lbl-specs">{{ specs | join(' | ') }}</div>
+    {%- endif %}
+
+    {%- if show_grade and prod and (prod.grade | nonan) != '—' %}
+    <div class="lbl-specs">Grade: {{ prod.grade }}</div>
+    {%- endif %}
+
+    {%- if show_loc and inst.shelf_bin %}
+    <div class="lbl-specs">Loc: {{ inst.shelf_bin }}</div>
+    {%- endif %}
+
+    <hr class="lbl-div">
+
+    {%- if show_sn %}
+    <div class="lbl-id">SN: {{ inst.serial }}</div>
+    {%- endif %}
+
+    {%- if show_at and inst.asset and (inst.asset | nonan) != '—' %}
+    <div class="lbl-id">AT: {{ inst.asset }}</div>
+    {%- endif %}
+
+    <div class="lbl-date">Printed: {{ label.printed_time.strftime('%d-%b-%Y %H:%M') }}</div>
+
   </div>
 </div>
 {% endfor %}
+
+{% if fmt == 'barcode128' %}
+<script>
+  document.querySelectorAll('.barcode-svg').forEach(function(el) {
+    JsBarcode(el, el.dataset.serial, {
+      format: 'CODE128',
+      width: 1.5,
+      height: {{ code_px }},
+      displayValue: true,
+      fontSize: {{ fsize }},
+      margin: 2,
+    });
+  });
+</script>
+{% endif %}
 </body>
 </html>
