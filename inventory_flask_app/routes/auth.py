@@ -39,9 +39,16 @@ def login():
                 flash("User is not assigned to any tenant. Contact administrator.", "danger")
                 return redirect(url_for('auth.login'))
             login_user(user)
+            from datetime import datetime, timezone
+            user.last_login_at = datetime.now(timezone.utc)
+            user.failed_login_attempts = 0
+            db.session.commit()
             flash("Logged in successfully!", "success")
             return redirect(url_for('dashboard_bp.main_dashboard'))
         else:
+            if user:
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                db.session.commit()
             flash("Invalid username or password.", "danger")
 
     return render_template('login.html', settings=settings)
@@ -110,6 +117,7 @@ def register_user():
     return render_template('register_user.html', settings=settings, users=users)
 
 @auth_bp.route('/register_tenant', methods=['GET', 'POST'])
+@limiter.limit("3/hour", methods=["POST"])
 def register_tenant():
     if request.method == 'POST':
         try:
@@ -138,23 +146,29 @@ def register_tenant():
             flash("Username already taken, please choose another.", "danger")
             return render_template('register_tenant.html')
 
-        tenant = Tenant(name=tenant_name)
-        db.session.add(tenant)
-        db.session.flush()
+        try:
+            tenant = Tenant(name=tenant_name)
+            db.session.add(tenant)
+            db.session.flush()
 
-        db.session.add_all([
-            TenantSettings(tenant_id=tenant.id, key='dashboard_name', value=f"{tenant_name} Dashboard"),
-            TenantSettings(tenant_id=tenant.id, key='dashboard_logo', value='/static/img/default_logo.png')
-        ])
+            db.session.add_all([
+                TenantSettings(tenant_id=tenant.id, key='dashboard_name', value=f"{tenant_name} Dashboard"),
+                TenantSettings(tenant_id=tenant.id, key='dashboard_logo', value='/static/img/default_logo.png')
+            ])
 
-        user = User(
-            username=username,
-            role='admin',
-            tenant_id=tenant.id,
-            password_hash=generate_password_hash(password)
-        )
-        db.session.add(user)
-        db.session.commit()
+            user = User(
+                username=username,
+                role='admin',
+                tenant_id=tenant.id,
+                password_hash=generate_password_hash(password)
+            )
+            db.session.add(user)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception("Failed to create tenant '%s'", tenant_name)
+            flash("An error occurred while creating the account. Please try again.", "danger")
+            return render_template('register_tenant.html')
 
         _seed_default_stages(tenant.id)
 

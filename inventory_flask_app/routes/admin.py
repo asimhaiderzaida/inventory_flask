@@ -119,7 +119,7 @@ def handle_csrf_error(e):
     return redirect(url_for('admin_bp.admin_settings'))
 
 
-ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
+ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2 MB
 
 

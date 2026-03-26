@@ -13,6 +13,8 @@ class User(db.Model, UserMixin):
     full_name = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='staff')
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    failed_login_attempts = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE', name='fk_user_tenant_id'),

@@ -49,7 +49,14 @@ def create_app():
         raise ValueError("DATABASE_URL is missing! Set it in .env file.")
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+        'max_overflow': 20,
+    }
 
     # Session & CSRF lifetime — keep tokens valid for a full work day
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
@@ -289,6 +296,14 @@ def create_app():
     def gone_error(e):
         from flask import render_template
         return render_template('errors/410.html', settings={}), 410
+
+    @app.after_request
+    def set_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return response
 
     @app.context_processor
     def inject_now_utc():
