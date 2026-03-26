@@ -180,7 +180,7 @@
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 1rem;
+      padding: 0.6rem 0.5rem;
       scrollbar-width: thin;
       scrollbar-color: rgba(255,255,255,0.2) transparent;
     }
@@ -206,11 +206,11 @@
 
     /* ── Primary section label (INVENTORY, SALES, FINANCE, etc.) */
     .sidebar-section-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      color: var(--text-muted);
-      padding: 16px 16px 4px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: rgba(148,163,184,0.85);
+      padding: 20px 16px 6px;
       text-transform: uppercase;
       white-space: nowrap;
       pointer-events: none;
@@ -218,6 +218,51 @@
       transition: opacity var(--transition-slow);
       display: block;
     }
+
+    /* ── Collapsible section toggle button (replaces static label) */
+    .sidebar-section-toggle {
+      pointer-events: auto;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 18px 12px 6px;
+      margin: 0;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: rgba(148,163,184,0.85);
+      text-transform: uppercase;
+      white-space: nowrap;
+      user-select: none;
+      transition: color var(--transition-fast);
+      border-radius: 6px;
+    }
+    .sidebar-section-toggle:hover { color: #94A3B8; }
+    .sidebar-section-toggle .section-chevron {
+      font-size: 0.6rem;
+      opacity: 0.5;
+      transition: transform 0.25s ease, opacity 0.2s ease;
+      flex-shrink: 0;
+    }
+    .sidebar-section-toggle.open .section-chevron { transform: rotate(90deg); opacity: 0.9; }
+    body.sidebar-collapsed .sidebar-section-toggle { display: none !important; }
+
+    /* ── Section body (accordion panel wrapping all links in a section) */
+    .sidebar-section-body {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.32s ease, opacity 0.22s ease;
+    }
+    .sidebar-section-body.open {
+      max-height: 2000px;
+      opacity: 1;
+    }
+    body.sidebar-collapsed .sidebar-section-body { display: none !important; }
 
     /* ── Nav group header (split: clickable link + chevron toggle) */
     .nav-group-header {
@@ -298,11 +343,11 @@
       display: flex;
       align-items: center;
       gap: 0.65rem;
-      height: 40px;
-      padding: 0 0.75rem;
+      height: 42px;
+      padding: 0 1rem;
       border-radius: 8px;
       color: #CBD5E1;
-      font-size: 0.875rem;
+      font-size: 0.9rem;
       font-weight: 500;
       text-decoration: none;
       transition: background var(--transition-fast), color var(--transition-fast);
@@ -329,9 +374,9 @@
       border-radius: 0 2px 2px 0;
     }
     .sidebar-link .nav-icon {
-      font-size: 1rem;
+      font-size: 1.1rem;
       flex-shrink: 0;
-      width: 20px;
+      width: 22px;
       text-align: center;
     }
 
@@ -340,7 +385,7 @@
     .collapse-section .sidebar-link {
       height: 34px;
       padding: 0 0.75rem 0 2.5rem;
-      font-size: 0.8rem;
+      font-size: 0.84rem;
       font-weight: 400;
       color: #94A3B8;
       margin-bottom: 1px;
@@ -1182,7 +1227,10 @@
 
         {% if current_user.can_access('stock') %}
         <!-- ── INVENTORY ──────────────────────────────────── -->
-        <div class="sidebar-section-label">Inventory</div>
+        <button class="sidebar-section-toggle" data-section="inventory">
+          Inventory <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-inventory">
 
         <a href="{{ url_for('stock_bp.group_view_page') }}"
            class="sidebar-link {% if ep == 'stock_bp.group_view_page' %}active{% endif %}">
@@ -1264,11 +1312,15 @@
           </a>
         </div>
         {% endif %}
+        </div>{# /sb-inventory #}
         {% endif %}{# /can_access('stock') #}
 
         <!-- ── PROCESSING ─────────────────────────────────── -->
         {% if current_user.can_access('processing') %}
-        <div class="sidebar-section-label">Processing</div>
+        <button class="sidebar-section-toggle" data-section="processing">
+          Processing <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-processing">
 
         <a href="{{ url_for('stock_bp.process_stage_update') }}"
            class="sidebar-link {% if ep == 'stock_bp.process_stage_update' %}active{% endif %}">
@@ -1286,11 +1338,15 @@
           <span class="sidebar-label">Scanner</span>
         </a>
 
+        </div>{# /sb-processing #}
         {% endif %}{# /can_access('processing') #}
 
         <!-- ── SALES ──────────────────────────────────────── -->
         {% if current_user.can_access('sales') %}
-        <div class="sidebar-section-label">Sales</div>
+        <button class="sidebar-section-toggle" data-section="sales">
+          Sales <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-sales">
 
         <a href="{{ url_for('sales_bp.create_sale_form') }}"
            class="sidebar-link {% if ep == 'sales_bp.create_sale_form' %}active{% endif %}">
@@ -1363,11 +1419,15 @@
           </a>
         </div>
 
+        </div>{# /sb-sales #}
         {% endif %}{# /can_access('sales') #}
 
         <!-- ── PARTS ──────────────────────────────────────── -->
         {% if settings.enable_parts_module != 'false' and current_user.can_access('parts') %}
-        <div class="sidebar-section-label">Parts</div>
+        <button class="sidebar-section-toggle" data-section="parts">
+          Parts <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-parts">
 
         <a href="{{ url_for('parts_bp.parts_list') }}"
            class="sidebar-link {% if ep in ('parts_bp.parts_list','parts_bp.part_detail','parts_bp.edit_part','parts_bp.add_part','parts_bp.part_history','parts_bp.sales_list','parts_bp.sale_detail') %}active{% endif %}">
@@ -1386,11 +1446,15 @@
           <i class="bi bi-qr-code-scan nav-icon"></i>
           <span class="sidebar-label">Parts Scanner</span>
         </a>
+        </div>{# /sb-parts #}
         {% endif %}
 
         <!-- ── PEOPLE ──────────────────────────────────────── -->
         {% if current_user.can_access('customers') or current_user.can_access('vendors') %}
-        <div class="sidebar-section-label">People</div>
+        <button class="sidebar-section-toggle" data-section="people">
+          People <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-people">
         {% if current_user.can_access('customers') %}
         <a href="{{ url_for('customers_bp.customer_center') }}"
            class="sidebar-link {% if ep.startswith('customers_bp') %}active{% endif %}">
@@ -1405,11 +1469,15 @@
           <span class="sidebar-label">Vendors</span>
         </a>
         {% endif %}
+        </div>{# /sb-people #}
         {% endif %}{# /can_access customers or vendors #}
 
         <!-- ── FINANCE ─────────────────────────────────────── -->
         {% if current_user.can_access('accounting') %}
-        <div class="sidebar-section-label">Finance</div>
+        <button class="sidebar-section-toggle" data-section="finance">
+          Finance <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-finance">
 
         {% set is_finance_active = ep.startswith('accounting_bp') %}
         <div class="nav-group-header {% if is_finance_active %}active-group{% endif %}">
@@ -1458,11 +1526,15 @@
             <span class="sidebar-label">Cash Flow</span>
           </a>
         </div>
+        </div>{# /sb-finance #}
         {% endif %}
 
         <!-- ── ANALYTICS ──────────────────────────────────── -->
         {% if current_user.can_access('reports') and settings.enable_reports_module != 'false' %}
-        <div class="sidebar-section-label">Analytics</div>
+        <button class="sidebar-section-toggle" data-section="analytics">
+          Analytics <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-analytics">
 
         <div class="nav-group-header {% if is_analytics %}active-group{% endif %}">
           <a href="{{ url_for('reports_bp.reports_index') }}"
@@ -1540,12 +1612,16 @@
             <span class="sidebar-label">Returns</span>
           </a>
         </div>
+        </div>{# /sb-analytics #}
         {% endif %}
 
         <!-- ── INTEGRATIONS ──────────────────────────────────── -->
         {% if current_user.can_access('shopify') %}
         {% set is_shopify = ep.startswith('shopify_bp') %}
-        <div class="sidebar-section-label">Integrations</div>
+        <button class="sidebar-section-toggle" data-section="integrations">
+          Integrations <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-integrations">
 
         <div class="nav-group-header {% if is_shopify %}active-group{% endif %}">
           <a href="{{ url_for('shopify_bp.dashboard') }}"
@@ -1578,11 +1654,15 @@
             <span class="sidebar-label">Orders</span>
           </a>
         </div>
+        </div>{# /sb-integrations #}
         {% endif %}
 
         <!-- ── ADMIN ───────────────────────────────────────── -->
         {% if current_user.can_access('admin') %}
-        <div class="sidebar-section-label">Admin</div>
+        <button class="sidebar-section-toggle" data-section="admin">
+          Admin <i class="bi bi-chevron-right section-chevron"></i>
+        </button>
+        <div class="sidebar-section-body" id="sb-admin">
 
         <a href="{{ url_for('admin_bp.admin_settings') }}"
            class="sidebar-link {% if ep == 'admin_bp.admin_settings' %}active{% endif %}">
@@ -1609,6 +1689,7 @@
           <i class="bi bi-shield-check nav-icon"></i>
           <span class="sidebar-label">Data Management</span>
         </a>
+        </div>{# /sb-admin #}
         {% endif %}
 
       {% endif %}{# end role check #}
@@ -1625,8 +1706,8 @@
           {{ (current_user.full_name or current_user.username)[0].upper() }}
         </div>
         <div class="sidebar-user-info sidebar-label">
-          <div class="sidebar-username">{{ current_user.full_name or current_user.username }}</div>
-          <div class="sidebar-role">{{ current_user.role | title }}</div>
+          <div class="sidebar-username">{{ (current_user.full_name or current_user.username)|capitalize }}</div>
+          <div class="sidebar-role">{{ current_user.role | upper }}</div>
         </div>
         <i class="bi bi-three-dots-vertical sidebar-label" style="color:var(--sidebar-text);font-size:0.8rem;"></i>
       </div>
@@ -1742,8 +1823,8 @@
       </div>
       <ul class="dropdown-menu dropdown-menu-end" style="min-width:200px;">
         <li class="px-3 py-2">
-          <div style="font-size:0.8rem;font-weight:600;">{{ current_user.full_name or current_user.username }}</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);">{{ current_user.role | title }}</div>
+          <div style="font-size:0.8rem;font-weight:600;">{{ (current_user.full_name or current_user.username)|capitalize }}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">{{ current_user.role | upper }}</div>
         </li>
         <li><hr class="dropdown-divider"></li>
         {% if current_user.can_access('admin') %}
@@ -1901,6 +1982,39 @@ if (sidebarToggleBtn) {
     localStorage.setItem(COLLAPSED_KEY, body.classList.contains('sidebar-collapsed') ? '1' : '0');
   });
 }
+
+/* ── Sidebar section accordion ── */
+(function() {
+  var PREFIX = 'sb_open_';
+
+  function applySection(btn, panel, open) {
+    if (open) {
+      btn.classList.add('open');
+      panel.classList.add('open');
+    } else {
+      btn.classList.remove('open');
+      panel.classList.remove('open');
+    }
+  }
+
+  document.querySelectorAll('.sidebar-section-toggle[data-section]').forEach(function(btn) {
+    var sid   = btn.getAttribute('data-section');
+    var panel = document.getElementById('sb-' + sid);
+    if (!panel) return;
+
+    /* Auto-open if section has an active link, or was manually opened before */
+    var hasActive = panel.querySelector('.active, .active-group') !== null;
+    var stored    = localStorage.getItem(PREFIX + sid);
+    var open      = hasActive || stored === '1';
+    applySection(btn, panel, open);
+
+    btn.addEventListener('click', function() {
+      var isOpen = btn.classList.contains('open');
+      applySection(btn, panel, !isOpen);
+      localStorage.setItem(PREFIX + sid, !isOpen ? '1' : '0');
+    });
+  });
+})();
 
 /* ── Sidebar mobile ── */
 const mobileMenuBtn  = document.getElementById('mobileMenuBtn');

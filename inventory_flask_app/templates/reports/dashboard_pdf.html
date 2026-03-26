@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Report — {{ month_label }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 15mm 18mm 15mm;
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #9CA3AF;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10pt;
+    color: #111827;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* ── Cover header ─────────────────────────────── */
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid #1D4ED8;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+  }
+  .report-header h1 {
+    font-size: 20pt;
+    font-weight: 800;
+    color: #1D4ED8;
+    margin: 0;
+  }
+  .report-header .meta {
+    font-size: 8.5pt;
+    color: #6B7280;
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* ── Section headings ─────────────────────────── */
+  .section-title {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6B7280;
+    border-bottom: 1px solid #E5E7EB;
+    padding-bottom: 3px;
+    margin: 18px 0 8px;
+  }
+
+  /* ── KPI grid ─────────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .kpi-box {
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: #F9FAFB;
+  }
+  .kpi-box .kpi-label {
+    font-size: 8pt;
+    color: #6B7280;
+    margin-bottom: 3px;
+  }
+  .kpi-box .kpi-value {
+    font-size: 15pt;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1.1;
+  }
+  .kpi-box .kpi-note {
+    font-size: 7.5pt;
+    color: #9CA3AF;
+    margin-top: 2px;
+  }
+
+  /* ── Tables ───────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin-bottom: 14px;
+  }
+  thead tr {
+    background: #1D4ED8;
+    color: #fff;
+  }
+  thead th {
+    padding: 6px 8px;
+    font-weight: 700;
+    text-align: left;
+  }
+  tbody tr:nth-child(even) { background: #F9FAFB; }
+  tbody td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #F3F4F6;
+    vertical-align: top;
+  }
+  .num { text-align: right; }
+
+  /* ── Two-column layout ────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── Page break hints ─────────────────────────── */
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+{# ── Cover header ─────────────────────────────────────────────────────── #}
+<div class="report-header">
+  <div>
+    <h1>{{ company_name or 'Dashboard Report' }}</h1>
+    <div style="font-size:10pt;color:#374151;margin-top:2px;">Management Summary — {{ month_label }}</div>
+  </div>
+  <div class="meta">
+    Generated: {{ generated_at }}<br>
+    Period: {{ month_label }}
+  </div>
+</div>
+
+{# ── KPI grid ──────────────────────────────────────────────────────────── #}
+<div class="section-title">Key Performance Indicators</div>
+<div class="kpi-grid">
+
+  <div class="kpi-box">
+    <div class="kpi-label">Total Inventory</div>
+    <div class="kpi-value">{{ "{:,}".format(total_inventory) }}</div>
+    <div class="kpi-note">units in stock</div>
+  </div>
+
+  <div class="kpi-box">
+    <div class="kpi-label">Revenue MTD ({{ currency }})</div>
+    <div class="kpi-value">{{ "{:,.2f}".format(revenue_mtd) }}</div>
+    <div class="kpi-note">prev month: {{ "{:,.2f}".format(revenue_prev) }}</div>
+  </div>
+
+  <div class="kpi-box">
+    <div class="kpi-label">Units Sold MTD</div>
+    <div class="kpi-value">{{ "{:,}".format(units_mtd) }}</div>
+    <div class="kpi-note">&nbsp;</div>
+  </div>
+
+  <div class="kpi-box">
+    <div class="kpi-label">Net Profit MTD ({{ currency }})</div>
+    <div class="kpi-value" style="color:{% if net_profit >= 0 %}#065F46{% else %}#991B1B{% endif %};">
+      {{ "{:,.2f}".format(net_profit) }}
+    </div>
+    <div class="kpi-note">revenue + other income − expenses</div>
+  </div>
+
+  <div class="kpi-box">
+    <div class="kpi-label">Outstanding AR ({{ currency }})</div>
+    <div class="kpi-value" style="color:{% if outstanding_ar > 0 %}#92400E{% else %}#065F46{% endif %};">
+      {{ "{:,.2f}".format(outstanding_ar) }}
+    </div>
+    <div class="kpi-note">open / partial / overdue</div>
+  </div>
+
+  <div class="kpi-box">
+    <div class="kpi-label">Overdue Units</div>
+    <div class="kpi-value" style="color:{% if overdue_count > 0 %}#991B1B{% else %}#065F46{% endif %};">
+      {{ overdue_count }}
+    </div>
+    <div class="kpi-note">{{ returns_mtd }} return{{ 's' if returns_mtd != 1 else '' }} this month</div>
+  </div>
+
+</div>
+
+{# ── Inventory value ───────────────────────────────────────────────────── #}
+<div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-bottom:18px;">
+  <div class="kpi-box">
+    <div class="kpi-label">Inventory Cost Value ({{ currency }})</div>
+    <div class="kpi-value">{{ "{:,.2f}".format(inventory_cost) }}</div>
+    <div class="kpi-note">sum of unit costs</div>
+  </div>
+  <div class="kpi-box">
+    <div class="kpi-label">Inventory Asking Value ({{ currency }})</div>
+    <div class="kpi-value">{{ "{:,.2f}".format(inventory_asking) }}</div>
+    <div class="kpi-note">sum of asking prices</div>
+  </div>
+</div>
+
+{# ── Status breakdown + Aging ──────────────────────────────────────────── #}
+<div class="two-col">
+  <div>
+    <div class="section-title">Inventory by Status</div>
+    <table>
+      <thead><tr><th>Status</th><th class="num">Units</th></tr></thead>
+      <tbody>
+        {% for status, cnt in status_counts.items() %}
+        <tr>
+          <td>{{ status | replace('_',' ') | title }}</td>
+          <td class="num">{{ "{:,}".format(cnt) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <div class="section-title">Stock Aging</div>
+    <table>
+      <thead><tr><th>Age Band</th><th class="num">Units</th></tr></thead>
+      <tbody>
+        {% for label, cnt in aging_buckets.items() %}
+        <tr>
+          <td>{{ label }}</td>
+          <td class="num">{{ "{:,}".format(cnt) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Recent sales ──────────────────────────────────────────────────────── #}
+<div class="section-title">Recent Sales (last 10)</div>
+{% if recent_sales %}
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Customer</th>
+      <th class="num">Amount ({{ currency }})</th>
+      <th>Payment</th>
+      <th>Invoice #</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in recent_sales %}
+    <tr>
+      <td style="white-space:nowrap;">{{ row.date }}</td>
+      <td>{{ row.customer }}</td>
+      <td class="num">{{ "{:,.2f}".format(row.amount) }}</td>
+      <td>{{ row.payment_method }}</td>
+      <td>{{ row.invoice_number }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#9CA3AF;font-size:9pt;">No sales recorded this period.</p>
+{% endif %}
+
+{# ── Tech workload ─────────────────────────────────────────────────────── #}
+<div class="section-title">Technician Workload</div>
+{% if tech_workload %}
+<table>
+  <thead>
+    <tr>
+      <th>Technician</th>
+      <th class="num">Units In Progress</th>
+      <th class="num">Avg Processing Time (min)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in tech_workload %}
+    <tr>
+      <td>{{ row.name }}</td>
+      <td class="num">{{ row.count }}</td>
+      <td class="num">{{ row.avg_minutes | int if row.avg_minutes else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#9CA3AF;font-size:9pt;">No technicians currently assigned.</p>
+{% endif %}
+
+</body>
+</html>

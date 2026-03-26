@@ -596,6 +596,354 @@ def home_redirect():
     return redirect(url_for('dashboard_bp.main_dashboard'))
 
 
+def _get_export_data(tid):
+    """Gather KPI snapshot data for Excel/PDF export."""
+    today = get_now_for_tenant().date()
+    month_start, month_end = _month_bounds(today.year, today.month)
+    prev_y, prev_m = _prev_month(today.year, today.month)
+    prev_month_start, prev_month_end = _month_bounds(prev_y, prev_m)
+
+    from inventory_flask_app.models import (
+        AccountReceivable, Expense, OtherIncome,
+        ProductProcessLog, User as UserModel,
+    )
+
+    # Inventory status counts
+    status_counts = dict(
+        db.session.query(ProductInstance.status, func.count(ProductInstance.id))
+        .join(Product)
+        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        .group_by(ProductInstance.status)
+        .all()
+    )
+
+    total_inventory = sum(status_counts.values())
+
+    # Revenue / sales
+    def _rev(start, end):
+        return round(float(
+            db.session.query(func.coalesce(func.sum(SaleTransaction.price_at_sale), 0))
+            .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+            .join(Product, ProductInstance.product_id == Product.id)
+            .filter(Product.tenant_id == tid,
+                    SaleTransaction.date_sold >= start,
+                    SaleTransaction.date_sold < end).scalar() or 0
+        ), 2)
+
+    def _units(start, end):
+        return (
+            SaleTransaction.query
+            .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+            .join(Product, ProductInstance.product_id == Product.id)
+            .filter(Product.tenant_id == tid,
+                    SaleTransaction.date_sold >= start,
+                    SaleTransaction.date_sold < end).count()
+        )
+
+    revenue_mtd = _rev(month_start, month_end)
+    revenue_prev = _rev(prev_month_start, prev_month_end)
+    units_mtd = _units(month_start, month_end)
+
+    # Expenses / other income
+    month_start_date = today.replace(day=1)
+    mtd_expenses = float(
+        db.session.query(func.coalesce(func.sum(Expense.amount), 0))
+        .filter(Expense.tenant_id == tid, Expense.deleted_at.is_(None),
+                Expense.expense_date >= month_start_date).scalar() or 0
+    )
+    mtd_other_income = float(
+        db.session.query(func.coalesce(func.sum(OtherIncome.amount), 0))
+        .filter(OtherIncome.tenant_id == tid, OtherIncome.deleted_at.is_(None),
+                OtherIncome.income_date >= month_start_date).scalar() or 0
+    )
+    net_profit = round(revenue_mtd + mtd_other_income - mtd_expenses, 2)
+
+    # AR
+    outstanding_ar = round(float(
+        db.session.query(
+            func.coalesce(func.sum(AccountReceivable.amount_due - AccountReceivable.amount_paid), 0)
+        ).filter(AccountReceivable.tenant_id == tid,
+                 AccountReceivable.status.in_(('open', 'partial', 'overdue'))).scalar() or 0
+    ), 2)
+
+    # Overdue
+    overdue_units = get_overdue_units(tid)
+    overdue_count = len(overdue_units)
+
+    # Returns this month
+    returns_mtd = Return.query.filter(
+        Return.tenant_id == tid,
+        Return.return_date >= datetime.combine(month_start, datetime.min.time()),
+    ).count()
+
+    # Aging buckets
+    _now = datetime.now(timezone.utc).replace(tzinfo=None)
+    _base = ProductInstance.query.join(Product).filter(
+        Product.tenant_id == tid, ProductInstance.is_sold == False
+    )
+    aging_buckets = {
+        '0–7 days':   _base.filter(ProductInstance.created_at >= _now - timedelta(days=7)).count(),
+        '7–30 days':  _base.filter(ProductInstance.created_at >= _now - timedelta(days=30),
+                                    ProductInstance.created_at < _now - timedelta(days=7)).count(),
+        '30–60 days': _base.filter(ProductInstance.created_at >= _now - timedelta(days=60),
+                                    ProductInstance.created_at < _now - timedelta(days=30)).count(),
+        '60+ days':   _base.filter(ProductInstance.created_at < _now - timedelta(days=60)).count(),
+    }
+
+    # Inventory value
+    inv_val = (
+        db.session.query(
+            func.coalesce(func.sum(UnitCost.total_cost), 0).label('cost'),
+            func.coalesce(func.sum(ProductInstance.asking_price), 0).label('asking'),
+        )
+        .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        .first()
+    )
+    inventory_cost   = round(float(inv_val.cost   or 0), 2)
+    inventory_asking = round(float(inv_val.asking or 0), 2)
+
+    # Recent sales (last 10)
+    recent_sale_rows = (
+        db.session.query(SaleTransaction, Customer, Invoice)
+        .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .join(Customer, SaleTransaction.customer_id == Customer.id)
+        .outerjoin(Invoice, SaleTransaction.invoice_id == Invoice.id)
+        .filter(Product.tenant_id == tid)
+        .order_by(SaleTransaction.date_sold.desc())
+        .limit(10)
+        .all()
+    )
+    recent_sales = [
+        {
+            'date':           txn.date_sold.strftime('%d %b %Y') if txn.date_sold else '—',
+            'customer':       cust.name if cust else '—',
+            'amount':         float(txn.price_at_sale or 0),
+            'payment_method': txn.payment_method or '—',
+            'invoice_number': inv.invoice_number if inv else '—',
+        }
+        for txn, cust, inv in recent_sale_rows
+    ]
+
+    # Tech workload
+    tech_rows = (
+        db.session.query(
+            UserModel.id,
+            UserModel.username,
+            UserModel.full_name,
+            func.count(ProductInstance.id).label('unit_count'),
+        )
+        .join(ProductInstance, ProductInstance.assigned_to_user_id == UserModel.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.status == 'under_process',
+            ProductInstance.is_sold == False,
+        )
+        .group_by(UserModel.id, UserModel.username, UserModel.full_name)
+        .order_by(func.count(ProductInstance.id).desc())
+        .limit(15)
+        .all()
+    )
+    avg_time_rows = {}
+    if tech_rows:
+        avg_time_rows = dict(
+            db.session.query(
+                ProductProcessLog.moved_by,
+                func.avg(ProductProcessLog.duration_minutes).label('avg_min'),
+            )
+            .filter(
+                ProductProcessLog.moved_by.in_([r.id for r in tech_rows]),
+                ProductProcessLog.duration_minutes.isnot(None),
+            )
+            .group_by(ProductProcessLog.moved_by)
+            .all()
+        )
+    tech_workload = [
+        {
+            'name':       r.full_name or r.username,
+            'count':      r.unit_count,
+            'avg_minutes': round(float(avg_time_rows[r.id]), 0) if r.id in avg_time_rows else None,
+        }
+        for r in tech_rows
+    ]
+
+    # Tenant settings for display
+    _settings = {
+        s.key: s.value
+        for s in TenantSettings.query.filter_by(tenant_id=tid).all()
+    }
+
+    return {
+        'generated_at':    today.strftime('%d %B %Y'),
+        'month_label':     today.strftime('%B %Y'),
+        'company_name':    _settings.get('company_name', ''),
+        'currency':        _settings.get('currency', 'AED'),
+        # KPIs
+        'total_inventory': total_inventory,
+        'revenue_mtd':     revenue_mtd,
+        'revenue_prev':    revenue_prev,
+        'units_mtd':       units_mtd,
+        'net_profit':      net_profit,
+        'outstanding_ar':  outstanding_ar,
+        'overdue_count':   overdue_count,
+        'returns_mtd':     returns_mtd,
+        'inventory_cost':  inventory_cost,
+        'inventory_asking': inventory_asking,
+        # Breakdowns
+        'status_counts':   status_counts,
+        'aging_buckets':   aging_buckets,
+        'recent_sales':    recent_sales,
+        'tech_workload':   tech_workload,
+    }
+
+
+@dashboard_bp.route('/dashboard/export/excel')
+@login_required
+def dashboard_export_excel():
+    if current_user.role not in ('admin', 'supervisor'):
+        from flask import abort
+        abort(403)
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        from flask import flash
+        flash('openpyxl is not installed. Run: pip install openpyxl', 'danger')
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    from flask import make_response
+    import io
+
+    tid = current_user.tenant_id
+    d = _get_export_data(tid)
+    currency = d['currency']
+    wb = openpyxl.Workbook()
+
+    # ── Styles ────────────────────────────────────────────────────────────────
+    hdr_fill  = PatternFill('solid', fgColor='1D4ED8')
+    hdr_font  = Font(bold=True, color='FFFFFF', size=11)
+    bold_font = Font(bold=True, size=11)
+    h1_font   = Font(bold=True, size=14)
+    muted     = Font(color='6B7280', size=10)
+    cent      = Alignment(horizontal='center')
+    thin      = Side(style='thin', color='D1D5DB')
+    thin_bdr  = Border(bottom=Side(style='thin', color='E5E7EB'))
+
+    def _header_row(ws, headers, row=1):
+        for col, text in enumerate(headers, 1):
+            c = ws.cell(row=row, column=col, value=text)
+            c.font, c.fill, c.alignment = hdr_font, hdr_fill, cent
+
+    def _autowidth(ws):
+        for col in ws.columns:
+            max_len = max((len(str(cell.value or '')) for cell in col), default=8)
+            ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 40)
+
+    # ── Sheet 1: KPI Summary ──────────────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = 'KPI Summary'
+    ws1['A1'] = d['company_name'] or 'Dashboard Export'
+    ws1['A1'].font = h1_font
+    ws1['A2'] = f"Generated: {d['generated_at']}  |  Period: {d['month_label']}"
+    ws1['A2'].font = muted
+    ws1.append([])
+
+    kpi_rows = [
+        ('Total Inventory (units)',  d['total_inventory'],  ''),
+        (f'MTD Revenue ({currency})',  d['revenue_mtd'],  f"prev month: {currency} {d['revenue_prev']:,.2f}"),
+        ('MTD Units Sold',           d['units_mtd'],      ''),
+        (f'Net Profit MTD ({currency})', d['net_profit'], ''),
+        (f'Outstanding AR ({currency})', d['outstanding_ar'], ''),
+        ('Overdue Units',            d['overdue_count'],  ''),
+        ('Returns This Month',       d['returns_mtd'],    ''),
+        (f'Inventory Cost ({currency})',   d['inventory_cost'],   ''),
+        (f'Inventory Asking ({currency})', d['inventory_asking'], ''),
+    ]
+    _header_row(ws1, ['KPI', 'Value', 'Note'], row=4)
+    for i, (label, val, note) in enumerate(kpi_rows, 5):
+        ws1.cell(i, 1, label)
+        ws1.cell(i, 2, val)
+        ws1.cell(i, 3, note)
+    _autowidth(ws1)
+
+    # ── Sheet 2: Inventory Status ─────────────────────────────────────────────
+    ws2 = wb.create_sheet('Inventory Status')
+    _header_row(ws2, ['Status', 'Count'])
+    for i, (status, cnt) in enumerate(d['status_counts'].items(), 2):
+        ws2.cell(i, 1, status.replace('_', ' ').title())
+        ws2.cell(i, 2, cnt)
+    ws2.append([])
+    ws2.append(['Stock Aging', ''])
+    ws2[ws2.max_row][0].font = bold_font
+    for label, cnt in d['aging_buckets'].items():
+        ws2.append([label, cnt])
+    _autowidth(ws2)
+
+    # ── Sheet 3: Recent Sales ─────────────────────────────────────────────────
+    ws3 = wb.create_sheet('Recent Sales')
+    _header_row(ws3, ['Date', 'Customer', f'Amount ({currency})', 'Payment', 'Invoice #'])
+    for i, row in enumerate(d['recent_sales'], 2):
+        ws3.cell(i, 1, row['date'])
+        ws3.cell(i, 2, row['customer'])
+        ws3.cell(i, 3, row['amount'])
+        ws3.cell(i, 4, row['payment_method'])
+        ws3.cell(i, 5, row['invoice_number'])
+    _autowidth(ws3)
+
+    # ── Sheet 4: Tech Workload ────────────────────────────────────────────────
+    ws4 = wb.create_sheet('Tech Workload')
+    _header_row(ws4, ['Technician', 'Units In Progress', 'Avg Processing Time (min)'])
+    for i, row in enumerate(d['tech_workload'], 2):
+        ws4.cell(i, 1, row['name'])
+        ws4.cell(i, 2, row['count'])
+        ws4.cell(i, 3, row['avg_minutes'] or '—')
+    _autowidth(ws4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"dashboard_{d['generated_at'].replace(' ', '_')}.xlsx"
+    resp = make_response(buf.read())
+    resp.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@dashboard_bp.route('/dashboard/export/pdf')
+@login_required
+def dashboard_export_pdf():
+    if current_user.role not in ('admin', 'supervisor'):
+        from flask import abort
+        abort(403)
+
+    try:
+        from weasyprint import HTML as WeasyprintHTML
+    except ImportError:
+        from flask import flash
+        flash('weasyprint is not installed. Run: pip install weasyprint', 'danger')
+        return redirect(url_for('dashboard_bp.main_dashboard'))
+
+    from flask import make_response, render_template as _rt
+    import io
+
+    tid = current_user.tenant_id
+    d = _get_export_data(tid)
+
+    html_str = _rt('reports/dashboard_pdf.html', **d)
+    pdf_bytes = WeasyprintHTML(string=html_str).write_pdf()
+
+    filename = f"dashboard_{d['generated_at'].replace(' ', '_')}.pdf"
+    resp = make_response(pdf_bytes)
+    resp.headers['Content-Type'] = 'application/pdf'
+    resp.headers['Content-Disposition'] = f'inline; filename="{filename}"'
+    return resp
+
+
 # ── Live stats API (60s cached) ───────────────────────────────────────────────
 @dashboard_bp.route('/api/dashboard_stats')
 @login_required
