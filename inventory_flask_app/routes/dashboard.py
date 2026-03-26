@@ -4,9 +4,9 @@ from flask_login import login_required, current_user
 from ..models import (
     Product, ProductInstance, db, CustomerOrderTracking,
     TenantSettings, SaleTransaction, Invoice, Customer, Return,
-    CustomerOrder,
+    CustomerOrder, UnitCost,
 )
-from sqlalchemy import func, text
+from sqlalchemy import func, text, case, literal_column
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta, timezone, date as date_type
 from inventory_flask_app.utils import get_now_for_tenant
@@ -126,6 +126,32 @@ def main_dashboard():
         .count()
     )
 
+    processed_count = (
+        ProductInstance.query.join(Product)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.status == 'processed',
+            ProductInstance.is_sold == False,
+        ).count()
+    )
+
+    disputed_count = (
+        ProductInstance.query.join(Product)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.status == 'disputed',
+            ProductInstance.is_sold == False,
+        ).count()
+    )
+
+    status_breakdown = {
+        'unprocessed':  unprocessed,
+        'under_process': under_process,
+        'processed':    processed_count,
+        'idle':         idle_units_count,
+        'disputed':     disputed_count,
+    }
+
     pending_orders = (
         CustomerOrderTracking.query
         .join(ProductInstance, CustomerOrderTracking.product_instance_id == ProductInstance.id)
@@ -149,6 +175,115 @@ def main_dashboard():
             ProductInstance.is_sold == False,
             ProductInstance.created_at < aged_cutoff,
         ).count()
+    )
+
+    # ── Stock Aging Breakdown ─────────────────────────────────────────────────
+    _now_age = datetime.now(timezone.utc).replace(tzinfo=None)
+    _age7    = _now_age - timedelta(days=7)
+    _age30   = _now_age - timedelta(days=30)
+    _age60   = _now_age - timedelta(days=60)
+    _base_age = (
+        ProductInstance.query.join(Product)
+        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+    )
+    aging_buckets = {
+        '0_7':    _base_age.filter(ProductInstance.created_at >= _age7).count(),
+        '7_30':   _base_age.filter(ProductInstance.created_at >= _age30, ProductInstance.created_at < _age7).count(),
+        '30_60':  _base_age.filter(ProductInstance.created_at >= _age60, ProductInstance.created_at < _age30).count(),
+        '60_plus': _base_age.filter(ProductInstance.created_at < _age60).count(),
+    }
+
+    # ── Top Models ────────────────────────────────────────────────────────────
+    _model_label = func.coalesce(Product.model, Product.item_name)
+    _top_raw = (
+        db.session.query(_model_label.label('name'), func.count(ProductInstance.id).label('cnt'))
+        .join(ProductInstance, ProductInstance.product_id == Product.id)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.is_sold == False,
+            _model_label.isnot(None),
+            _model_label != 'nan',
+        )
+        .group_by(_model_label)
+        .order_by(func.count(ProductInstance.id).desc())
+        .limit(6)
+        .all()
+    )
+    top_models = [
+        {'name': r.name, 'count': r.cnt}
+        for r in _top_raw
+        if r.name and r.name.lower() != 'nan'
+    ][:5]
+
+    # ── Processing Throughput ─────────────────────────────────────────────────
+    from inventory_flask_app.models import ProductProcessLog as _PPLog
+    _week_start      = datetime.combine(today - timedelta(days=today.weekday()), datetime.min.time())
+    _last_week_start = _week_start - timedelta(days=7)
+
+    throughput_this_week = (
+        db.session.query(func.count(_PPLog.id))
+        .join(ProductInstance, _PPLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(
+            Product.tenant_id == tid,
+            _PPLog.to_stage == 'processed',
+            _PPLog.moved_at >= _week_start,
+        )
+        .scalar() or 0
+    )
+    throughput_last_week = (
+        db.session.query(func.count(_PPLog.id))
+        .join(ProductInstance, _PPLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(
+            Product.tenant_id == tid,
+            _PPLog.to_stage == 'processed',
+            _PPLog.moved_at >= _last_week_start,
+            _PPLog.moved_at < _week_start,
+        )
+        .scalar() or 0
+    )
+    _spark_start = datetime.combine(today - timedelta(days=13), datetime.min.time())
+    _spark_rows = (
+        db.session.query(
+            func.date(_PPLog.moved_at).label('day'),
+            func.count(_PPLog.id).label('cnt'),
+        )
+        .join(ProductInstance, _PPLog.product_instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(
+            Product.tenant_id == tid,
+            _PPLog.to_stage == 'processed',
+            _PPLog.moved_at >= _spark_start,
+        )
+        .group_by(func.date(_PPLog.moved_at))
+        .all()
+    )
+    _spark_map  = {r.day: r.cnt for r in _spark_rows}
+    _spark_days = [today - timedelta(days=i) for i in range(13, -1, -1)]
+    throughput_sparkline = [_spark_map.get(d, 0) for d in _spark_days]
+
+    # ── Inventory Value ───────────────────────────────────────────────────────
+    _inv_val = (
+        db.session.query(
+            func.coalesce(func.sum(UnitCost.total_cost), 0).label('cost'),
+            func.coalesce(func.sum(ProductInstance.asking_price), 0).label('asking'),
+        )
+        .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        .first()
+    )
+    inventory_cost   = round(float(_inv_val.cost   or 0), 2)
+    inventory_asking = round(float(_inv_val.asking or 0), 2)
+    priced_count = (
+        ProductInstance.query.join(Product)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.is_sold == False,
+            ProductInstance.asking_price > 0,
+        )
+        .count()
     )
 
     # ── Sales / Revenue KPIs ──────────────────────────────────────────────────
@@ -424,6 +559,22 @@ def main_dashboard():
         my_completions_today=my_completions_today,
         # Configurable thresholds
         aged_threshold_days=aged_threshold_days,
+        # New: inventory breakdown
+        status_breakdown=status_breakdown,
+        processed_count=processed_count,
+        disputed_count=disputed_count,
+        # New: aging
+        aging_buckets=aging_buckets,
+        # New: top models
+        top_models=top_models,
+        # New: throughput
+        throughput_this_week=throughput_this_week,
+        throughput_last_week=throughput_last_week,
+        throughput_sparkline=throughput_sparkline,
+        # New: inventory value
+        inventory_cost=inventory_cost,
+        inventory_asking=inventory_asking,
+        priced_count=priced_count,
     )
 
 

@@ -257,6 +257,30 @@
   .ops-num   { font-size: 1.25rem; }
   .kpi-card  { padding: 1rem 1.1rem .9rem; }
 }
+
+/* ── Cyan token ─────────────────────────────────────────────── */
+.db-cyan { --c: #06B6D4; --c-bg: #ECFEFF; --c-text: #155E75; }
+
+/* ── Donut chart center overlay ─────────────────────────────── */
+.donut-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+.donut-center-value { font-size: 1.5rem; font-weight: 800; color: #111827; line-height: 1; }
+.donut-center-label { font-size: .68rem; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── Status legend ──────────────────────────────────────────── */
+.status-legend      { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin-top: .6rem; }
+.status-legend-item { display: flex; align-items: center; gap: .35rem; font-size: .72rem; color: #374151; font-weight: 500; }
+.status-legend-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Sparkline ──────────────────────────────────────────────── */
+.sparkline-wrap { display: flex; align-items: flex-end; gap: 2px; height: 32px; }
+.sparkline-bar  { flex: 1; background: #3B82F6; border-radius: 2px 2px 0 0; min-width: 4px; transition: height .3s; }
+.sparkline-bar.zero { background: #E5E7EB; min-height: 2px; }
 </style>
 
 {# ── SECTION 1: Alert banners ──────────────────────────────────────────────── #}
@@ -490,7 +514,7 @@
 <div class="dash-section-title animate-fade-up">Operations</div>
 <div class="row g-3 mb-4 animate-fade-up">
 
-  <div class="col-6 col-sm-3">
+  <div class="col-6 col-sm-4 col-lg-2">
     <a href="{{ url_for('stock_bp.under_process') }}" class="ops-card db-primary">
       <div class="ops-dot"><i class="bi bi-arrow-repeat"></i></div>
       <div>
@@ -500,7 +524,7 @@
     </a>
   </div>
 
-  <div class="col-6 col-sm-3">
+  <div class="col-6 col-sm-4 col-lg-2">
     <a href="{{ url_for('pipeline_bp.pipeline') }}" class="ops-card db-red">
       <div class="ops-dot"><i class="bi bi-alarm"></i></div>
       <div>
@@ -510,7 +534,7 @@
     </a>
   </div>
 
-  <div class="col-6 col-sm-3">
+  <div class="col-6 col-sm-4 col-lg-2">
     <a href="{{ url_for('stock_bp.under_process', status='unprocessed') }}" class="ops-card db-amber">
       <div class="ops-dot"><i class="bi bi-hourglass-split"></i></div>
       <div>
@@ -520,7 +544,7 @@
     </a>
   </div>
 
-  <div class="col-6 col-sm-3">
+  <div class="col-6 col-sm-4 col-lg-2">
     {% if current_user.role in ('admin', 'supervisor') %}
     <a href="{{ url_for('accounting_bp.receivables') }}" class="ops-card {{ 'db-amber' if outstanding_ar > 0 else 'db-green' }}">
       <div class="ops-dot"><i class="bi bi-file-earmark-check"></i></div>
@@ -540,7 +564,7 @@
     {% endif %}
   </div>
 
-  <div class="col-6 col-sm-3">
+  <div class="col-6 col-sm-4 col-lg-2">
     <a href="{{ url_for('returns_bp.view_returns') }}" class="ops-card db-purple">
       <div class="ops-dot"><i class="bi bi-arrow-return-left"></i></div>
       <div>
@@ -549,40 +573,215 @@
       </div>
     </a>
   </div>
+
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a href="{{ url_for('pipeline_bp.pipeline') }}" class="ops-card db-cyan">
+      <div class="ops-dot"><i class="bi bi-speedometer2"></i></div>
+      <div>
+        <div class="ops-num">{{ throughput_this_week }}</div>
+        <div class="ops-lbl">Completed /wk</div>
+      </div>
+    </a>
+  </div>
 </div>
 {% endif %}{# end sales role hide #}
 
-{# ── SECTION 4: Chart (hidden for technician role) ────────────────────────── #}
+{# ── SECTION 4: Charts row (hidden for technician role) ───────────────────── #}
 {% if current_user.role != 'technician' %}
-<div class="animate-fade-up mb-4">
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title"><i class="bi bi-bar-chart-line me-2" style="color:#3B82F6;"></i>Sales Activity</span>
-      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-        <div style="display:flex;gap:.25rem;">
-          <button class="chart-tab-btn active" onclick="switchChartType('sales', this)">Units Sold</button>
-          <button class="chart-tab-btn" onclick="switchChartType('revenue', this)">Revenue ({{ currency }})</button>
+<div class="row g-3 mb-4 animate-fade-up">
+
+  {# Sales chart — left 8 cols #}
+  <div class="col-12 col-lg-8">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-bar-chart-line me-2" style="color:#3B82F6;"></i>Sales Activity</span>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <div style="display:flex;gap:.25rem;">
+            <button class="chart-tab-btn active" onclick="switchChartType('sales', this)">Units Sold</button>
+            <button class="chart-tab-btn" onclick="switchChartType('revenue', this)">Revenue ({{ currency }})</button>
+          </div>
+          <div class="d-none d-md-flex gap-1 ms-2">
+            <button class="period-btn" onclick="setPeriod(7, this)">7d</button>
+            <button class="period-btn active" onclick="setPeriod(30, this)">30d</button>
+            <button class="period-btn" onclick="setPeriod(90, this)">90d</button>
+          </div>
+          <select class="form-select form-select-sm d-md-none chart-period-select" id="chartPeriodSelect" style="width:auto;" onchange="onPeriodSelectChange(this)">
+            <option value="7">7 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+          </select>
         </div>
-        <!-- Desktop period buttons -->
-        <div class="d-none d-md-flex gap-1 ms-2">
-          <button class="period-btn" onclick="setPeriod(7, this)">7d</button>
-          <button class="period-btn active" onclick="setPeriod(30, this)">30d</button>
-          <button class="period-btn" onclick="setPeriod(90, this)">90d</button>
-        </div>
-        <!-- Mobile period select -->
-        <select class="form-select form-select-sm d-md-none chart-period-select" id="chartPeriodSelect" style="width:auto;" onchange="onPeriodSelectChange(this)">
-          <option value="7">7 days</option>
-          <option value="30" selected>30 days</option>
-          <option value="90">90 days</option>
-        </select>
+      </div>
+      <div class="panel-body" style="padding-top:.75rem;height:240px;position:relative;">
+        <canvas id="salesChart"></canvas>
       </div>
     </div>
-    <div class="panel-body" style="padding-top:.75rem;height:240px;position:relative;">
-      <canvas id="salesChart"></canvas>
+  </div>
+
+  {# Inventory status donut — right 4 cols #}
+  <div class="col-12 col-lg-4">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-pie-chart me-2" style="color:#8B5CF6;"></i>Inventory Status</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;">
+        {% set _total_status = status_breakdown.unprocessed + status_breakdown.under_process + status_breakdown.processed + status_breakdown.idle + status_breakdown.disputed %}
+        <div style="position:relative;width:160px;height:160px;margin:.25rem auto .5rem;">
+          <canvas id="statusDonut" width="160" height="160"></canvas>
+          <div class="donut-center">
+            <div class="donut-center-value">{{ _total_status }}</div>
+            <div class="donut-center-label">Units</div>
+          </div>
+        </div>
+        <div class="status-legend">
+          <div class="status-legend-item">
+            <div class="status-legend-dot" style="background:#6B7280;"></div>
+            Unprocessed {{ status_breakdown.unprocessed }}
+          </div>
+          <div class="status-legend-item">
+            <div class="status-legend-dot" style="background:#3B82F6;"></div>
+            Processing {{ status_breakdown.under_process }}
+          </div>
+          <div class="status-legend-item">
+            <div class="status-legend-dot" style="background:#10B981;"></div>
+            Processed {{ status_breakdown.processed }}
+          </div>
+          <div class="status-legend-item">
+            <div class="status-legend-dot" style="background:#F59E0B;"></div>
+            Idle {{ status_breakdown.idle }}
+          </div>
+          <div class="status-legend-item">
+            <div class="status-legend-dot" style="background:#EF4444;"></div>
+            Disputed {{ status_breakdown.disputed }}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+
 </div>
 {% endif %}{# end technician chart hide #}
+
+{# ── SECTION 4b: Insights row (admin/supervisor/staff only) ───────────────── #}
+{% if current_user.role in ('admin', 'supervisor', 'staff') %}
+<div class="row g-3 mb-4 animate-fade-up">
+
+  {# Column 1: Top Models #}
+  <div class="col-12 col-md-4">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-trophy me-2" style="color:#F59E0B;"></i>Top Models</span>
+        <a href="{{ url_for('stock_bp.group_view_page') }}" class="btn btn-ghost btn-sm" style="font-size:.75rem;">View All</a>
+      </div>
+      <div class="panel-body">
+        {% if top_models %}
+          {% set _max_count = top_models[0].count if top_models else 1 %}
+          {% for m in top_models %}
+          <div style="margin-bottom:.65rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem;">
+              <span style="font-size:.82rem;font-weight:500;color:#111827;max-width:75%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ m.name }}">{{ m.name | nonan }}</span>
+              <span style="font-size:.82rem;font-weight:700;color:#374151;flex-shrink:0;">{{ m.count }}</span>
+            </div>
+            <div style="height:5px;background:#F3F4F6;border-radius:3px;">
+              <div style="height:5px;background:#3B82F6;border-radius:3px;width:{{ ((m.count / _max_count) * 100) | int }}%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+        <div class="empty-state" style="padding:1.5rem 0;">
+          <i class="bi bi-box-seam"></i>
+          <p>No inventory data</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Column 2: Stock Aging #}
+  <div class="col-12 col-md-4">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-clock-history me-2" style="color:#EF4444;"></i>Stock Aging</span>
+      </div>
+      <div class="panel-body">
+        {% set _aging_total = (aging_buckets['0_7'] + aging_buckets['7_30'] + aging_buckets['30_60'] + aging_buckets['60_plus']) or 1 %}
+        {% set _aging_rows = [
+          ('0–7 days',   aging_buckets['0_7'],    '#10B981'),
+          ('7–30 days',  aging_buckets['7_30'],   '#3B82F6'),
+          ('30–60 days', aging_buckets['30_60'],  '#F59E0B'),
+          ('60+ days',   aging_buckets['60_plus'],'#EF4444'),
+        ] %}
+        {% for label, count, color in _aging_rows %}
+        <div style="margin-bottom:.75rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem;">
+            <span style="font-size:.8rem;color:#374151;font-weight:500;">{{ label }}</span>
+            <span style="font-size:.8rem;font-weight:700;color:#111827;">
+              {{ count }}
+              <span style="font-weight:400;color:#9CA3AF;font-size:.72rem;">({{ ((count / _aging_total) * 100) | int }}%)</span>
+            </span>
+          </div>
+          <div style="height:6px;background:#F3F4F6;border-radius:3px;">
+            <div style="height:6px;background:{{ color }};border-radius:3px;width:{{ ((count / _aging_total) * 100) | int }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# Column 3: Processing & Value #}
+  <div class="col-12 col-md-4">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-activity me-2" style="color:#06B6D4;"></i>Processing &amp; Value</span>
+      </div>
+      <div class="panel-body">
+
+        {# Sparkline #}
+        <div style="font-size:.75rem;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem;">14-day Completions</div>
+        {% set _spark_max = (throughput_sparkline | max) or 1 %}
+        <div class="sparkline-wrap">
+          {% for v in throughput_sparkline %}
+          <div class="sparkline-bar {% if v == 0 %}zero{% endif %}"
+               style="height:{{ [((v / _spark_max) * 30) | int, 2] | max }}px;"
+               title="{{ v }}"></div>
+          {% endfor %}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:.45rem;font-size:.76rem;">
+          <span style="color:#374151;font-weight:600;"><i class="bi bi-calendar-week me-1" style="color:#3B82F6;"></i>This week: <strong>{{ throughput_this_week }}</strong></span>
+          <span style="color:#9CA3AF;">Last week: {{ throughput_last_week }}</span>
+        </div>
+
+        <hr style="margin:.85rem 0;border-color:#F3F4F6;">
+
+        {# Inventory Value #}
+        <div style="font-size:.75rem;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">Inventory Value</div>
+        <div style="display:flex;gap:1rem;margin-bottom:.5rem;">
+          <div style="flex:1;background:#F9FAFB;border-radius:8px;padding:.55rem .7rem;">
+            <div style="font-size:.68rem;color:#9CA3AF;font-weight:500;margin-bottom:.2rem;">AT COST</div>
+            <div style="font-size:.95rem;font-weight:800;color:#111827;">{{ currency }} {{ '{:,.0f}'.format(inventory_cost) }}</div>
+          </div>
+          <div style="flex:1;background:#F9FAFB;border-radius:8px;padding:.55rem .7rem;">
+            <div style="font-size:.68rem;color:#9CA3AF;font-weight:500;margin-bottom:.2rem;">ASKING</div>
+            <div style="font-size:.95rem;font-weight:800;color:#111827;">{{ currency }} {{ '{:,.0f}'.format(inventory_asking) }}</div>
+          </div>
+        </div>
+        {% if inventory_cost > 0 %}
+          {% set _margin_val = inventory_asking - inventory_cost %}
+          {% set _margin_pct = ((_margin_val / inventory_cost) * 100) | round(1) %}
+        <div style="font-size:.79rem;color:{{ '#10B981' if _margin_val >= 0 else '#EF4444' }};font-weight:600;">
+          <i class="bi {{ 'bi-arrow-up-right' if _margin_val >= 0 else 'bi-arrow-down-right' }}"></i>
+          Potential margin: {{ currency }} {{ '{:,.0f}'.format(_margin_val) }} ({{ _margin_pct }}%)
+        </div>
+        {% endif %}
+        <div style="font-size:.72rem;color:#9CA3AF;margin-top:.3rem;">{{ priced_count }} of {{ total_inventory }} units priced</div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}{# end admin/supervisor/staff insights #}
 
 {# ── SECTION 5: Recent sales + Alerts ─────────────────────────────────────── #}
 <div class="row g-3 mb-4 animate-fade-up">
@@ -979,6 +1178,44 @@ function onPeriodSelectChange(sel) {
 }
 
 buildChart();
+
+/* ── Inventory status donut ───────────────────────────────── */
+const donutEl = document.getElementById('statusDonut');
+if (donutEl) {
+  new Chart(donutEl.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Unprocessed', 'Processing', 'Processed', 'Idle', 'Disputed'],
+      datasets: [{
+        data: [
+          {{ status_breakdown.unprocessed }},
+          {{ status_breakdown.under_process }},
+          {{ status_breakdown.processed }},
+          {{ status_breakdown.idle }},
+          {{ status_breakdown.disputed }}
+        ],
+        backgroundColor: ['#6B7280', '#3B82F6', '#10B981', '#F59E0B', '#EF4444'],
+        borderWidth: 0,
+        hoverOffset: 4,
+      }]
+    },
+    options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827',
+          titleFont: { size: 11 },
+          bodyFont: { size: 12, weight: '600' },
+          padding: 10,
+          cornerRadius: 8,
+        }
+      }
+    }
+  });
+}
 
 /* ── Live stat refresh (60s) ──────────────────────────────── */
 function refreshStats() {
