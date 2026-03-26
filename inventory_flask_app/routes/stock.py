@@ -1542,6 +1542,7 @@ def under_process():
     # New RAM and Disk filters
     ram_filter = request.args.get('ram')
     disk_filter = request.args.get('disk1size')
+    returned_filter = request.args.get('returned', '').strip()
 
     # Improved status filter logic: always use .filter(), never .filter_by() for status
     if not status_filter or status_filter == 'all':
@@ -1614,6 +1615,9 @@ def under_process():
     #     query = query.filter(ProductInstance.location_id == int(location_id))
     if bin_search:
         query = query.filter(ProductInstance.shelf_bin.ilike(f"%{bin_search}%"))
+
+    if returned_filter == 'yes':
+        query = query.filter(ProductInstance.returned_at.isnot(None))
 
     # Always exclude sold items for inventory views
     if not status_filter or status_filter == 'all':
@@ -1797,6 +1801,7 @@ def under_process():
         sort_col=sort_col,
         sort_dir=sort_dir,
         summary_stats=summary_stats,
+        returned_filter=returned_filter,
     )
 
 

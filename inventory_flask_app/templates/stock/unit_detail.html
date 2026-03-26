@@ -64,6 +64,17 @@
         </div>
         {% endfor %}
 
+        {# Return indicator #}
+        {% if instance.returned_at %}
+        <div style="margin-bottom:0.5rem;background:#FEF2F2;border:1px solid #FECDD3;border-radius:8px;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.5rem;">
+          <i class="bi bi-arrow-return-left" style="color:#DC2626;flex-shrink:0;"></i>
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;color:#991B1B;">This unit was returned to inventory</div>
+            <div style="font-size:0.75rem;color:#B91C1C;">Returned on {{ instance.returned_at.strftime('%d %b %Y at %H:%M') }}</div>
+          </div>
+        </div>
+        {% endif %}
+
         {# Status #}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
           <span style="font-size:0.78rem;color:var(--text-muted);">Status</span>

@@ -291,6 +291,7 @@ def create_return(instance_id):
         prev_status = instance.status or 'unprocessed'
         instance.is_sold = False
         instance.status = 'unprocessed'
+        instance.returned_at = now
         instance.assigned_to_user_id = None
 
         if invoice:

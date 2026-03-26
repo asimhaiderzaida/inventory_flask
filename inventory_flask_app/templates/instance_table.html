@@ -183,11 +183,28 @@
       <label class="form-label" style="font-size:0.72rem;">Bin</label>
       <input type="text" name="bin_search" value="{{ request.args.get('bin_search','') }}" class="form-control" placeholder="Search bin…">
     </div>
+    <div class="col-12 col-sm-auto d-flex align-items-end gap-2" style="padding-bottom:0.1rem;">
+      <div class="form-check d-flex align-items-center gap-1 mb-0" style="cursor:pointer;">
+        <input class="form-check-input" type="checkbox" id="returnedFilterChk"
+               style="cursor:pointer;margin-top:0;"
+               {% if request.args.get('returned') == 'yes' %}checked{% endif %}
+               onchange="
+                 var u = new URL(window.location.href);
+                 if (this.checked) { u.searchParams.set('returned','yes'); } else { u.searchParams.delete('returned'); }
+                 u.searchParams.delete('page');
+                 window.location.href = u.toString();
+               ">
+        <label class="form-check-label" for="returnedFilterChk"
+               style="font-size:0.8rem;cursor:pointer;white-space:nowrap;">
+          <i class="bi bi-arrow-return-left" style="color:#DC2626;font-size:0.75rem;"></i> Returned only
+        </label>
+      </div>
+    </div>
     <div class="col-auto d-flex gap-1 align-items-end">
       <button type="submit" class="btn btn-primary" style="min-height:36px;padding:0.35rem 0.9rem;font-size:0.8rem;">
         <i class="bi bi-funnel"></i> Apply
       </button>
-      {% if request.args.get('serial_search') or request.args.get('model') or request.args.get('processor') or request.args.get('ram') or request.args.get('video_card') or request.args.get('disk1size') or request.args.get('bin_search') or request.args.get('team') or request.args.get('status','all')!='all' or request.args.get('process_stage') or request.args.get('location') %}
+      {% if request.args.get('serial_search') or request.args.get('model') or request.args.get('processor') or request.args.get('ram') or request.args.get('video_card') or request.args.get('disk1size') or request.args.get('bin_search') or request.args.get('team') or request.args.get('status','all')!='all' or request.args.get('process_stage') or request.args.get('location') or request.args.get('returned') %}
       <a href="{{ url_for('stock_bp.under_process') }}" class="btn btn-ghost" style="min-height:36px;padding:0.35rem 0.75rem;font-size:0.8rem;">Clear</a>
       {% endif %}
     </div>

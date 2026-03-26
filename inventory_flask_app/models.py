@@ -318,6 +318,7 @@ class ProductInstance(db.Model):
     shopify_listed = db.Column(db.Boolean, default=False, nullable=False)
     asking_price = db.Column(db.Numeric(10, 2), nullable=True)
     entered_stage_at = db.Column(db.DateTime, nullable=True)  # timestamp when current stage began
+    returned_at = db.Column(db.DateTime, nullable=True)       # set when unit is returned to inventory
     tenant_id = db.Column(
         db.Integer,
         db.ForeignKey('tenant.id', ondelete='CASCADE', name='fk_product_instance_tenant_id'),

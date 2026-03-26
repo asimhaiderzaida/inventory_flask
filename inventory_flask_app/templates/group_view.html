@@ -100,7 +100,7 @@
                 {% elif k == 'disk1size' %}{{ (i.product.disk1size if i.product else None) | nonan }}
                 {% elif k == 'grade' %}{{ (i.product.grade if i.product else None) | nonan }}
                 {% elif k == 'location' %}{{ i.location.name if i.location else '' }}
-                {% elif k == 'status' %}<span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>
+                {% elif k == 'status' %}<span class="status-pill status-{{ i.status }}">{{ get_status_label(i.status) }}</span>{% if i.returned_at %}<span style="background:#FEF2F2;color:#DC2626;font-size:0.65rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem;white-space:nowrap;"><i class="bi bi-arrow-return-left" style="font-size:0.6rem;"></i> Returned</span>{% endif %}
                 {% elif k == 'process_stage' %}{{ i.process_stage or '' }}
                 {% elif k == 'team' or k == 'team_assigned' %}{{ i.team_assigned or '' }}
                 {% elif k == 'shelf_bin' %}{% if i.shelf_bin %}{% if i.bin_id %}<a href="{{ url_for('stock_bp.bin_detail', bin_id=i.bin_id) }}" style="font-family:monospace;font-size:0.82rem;text-decoration:none;">{{ i.shelf_bin }}</a>{% else %}<a href="{{ url_for('stock_bp.bin_contents', bin_code=i.shelf_bin) }}" style="font-family:monospace;font-size:0.82rem;text-decoration:none;">{{ i.shelf_bin }}</a>{% endif %}{% endif %}

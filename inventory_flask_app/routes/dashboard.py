@@ -363,6 +363,19 @@ def main_dashboard():
     overdue_units   = get_overdue_units(tid)
     overdue_count   = len(overdue_units)
 
+    # ── Recently returned units (last 7 days) ─────────────────────────────────
+    seven_days_ago = datetime.combine(today - timedelta(days=7), datetime.min.time())
+    recently_returned_count = (
+        ProductInstance.query.join(Product)
+        .filter(
+            Product.tenant_id == tid,
+            ProductInstance.returned_at.isnot(None),
+            ProductInstance.returned_at >= seven_days_ago,
+            ProductInstance.is_sold == False,
+        )
+        .count()
+    )
+
     # ── Recent Sales (last 5) ─────────────────────────────────────────────────
     recent_sale_rows = (
         db.session.query(SaleTransaction, Customer, Invoice)
@@ -544,6 +557,7 @@ def main_dashboard():
         returns_this_month=returns_this_month,
         # Alerts
         low_stock_parts=low_stock_parts,
+        recently_returned_count=recently_returned_count,
         aged_inventory_count=aged_inventory_count,
         idle_units_count=idle_units_count,
         pending_orders=pending_orders,

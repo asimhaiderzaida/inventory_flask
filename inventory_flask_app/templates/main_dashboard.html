@@ -888,6 +888,14 @@
         </a>
         {% endif %}
 
+        {% if recently_returned_count > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('stock_bp.under_process', returned='yes') }}" class="alert-item db-red">
+          <span><i class="bi bi-arrow-return-left me-2"></i>{{ recently_returned_count }} returned unit{{ 's' if recently_returned_count != 1 }} need processing</span>
+          <span class="alert-item-count">{{ recently_returned_count }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
         {% if stale_backlog > 0 %}
         {% set has_alert = true %}
         <a href="{{ url_for('stock_bp.under_process', status='unprocessed') }}" class="alert-item db-amber">
