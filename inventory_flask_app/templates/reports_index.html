@@ -44,6 +44,7 @@
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
     {{ report_card(url_for('reports_bp.tech_productivity'), 'bi-person-badge', 'var(--primary)', 'Tech Productivity', 'Stage processing counts') }}
+    {{ report_card(url_for('reports_bp.technician_dashboard'), 'bi-speedometer2', '#0891b2', 'Tech Dashboard', 'KPIs, SLA rates, sparklines per technician') }}
     {{ report_card(url_for('reports_bp.stage_times'), 'bi-stopwatch', '#0891b2', 'Stage Times', 'Avg time per processing stage') }}
     {{ report_card(url_for('reports_bp.slow_technicians'), 'bi-hourglass-bottom', '#f59e0b', 'Slow Technicians', 'Units stuck in processing') }}
     {{ report_card(url_for('reports_bp.idle_units'), 'bi-clock-history', '#f59e0b', 'Idle Units', 'Units with no recent activity') }}

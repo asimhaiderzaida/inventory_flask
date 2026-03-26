@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Technician Productivity{% endblock %}
+{% block page_title %}Technician Productivity{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Technician Productivity</h1>
+    <div class="page-subtitle">Last {{ days }} days — processing activity, SLA rates &amp; sparklines</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('reports_bp.reports_index') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+  </div>
+</div>
+
+<!-- Period selector -->
+<div class="animate-fade-up mb-4">
+  <div class="d-flex gap-2 flex-wrap">
+    {% for d in [7, 14, 30, 60, 90] %}
+    <a href="?days={{ d }}"
+       class="btn btn-sm {% if days == d %}btn-primary{% else %}btn-ghost{% endif %} period-btn">
+      {{ d }}d
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if not technicians %}
+<!-- Empty state -->
+<div class="table-card animate-fade-up">
+  <div class="empty-state" style="padding:4rem 0;">
+    <i class="bi bi-person-badge"></i>
+    <p>No technician activity in the last {{ days }} days</p>
+    <a href="?days=90" class="btn btn-ghost btn-sm mt-2">Try 90 days</a>
+  </div>
+</div>
+
+{% else %}
+
+{# ── Aggregate KPI row ──────────────────────────────────────────── #}
+{% set total_moves_all   = technicians | sum(attribute='total_moves') %}
+{% set total_completed   = technicians | sum(attribute='checkouts') %}
+{% set total_assigned    = technicians | sum(attribute='assigned_count') %}
+{% set sla_techs         = technicians | selectattr('sla_rate', 'ne', none) | list %}
+{% set avg_sla_all       = (sla_techs | sum(attribute='sla_rate') / sla_techs|length) | round(1) if sla_techs else none %}
+
+<div class="row g-3 mb-4 animate-fade-up">
+  <div class="col-6 col-md-3">
+    <div class="stat-card blue">
+      <div class="stat-icon-wrap blue"><i class="bi bi-person-lines-fill"></i></div>
+      <div class="stat-value">{{ technicians | length }}</div>
+      <div class="stat-label">Active Technicians</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card green">
+      <div class="stat-icon-wrap green"><i class="bi bi-check2-circle"></i></div>
+      <div class="stat-value">{{ total_completed }}</div>
+      <div class="stat-label">Units Completed</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card purple">
+      <div class="stat-icon-wrap purple"><i class="bi bi-shuffle"></i></div>
+      <div class="stat-value">{{ total_moves_all }}</div>
+      <div class="stat-label">Total Stage Moves</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card {% if avg_sla_all is not none and avg_sla_all >= 80 %}green{% elif avg_sla_all is not none and avg_sla_all >= 60 %}orange{% else %}red{% endif %}">
+      <div class="stat-icon-wrap {% if avg_sla_all is not none and avg_sla_all >= 80 %}green{% elif avg_sla_all is not none and avg_sla_all >= 60 %}orange{% else %}red{% endif %}">
+        <i class="bi bi-speedometer2"></i>
+      </div>
+      <div class="stat-value">{% if avg_sla_all is not none %}{{ avg_sla_all }}%{% else %}—{% endif %}</div>
+      <div class="stat-label">Avg SLA Rate</div>
+    </div>
+  </div>
+</div>
+
+{# ── Charts ──────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4 animate-fade-up">
+  <div class="col-12 col-lg-6">
+    <div class="table-card" style="padding:1.25rem;">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">
+        Units Completed — last {{ days }}d
+      </div>
+      <canvas id="completedChart" height="220"></canvas>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="table-card" style="padding:1.25rem;">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">
+        Avg Processing Time (min) — last {{ days }}d
+      </div>
+      <canvas id="avgTimeChart" height="220"></canvas>
+    </div>
+  </div>
+</div>
+
+{# ── Detail table ─────────────────────────────────────────────────── #}
+<div class="table-card animate-fade-up">
+  <div style="overflow-x:auto;">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Technician</th>
+          <th style="text-align:right;">Stage Moves</th>
+          <th style="text-align:right;">Completed</th>
+          <th style="text-align:right;">Avg Time (min)</th>
+          <th style="min-width:140px;">SLA Rate</th>
+          <th style="text-align:right;">Assigned</th>
+          <th style="text-align:right;">Idle Events</th>
+          <th style="min-width:120px;">Activity ({{ [days, 30] | min }}d)</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in technicians %}
+        {% set tid_row = loop.index %}
+        <tr>
+          <td>
+            <div style="font-weight:600;font-size:0.88rem;">{{ t.user.full_name or t.user.username }}</div>
+            {% if t.user.role %}
+            <div style="font-size:0.73rem;color:var(--text-muted);">{{ t.user.role | title }}</div>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">{{ t.total_moves }}</td>
+          <td style="text-align:right;font-weight:600;color:var(--color-success);">{{ t.checkouts }}</td>
+          <td style="text-align:right;">
+            {% if t.avg_duration is not none %}{{ t.avg_duration | int }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+          </td>
+          <td>
+            {% if t.sla_rate is not none %}
+            {% set sc = 'success' if t.sla_rate >= 80 else ('warning' if t.sla_rate >= 60 else 'danger') %}
+            <div class="d-flex align-items-center gap-2">
+              <div style="flex:1;background:var(--surface-3);border-radius:var(--radius-full);height:6px;overflow:hidden;">
+                <div style="width:{{ t.sla_rate }}%;height:100%;background:var(--color-{{ sc }});border-radius:var(--radius-full);transition:width .4s;"></div>
+              </div>
+              <span style="font-size:0.78rem;font-weight:600;color:var(--color-{{ sc }});min-width:36px;text-align:right;">{{ t.sla_rate }}%</span>
+            </div>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:0.8rem;">No SLA data</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if t.assigned_count > 0 %}
+            <span class="status-pill status-under_process">{{ t.assigned_count }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);">0</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if t.idle_events > 0 %}
+            <span style="color:var(--color-warning);">{{ t.idle_events }}</span>
+            {% else %}
+            0
+            {% endif %}
+          </td>
+          <td>
+            {# Sparkline bars #}
+            {% if t.sparkline %}
+            {% set spark_max = t.sparkline | max %}
+            <div class="sparkline-wrap" title="Daily activity">
+              {% for val in t.sparkline %}
+              <div class="sparkline-bar"
+                   style="height:{% if spark_max > 0 %}{{ ((val / spark_max) * 100) | int }}{% else %}0{% endif %}%;{% if val == 0 %}background:var(--surface-3);{% endif %}"
+                   title="{{ val }} moves"></div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:0.78rem;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.stage_breakdown %}
+            <button class="btn btn-ghost btn-sm"
+                    onclick="toggleBreakdown('bd-{{ tid_row }}')"
+                    style="padding:0.2rem 0.5rem;font-size:0.75rem;">
+              <i class="bi bi-chevron-down" id="icon-bd-{{ tid_row }}"></i>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% if t.stage_breakdown %}
+        <tr id="bd-{{ tid_row }}" style="display:none;">
+          <td colspan="9" style="padding:0.75rem 1rem 1rem 2rem;background:var(--surface-1);">
+            <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em;">Stage Breakdown</div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+              {% for sb in t.stage_breakdown %}
+              <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.6rem 0.875rem;min-width:140px;">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:{{ sb.color }};flex-shrink:0;"></span>
+                  <span style="font-size:0.78rem;font-weight:600;">{{ sb.name }}</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);">
+                  {{ sb.count }} move{{ 's' if sb.count != 1 }}
+                  {% if sb.avg_minutes is not none %}· {{ sb.avg_minutes | int }}m avg{% endif %}
+                  {% if sb.sla_pass_rate is not none %}
+                  <br>SLA: <span style="color:{% if sb.sla_pass_rate >= 80 %}var(--color-success){% elif sb.sla_pass_rate >= 60 %}var(--color-warning){% else %}var(--color-danger){% endif %}">{{ sb.sla_pass_rate }}%</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer">
+    <span style="font-size:0.82rem;color:var(--text-muted);">{{ technicians | length }} technician{{ 's' if technicians|length != 1 }}</span>
+  </div>
+</div>
+
+{% endif %}{# end if technicians #}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .sparkline-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 28px;
+    width: 100%;
+  }
+  .sparkline-bar {
+    flex: 1;
+    min-height: 2px;
+    background: var(--primary);
+    border-radius: 1px;
+    opacity: 0.75;
+    transition: opacity .15s;
+  }
+  .sparkline-bar:hover { opacity: 1; }
+  .period-btn { min-width: 44px; }
+  .stat-card.orange { border-top: 3px solid #f59e0b; }
+  .stat-icon-wrap.orange { background: #f59e0b1a; color: #f59e0b; }
+  .stat-card.red { border-top: 3px solid var(--color-danger); }
+  .stat-icon-wrap.red { background: var(--color-danger-bg, #fee2e2); color: var(--color-danger); }
+</style>
+<script>
+(function () {
+  {% if technicians %}
+  const chartData = {{ chart_data | tojson }};
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const labelColor = isDark ? '#9ca3af' : '#6b7280';
+
+  const baseOpts = {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 11 } } },
+      y: { grid: { display: false }, ticks: { color: labelColor, font: { size: 11 } } },
+    },
+  };
+
+  new Chart(document.getElementById('completedChart'), {
+    type: 'bar',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        data: chartData.completed,
+        backgroundColor: 'rgba(16,185,129,0.7)',
+        borderRadius: 4,
+      }],
+    },
+    options: { ...baseOpts, scales: { ...baseOpts.scales, x: { ...baseOpts.scales.x, title: { display: true, text: 'Units', color: labelColor, font: { size: 10 } } } } },
+  });
+
+  new Chart(document.getElementById('avgTimeChart'), {
+    type: 'bar',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        data: chartData.avg_time,
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderRadius: 4,
+      }],
+    },
+    options: { ...baseOpts, scales: { ...baseOpts.scales, x: { ...baseOpts.scales.x, title: { display: true, text: 'Minutes', color: labelColor, font: { size: 10 } } } } },
+  });
+  {% endif %}
+
+  function toggleBreakdown(id) {
+    const row = document.getElementById(id);
+    const icon = document.getElementById('icon-' + id);
+    if (!row) return;
+    const hidden = row.style.display === 'none';
+    row.style.display = hidden ? '' : 'none';
+    if (icon) icon.className = hidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+  }
+  window.toggleBreakdown = toggleBreakdown;
+})();
+</script>
+{% endblock %}

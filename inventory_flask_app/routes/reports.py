@@ -37,6 +37,187 @@ def reports_index():
     return render_template('reports_index.html')
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Technician Productivity Dashboard — per-tech KPIs, charts, SLA rates
+# ─────────────────────────────────────────────────────────────────────────────
+@reports_bp.route('/reports/technician_dashboard')
+@login_required
+@module_required('reports', 'view')
+def technician_dashboard():
+    _require_reports_module()
+    from inventory_flask_app.models import ProcessStage, ProductInstance, Product
+
+    tid = current_user.tenant_id
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    today = now.date()
+
+    days = request.args.get('days', 30, type=int)
+    if days not in (7, 14, 30, 60, 90):
+        days = 30
+    start_date = datetime.combine(today - timedelta(days=days), datetime.min.time())
+
+    # Find all tech IDs active in the period or with assigned units
+    tech_ids_from_logs = (
+        db.session.query(ProductProcessLog.moved_by)
+        .join(User, ProductProcessLog.moved_by == User.id)
+        .filter(User.tenant_id == tid, ProductProcessLog.moved_at >= start_date)
+        .distinct()
+        .all()
+    )
+    tech_ids_from_assigned = (
+        db.session.query(ProductInstance.assigned_to_user_id)
+        .join(Product, ProductInstance.product_id == Product.id)
+        .filter(Product.tenant_id == tid, ProductInstance.assigned_to_user_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    all_tech_ids = list({r[0] for r in tech_ids_from_logs + tech_ids_from_assigned if r[0]})
+
+    if not all_tech_ids:
+        return render_template('reports/technician_dashboard.html',
+            technicians=[], days=days, chart_data={}, stages=[])
+
+    techs = User.query.filter(
+        User.id.in_(all_tech_ids), User.tenant_id == tid
+    ).order_by(User.username).all()
+
+    stages = ProcessStage.query.filter_by(tenant_id=tid).order_by(ProcessStage.order).all()
+    sla_map = {s.name: s.sla_hours for s in stages if s.sla_hours and s.sla_hours > 0}
+
+    tech_data = []
+    chart_labels = []
+    chart_completed = []
+    chart_avg_time = []
+
+    for tech in techs:
+        total_moves = ProductProcessLog.query.filter(
+            ProductProcessLog.moved_by == tech.id,
+            ProductProcessLog.moved_at >= start_date,
+        ).count()
+
+        checkouts = ProductProcessLog.query.filter(
+            ProductProcessLog.moved_by == tech.id,
+            ProductProcessLog.moved_at >= start_date,
+            ProductProcessLog.action.in_(['checkout', 'check_out', 'scanner_status_update']),
+            ProductProcessLog.to_stage == 'processed',
+        ).count()
+
+        avg_duration_row = (
+            db.session.query(func.avg(ProductProcessLog.duration_minutes))
+            .filter(
+                ProductProcessLog.moved_by == tech.id,
+                ProductProcessLog.moved_at >= start_date,
+                ProductProcessLog.duration_minutes.isnot(None),
+                ProductProcessLog.duration_minutes > 0,
+            )
+            .scalar()
+        )
+        avg_duration = round(float(avg_duration_row), 0) if avg_duration_row else None
+
+        sla_logs = (
+            ProductProcessLog.query
+            .filter(
+                ProductProcessLog.moved_by == tech.id,
+                ProductProcessLog.moved_at >= start_date,
+                ProductProcessLog.duration_minutes.isnot(None),
+                ProductProcessLog.from_stage.isnot(None),
+            )
+            .all()
+        )
+        sla_total = 0
+        sla_passed = 0
+        for log in sla_logs:
+            stage_sla = sla_map.get((log.from_stage or '').strip(), 0)
+            if stage_sla > 0:
+                sla_total += 1
+                if (log.duration_minutes or 0) <= stage_sla * 60:
+                    sla_passed += 1
+        sla_rate = round(sla_passed / sla_total * 100, 1) if sla_total > 0 else None
+
+        assigned_count = ProductInstance.query.join(Product).filter(
+            Product.tenant_id == tid,
+            ProductInstance.assigned_to_user_id == tech.id,
+            ProductInstance.status == 'under_process',
+            ProductInstance.is_sold == False,
+        ).count()
+
+        idle_events = ProductProcessLog.query.filter(
+            ProductProcessLog.moved_by == tech.id,
+            ProductProcessLog.moved_at >= start_date,
+            ProductProcessLog.action.in_(['mark_idle', 'scanner_status_update']),
+            ProductProcessLog.to_stage == 'idle',
+        ).count()
+
+        stage_breakdown = []
+        for stage in stages:
+            stage_moves = ProductProcessLog.query.filter(
+                ProductProcessLog.moved_by == tech.id,
+                ProductProcessLog.moved_at >= start_date,
+                ProductProcessLog.from_stage == stage.name,
+                ProductProcessLog.duration_minutes.isnot(None),
+            ).all()
+            if stage_moves:
+                durations = [m.duration_minutes for m in stage_moves if m.duration_minutes]
+                stage_avg = round(sum(durations) / len(durations), 0) if durations else None
+                stage_sla_h = sla_map.get(stage.name, 0)
+                stage_passed = sum(1 for d in durations if stage_sla_h > 0 and d <= stage_sla_h * 60)
+                stage_total_sla = sum(1 for _ in durations if stage_sla_h > 0)
+                stage_breakdown.append({
+                    'name': stage.name,
+                    'color': stage.color if hasattr(stage, 'color') and stage.color else '#6B7280',
+                    'count': len(stage_moves),
+                    'avg_minutes': stage_avg,
+                    'sla_hours': stage_sla_h,
+                    'sla_pass_rate': round(stage_passed / stage_total_sla * 100, 1) if stage_total_sla else None,
+                })
+
+        daily_rows = (
+            db.session.query(
+                func.date(ProductProcessLog.moved_at).label('day'),
+                func.count(ProductProcessLog.id).label('cnt'),
+            )
+            .filter(
+                ProductProcessLog.moved_by == tech.id,
+                ProductProcessLog.moved_at >= start_date,
+            )
+            .group_by(func.date(ProductProcessLog.moved_at))
+            .all()
+        )
+        daily_map = {r.day: r.cnt for r in daily_rows}
+        spark_days = min(days, 30)
+        sparkline = [daily_map.get(today - timedelta(days=i), 0) for i in range(spark_days - 1, -1, -1)]
+
+        tech_data.append({
+            'user': tech,
+            'total_moves': total_moves,
+            'checkouts': checkouts,
+            'avg_duration': avg_duration,
+            'sla_rate': sla_rate,
+            'assigned_count': assigned_count,
+            'idle_events': idle_events,
+            'stage_breakdown': stage_breakdown,
+            'sparkline': sparkline,
+        })
+        chart_labels.append(tech.full_name or tech.username)
+        chart_completed.append(checkouts)
+        chart_avg_time.append(avg_duration or 0)
+
+    tech_data.sort(key=lambda t: t['checkouts'], reverse=True)
+
+    chart_data = {
+        'labels': chart_labels,
+        'completed': chart_completed,
+        'avg_time': chart_avg_time,
+    }
+
+    return render_template('reports/technician_dashboard.html',
+        technicians=tech_data,
+        days=days,
+        chart_data=chart_data,
+        stages=stages,
+    )
+
+
 # Technician productivity report route
 @reports_bp.route('/tech_productivity', methods=['GET'])
 @login_required

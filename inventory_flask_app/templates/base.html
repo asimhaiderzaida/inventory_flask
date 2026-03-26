@@ -1499,6 +1499,11 @@
             <i class="bi bi-person-workspace nav-icon"></i>
             <span class="sidebar-label">Tech Productivity</span>
           </a>
+          <a href="{{ url_for('reports_bp.technician_dashboard') }}"
+             class="sidebar-link {% if ep == 'reports_bp.technician_dashboard' %}active{% endif %}">
+            <i class="bi bi-person-badge nav-icon"></i>
+            <span class="sidebar-label">Tech Dashboard</span>
+          </a>
           <a href="{{ url_for('reports_bp.stage_times') }}"
              class="sidebar-link {% if ep == 'reports_bp.stage_times' %}active{% endif %}">
             <i class="bi bi-bar-chart-steps nav-icon"></i>
