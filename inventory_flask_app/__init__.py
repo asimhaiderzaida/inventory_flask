@@ -335,4 +335,7 @@ def create_app():
         except Exception:
             return dict(notifications=[], system_notifications=[], unread_notification_count=0)
 
+    from .cli import alerts_cli
+    app.cli.add_command(alerts_cli)
+
     return app

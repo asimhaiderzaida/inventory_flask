@@ -249,6 +249,11 @@ def maybe_send_low_stock_email(tenant_id):
     from flask_mail import Message
     from flask import current_app
 
+    # Check master automated-alerts switch
+    master = TenantSettings.query.filter_by(tenant_id=tenant_id, key='enable_automated_alerts').first()
+    if not master or master.value != 'true':
+        return
+
     # Check the feature flag
     enabled_setting = TenantSettings.query.filter_by(
         tenant_id=tenant_id, key='enable_low_stock_alerts'
@@ -400,6 +405,11 @@ def maybe_send_sla_alert(tenant_id):
     from ..models import TenantSettings, db
     from .. import mail
     from flask_mail import Message
+
+    # Check master automated-alerts switch
+    master = TenantSettings.query.filter_by(tenant_id=tenant_id, key='enable_automated_alerts').first()
+    if not master or master.value != 'true':
+        return
 
     # Feature flag — dedicated enable_sla_alerts toggle
     enabled = TenantSettings.query.filter_by(

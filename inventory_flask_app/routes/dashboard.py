@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta, timezone, date as date_type
 from inventory_flask_app.utils import get_now_for_tenant
 from collections import defaultdict
-from inventory_flask_app.utils.mail_utils import get_low_stock_parts, get_overdue_units, maybe_send_sla_alert
+from inventory_flask_app.utils.mail_utils import get_low_stock_parts, get_overdue_units
 from sqlalchemy.orm import aliased
 import time as _time
 
@@ -362,10 +362,6 @@ def main_dashboard():
     low_stock_parts = get_low_stock_parts(tid)
     overdue_units   = get_overdue_units(tid)
     overdue_count   = len(overdue_units)
-    try:
-        maybe_send_sla_alert(tid)
-    except Exception:
-        pass
 
     # ── Recent Sales (last 5) ─────────────────────────────────────────────────
     recent_sale_rows = (

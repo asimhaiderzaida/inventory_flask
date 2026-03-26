@@ -262,26 +262,77 @@
         </div>
 
         <div class="sub-sep">Email Alerts</div>
-        {% for name, id_name, label, desc in [
-          ('enable_email_alerts',     'enableEmailAlerts',    'Customer reservation emails',
-           'Emails customers when reserved and when ready for pickup.'),
-          ('enable_low_stock_alerts', 'enableLowStockAlerts', 'Low-stock email alerts',
-           'Daily summary when any part drops below minimum stock.'),
-          ('enable_sla_alerts',       'enableSlaAlerts',      'SLA overdue alerts',
-           'Daily summary listing units past their processing stage SLA.'),
-        ] %}
-        <div class="toggle-row">
+
+        {# Customer transactional emails (always independent of master switch) #}
+        <div class="toggle-row mb-2">
           <div>
-            <div class="toggle-lbl">{{ label }}</div>
-            <div class="toggle-desc">{{ desc }}</div>
+            <div class="toggle-lbl">Customer reservation emails</div>
+            <div class="toggle-desc">Emails customers when reserved and when ready for pickup.</div>
           </div>
           <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
-            <input class="form-check-input" type="checkbox" role="switch" name="{{ name }}" id="{{ id_name }}"
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="enable_email_alerts" id="enableEmailAlerts"
                    style="width:42px;height:23px;cursor:pointer;margin:0;"
-                   {% if settings[name] == 'true' %}checked{% endif %}>
+                   {% if settings.enable_email_alerts == 'true' %}checked{% endif %}>
           </div>
         </div>
-        {% endfor %}
+
+        {# Master switch for scheduled / automated alerts #}
+        <div style="border:1px solid var(--border);border-radius:var(--radius-md);padding:0.875rem 1rem;margin-top:0.75rem;">
+          <div class="d-flex align-items-start justify-content-between gap-3 mb-1">
+            <div>
+              <div class="toggle-lbl">Enable automated scheduled alerts</div>
+              <div class="toggle-desc">
+                Master switch — when off, no scheduled alert emails are sent regardless of individual settings below.
+                Set up a cron job: <code style="font-size:0.75rem;">*/30 * * * * cd /home/pcmart/inventory_flask &amp;&amp; venv/bin/flask alerts send</code>
+              </div>
+            </div>
+            <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     name="enable_automated_alerts" id="masterAlertToggle"
+                     style="width:42px;height:23px;cursor:pointer;margin:0;"
+                     {% if settings.enable_automated_alerts == 'true' %}checked{% endif %}
+                     onchange="toggleAlertChildren(this.checked)">
+            </div>
+          </div>
+
+          {# Per-alert toggles #}
+          <div id="alertChildren"
+               style="margin-top:0.75rem;padding-left:1rem;border-left:2px solid var(--border);
+                      {% if settings.enable_automated_alerts != 'true' %}opacity:0.45;pointer-events:none;{% endif %}">
+            {% for name, id_name, label, desc in [
+              ('enable_low_stock_alerts',       'enableLowStockAlerts', 'Low-stock parts alerts',
+               'Daily summary when any part drops below minimum stock.'),
+              ('enable_sla_alerts',             'enableSlaAlerts',      'SLA overdue alerts',
+               'Daily summary listing units past their processing stage SLA.'),
+              ('enable_aged_inventory_alerts',  'agedAlertToggle',      'Aged inventory alerts',
+               'Units in stock longer than the Aged Inventory threshold (days above).'),
+              ('enable_ar_overdue_alerts',      'arAlertToggle',        'Accounts receivable overdue alerts',
+               'Open invoices that are past their due date.'),
+            ] %}
+            <div class="toggle-row" style="padding:0.4rem 0;">
+              <div>
+                <div class="toggle-lbl" style="font-size:0.82rem;">{{ label }}</div>
+                <div class="toggle-desc">{{ desc }}</div>
+              </div>
+              <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="{{ name }}" id="{{ id_name }}"
+                       style="width:38px;height:21px;cursor:pointer;margin:0;"
+                       {% if settings[name] == 'true' %}checked{% endif %}>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <script>
+        function toggleAlertChildren(enabled) {
+          var el = document.getElementById('alertChildren');
+          el.style.opacity = enabled ? '1' : '0.45';
+          el.style.pointerEvents = enabled ? 'auto' : 'none';
+        }
+        </script>
       </div>
 
       {# ═══ 4. MODULES ═══ #}
