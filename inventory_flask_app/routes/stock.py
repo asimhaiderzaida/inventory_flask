@@ -581,30 +581,9 @@ def create_purchase_order():
             flash(f'Could not read Excel file: {e}', 'danger')
             return redirect(url_for('stock_bp.create_purchase_order'))
 
-        # Normalise column names: strip, lowercase, spaces→underscores
-        df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
-
-        # Common alias mappings from vendor spreadsheets
-        df.rename(columns={
-            'serial_number':  'serial',
-            'sn':             'serial',
-            'asset_tag':      'asset',
-            'asset_number':   'asset',
-            'product_name':   'item_name',
-            'item':           'item_name',
-            'description':    'item_name',
-            'manufacturer':   'make',
-            'brand':          'make',
-            'screen_size':    'display',
-            'hdd':            'disk1size',
-            'disk':           'disk1size',
-            'storage':        'disk1size',
-            'processor':      'cpu',
-            'memory':         'ram',
-            'unit_cost':      'cost',
-            'price':          'cost',
-            'purchase_cost':  'cost',
-        }, inplace=True)
+        # Auto-map column names from any vendor spreadsheet format
+        from inventory_flask_app.utils.column_mapper import auto_rename_columns
+        df, _, _ = auto_rename_columns(df)
 
         # Serial is the only truly required column
         if 'serial' not in df.columns:

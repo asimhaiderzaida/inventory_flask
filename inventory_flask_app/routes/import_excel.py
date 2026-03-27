@@ -135,20 +135,8 @@ def upload_excel():
                 except OSError:
                     pass
             df.dropna(how='all', inplace=True)
-            df.columns = [col.strip().lower() for col in df.columns]
-            df.rename(columns={
-                'serial_number': 'serial',
-                'asset_tag': 'asset',
-                'asset tag': 'asset',
-                'screen_size': 'display',
-                'screen size': 'display',
-                'screen': 'display',
-                'product name': 'item_name',
-                'item': 'item_name',
-                'item name': 'item_name',
-                'product': 'item_name',
-            }, inplace=True)
-            # Only keep fields defined in Product or ProductInstance models
+            from inventory_flask_app.utils.column_mapper import auto_rename_columns
+            df, _, _ = auto_rename_columns(df)
             allowed_columns = {
                 'asset', 'serial', 'item_name', 'make', 'model', 'cpu', 'ram',
                 'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location', 'cost'
@@ -285,21 +273,9 @@ def upload_excel():
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         # Drop fully empty rows
         df.dropna(how='all', inplace=True)
-        # Normalize column names
-        df.columns = [col.strip().lower() for col in df.columns]
-        df.rename(columns={
-            'serial_number': 'serial',
-            'asset_tag': 'asset',
-            'asset tag': 'asset',
-            'screen_size': 'display',
-            'screen size': 'display',
-            'screen': 'display',
-            'product name': 'item_name',
-            'item': 'item_name',
-            'item name': 'item_name',
-            'product': 'item_name',
-        }, inplace=True)
-        # Only keep allowed columns
+        # Normalize and auto-map column names from any vendor format
+        from inventory_flask_app.utils.column_mapper import auto_rename_columns
+        df, col_mapping, unmapped_cols = auto_rename_columns(df)
         allowed_columns = {
             'asset', 'serial', 'item_name', 'make', 'model', 'cpu', 'ram',
             'display', 'gpu1', 'gpu2', 'grade', 'disk1size', 'location', 'cost'
@@ -334,6 +310,8 @@ def upload_excel():
             location_id=location_id,
             import_token=import_token,
             existing_serials=existing_serials,
+            col_mapping=col_mapping,
+            unmapped_cols=unmapped_cols,
         )
 
     # GET

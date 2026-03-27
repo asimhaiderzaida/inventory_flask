@@ -207,6 +207,25 @@
           <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
             Review all uploaded fields. Confirm to proceed with import.
           </p>
+          {% if col_mapping %}
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.82rem;">
+            <div style="font-weight:600;margin-bottom:0.5rem;">
+              <i class="bi bi-arrow-left-right me-1"></i>Column Mapping (auto-detected)
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+              {% for orig, internal in col_mapping.items() %}
+              <span style="background:#ECFDF5;color:#065F46;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;">
+                {{ orig }} → {{ internal }}
+              </span>
+              {% endfor %}
+            </div>
+            {% if unmapped_cols %}
+            <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.75rem;">
+              <i class="bi bi-info-circle me-1"></i>Ignored columns: {{ unmapped_cols | join(', ') }}
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
           <div style="overflow-x:auto;">
             <table class="table">
               <thead>
