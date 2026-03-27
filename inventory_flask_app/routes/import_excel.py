@@ -105,28 +105,28 @@ def upload_excel():
             try:
                 uuid.UUID(import_token)
             except (ValueError, AttributeError):
-                flash(\1, 'danger')
+                flash('Invalid import token. Please re-upload the file.', 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             tmp_path = os.path.join(tempfile.gettempdir(), f"excel_import_{import_token}.xlsx")
             if not os.path.exists(tmp_path):
-                flash(\1, 'danger')
+                flash('Import session expired or already used. Please re-upload the file.', 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             if not vendor_id:
-                flash(\1, 'danger')
+                flash('Missing vendor for import.', 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             try:
                 vid = int(vendor_id)
             except (TypeError, ValueError):
-                flash(\1, 'danger')
+                flash('Invalid vendor selected.', 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             vendor = Vendor.query.filter_by(id=vid, tenant_id=current_user.tenant_id).first()
             if not vendor:
-                flash(\1, 'danger')
+                flash('Vendor not found for this tenant.', 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             try:
                 df = pd.read_excel(tmp_path)
             except Exception as e:
-                flash(\1, 'danger')
+                flash(f"Error reading uploaded Excel data: {e}", 'danger')
                 return render_template('upload_product.html', vendors=vendors, locations=locations)
             finally:
                 # Always clean up temp file after reading
@@ -255,21 +255,21 @@ def upload_excel():
 
         # STEP 1: PREVIEW — do not import yet!
         if not file or not vendor_id:
-            flash(\1, 'danger')
+            flash('Please upload a file and select a vendor.', 'danger')
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         try:
             vid = int(vendor_id)
         except (TypeError, ValueError):
-            flash(\1, 'danger')
+            flash('Invalid vendor selected.', 'danger')
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         vendor = Vendor.query.filter_by(id=vid, tenant_id=current_user.tenant_id).first()
         if not vendor:
-            flash(\1, 'danger')
+            flash('Vendor not found for this tenant.', 'danger')
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         try:
             df = pd.read_excel(file)
         except Exception as e:
-            flash(\1, 'danger')
+            flash(f"Error reading Excel file: {e}", 'danger')
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         # Drop fully empty rows
         df.dropna(how='all', inplace=True)
@@ -282,7 +282,7 @@ def upload_excel():
         }
         df = df[[col for col in df.columns if col in allowed_columns]]
         if 'serial' not in df.columns:
-            flash(\1, 'danger')
+            flash("Missing required column in Excel: 'serial' (or 'serial_number')", 'danger')
             return render_template('upload_product.html', vendors=vendors, locations=locations)
         preview_columns = list(df.columns)
         preview_data = df.to_dict(orient='records')
