@@ -243,6 +243,12 @@
 
 {% block extra_scripts %}
 <script>
+const LOC_URLS = {
+  lookupUnit:     '{{ url_for("scanner_bp.lookup_unit") }}',
+  lookupBin:      '{{ url_for("scanner_bp.lookup_bin") }}',
+  viewInstanceBase: '{{ url_for("stock_bp.view_edit_instance", instance_id=0) }}'.slice(0, -2),
+  createLocation: '{{ url_for("stock_bp.create_location_ajax") }}',
+};
 // ── Universal Search ───────────────────────────────────────────────────────────
 (function () {
   const input     = document.getElementById('locSearchInput');
@@ -279,13 +285,13 @@
     resultDiv.style.display = '';
     resultDiv.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);"><span class="spinner-border spinner-border-sm me-2"></span>Searching…</div>';
 
-    fetch('/stock/api/lookup_unit?q=' + encodeURIComponent(q))
+    fetch(LOC_URLS.lookupUnit + '?q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.found) {
           showUnitResult(data);
         } else {
-          return fetch('/stock/api/lookup_bin?q=' + encodeURIComponent(q))
+          return fetch(LOC_URLS.lookupBin + '?q=' + encodeURIComponent(q))
             .then(function (r) { return r.json(); })
             .then(function (binData) {
               if (binData.found) {
@@ -323,7 +329,7 @@
           locHtml +
           (binHtml ? ' &nbsp;·&nbsp; ' + binHtml : '') +
         '</div>' +
-        '<a href="/stock/instance/' + d.instance_id + '/view_edit" class="btn btn-ghost btn-sm" target="_blank">' +
+        '<a href="' + LOC_URLS.viewInstanceBase + d.instance_id + '/view_edit" class="btn btn-ghost btn-sm" target="_blank">' +
           '<i class="bi bi-box-arrow-up-right"></i> View Unit' +
         '</a>' +
       '</div>';
@@ -473,7 +479,7 @@ function saveEdit(id) {
     saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
     errorDiv.style.display = 'none';
 
-    fetch('/stock/locations/create', {
+    fetch(LOC_URLS.createLocation, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name: name}),

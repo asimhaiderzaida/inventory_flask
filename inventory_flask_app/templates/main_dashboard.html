@@ -346,7 +346,7 @@
       <div class="kpi-trend flat" style="margin-top:.4rem;">
         <i class="bi bi-box-arrow-in-down"></i> {{ unprocessed }} unprocessed
       </div>
-      <div id="kpi-reserved-note" style="font-size:.72rem;color:#F59E0B;margin-top:.3rem;{% if not reserved_count %}display:none;{% endif %}"><i class="bi bi-bag-check"></i> <span id="kpi-reserved-count">{{ reserved_count }}</span> reserved not included</div>
+      <div id="kpi-reserved-note-tech" style="font-size:.72rem;color:#F59E0B;margin-top:.3rem;{% if not reserved_count %}display:none;{% endif %}"><i class="bi bi-bag-check"></i> <span id="kpi-reserved-count-tech">{{ reserved_count }}</span> reserved not included</div>
     </a>
   </div>
   <div class="col-6 col-lg-3">
@@ -1320,14 +1320,16 @@ function refreshStats() {
       const revEl = document.getElementById('kpi-revenue');
       if (revEl && d.revenue_this_month !== undefined)
         revEl.textContent = Math.round(d.revenue_this_month).toLocaleString();
-      // Reserved count subtitle
+      // Reserved count subtitle (standard + technician KPI cards)
       if (d.reserved_count !== undefined) {
-        const noteEl  = document.getElementById('kpi-reserved-note');
-        const countEl = document.getElementById('kpi-reserved-count');
-        if (noteEl && countEl) {
-          countEl.textContent = d.reserved_count;
-          noteEl.style.display = d.reserved_count > 0 ? '' : 'none';
-        }
+        ['', '-tech'].forEach(function (sfx) {
+          const noteEl  = document.getElementById('kpi-reserved-note' + sfx);
+          const countEl = document.getElementById('kpi-reserved-count' + sfx);
+          if (noteEl && countEl) {
+            countEl.textContent = d.reserved_count;
+            noteEl.style.display = d.reserved_count > 0 ? '' : 'none';
+          }
+        });
       }
     })
     .catch(() => {});
