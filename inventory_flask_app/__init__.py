@@ -7,6 +7,7 @@ load_dotenv()
 
 from datetime import timedelta, datetime, timezone
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_login import LoginManager
 from flask_wtf import CSRFProtect
 from flask_cors import CORS
@@ -38,6 +39,7 @@ def create_app():
                 instance_relative_config=False,
                 template_folder='templates',
                 static_folder='static')
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
