@@ -100,28 +100,17 @@ def verify_webhook(data, hmac_header):
     try:
         from flask import current_app
         secret = current_app.config.get('SHOPIFY_WEBHOOK_SECRET', '')
-
-        logger.info("HMAC debug: secret length=%d, secret_start=%s, hmac_header=%s",
-                    len(secret), secret[:6] + '...' if secret else 'EMPTY',
-                    hmac_header[:20] + '...' if hmac_header else 'NONE')
-
         if not secret:
             logger.warning("SHOPIFY_WEBHOOK_SECRET is empty — cannot verify webhook")
             return False
         if not hmac_header:
-            logger.warning("No HMAC header received from Shopify")
+            logger.warning("No X-Shopify-Hmac-Sha256 header received")
             return False
-
         digest = hmac_lib.new(secret.encode('utf-8'), data, hashlib.sha256).digest()
         computed = base64.b64encode(digest).decode('utf-8')
-
-        match = hmac_lib.compare_digest(computed, hmac_header)
-        if not match:
-            logger.warning("HMAC mismatch: computed=%s received=%s",
-                           computed[:20] + '...', hmac_header[:20] + '...')
-        return match
+        return hmac_lib.compare_digest(computed, hmac_header)
     except Exception as e:
-        logger.warning(f"verify_webhook error: {e}")
+        logger.warning("verify_webhook error: %s", e)
         return False
 
 
