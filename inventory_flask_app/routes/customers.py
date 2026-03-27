@@ -704,7 +704,7 @@ def customer_portal(token):
         order_rows.append({
             'order_number': order.order_number,
             'created_at':   order.created_at,
-            'items':        items,
+            'line_items':   items,
         })
 
     return render_template(

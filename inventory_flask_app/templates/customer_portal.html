@@ -571,9 +571,9 @@
         </div>
       </div>
 
-      {% if order.items %}
+      {% if order.line_items %}
       <div class="order-units">
-        {% for item in order.items %}
+        {% for item in order.line_items %}
         <div class="order-unit-row">
           <span class="order-unit-name">{{ item.item_name }}</span>
           <span class="order-unit-spec">
