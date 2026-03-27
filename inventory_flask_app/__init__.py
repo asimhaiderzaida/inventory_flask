@@ -178,6 +178,8 @@ def create_app():
         settings = getattr(g, '_tenant_settings', {})
         return settings.get(f'label_status_{status_key}') or default
 
+    app.jinja_env.add_extension('jinja2.ext.loopcontrols')
+
     app.jinja_env.globals.update(
         get_instance_id=get_instance_id,
         get_now_for_tenant=get_now_for_tenant,
