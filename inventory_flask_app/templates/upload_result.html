@@ -122,7 +122,7 @@
                 <td>{{ (row.instance.product.grade if row.instance.product else None) | nonan }}</td>
                 <td>{{ row.instance.location.name if row.instance.location else '—' }}</td>
               {% else %}
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
               {% endif %}
               <td style="max-width:260px;">
                 {% if row.changes %}

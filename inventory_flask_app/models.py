@@ -262,11 +262,11 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     asset = db.Column(db.String(100), nullable=True, index=True)
     serial = db.Column(db.String(100), nullable=True, index=True)
-    item_name = db.Column(db.String(100), nullable=False, index=True)
+    item_name = db.Column(db.String(255), nullable=False, index=True)
     make = db.Column(db.String(100))
     model = db.Column(db.String(100))
     display = db.Column(db.String(100))
-    cpu = db.Column(db.String(100))
+    cpu = db.Column(db.String(255))
 
     @hybrid_property
     def processor(self):
@@ -276,10 +276,10 @@ class Product(db.Model):
     def processor(cls):
         return cls.cpu
 
-    ram = db.Column(db.String(100))
-    gpu1 = db.Column(db.String(100))
-    gpu2 = db.Column(db.String(100))
-    disk1size = db.Column(db.String(100))
+    ram = db.Column(db.String(255))
+    gpu1 = db.Column(db.String(255))
+    gpu2 = db.Column(db.String(255))
+    disk1size = db.Column(db.String(255))
     grade = db.Column(db.String(20))
     # stock = db.Column(db.Integer, default=0)   ← REMOVED - use ProductInstance count instead
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -488,16 +488,16 @@ class PurchaseOrderItem(db.Model):
     serial      = db.Column(db.String(100), nullable=False, index=True)
     asset_tag   = db.Column(db.String(100), nullable=True, index=True)
     # Spec fields (all optional except serial)
-    item_name   = db.Column(db.String(100))
+    item_name   = db.Column(db.String(255))
     make        = db.Column(db.String(100))
     model       = db.Column(db.String(100))
     display     = db.Column(db.String(100))
-    cpu         = db.Column(db.String(100))
-    ram         = db.Column(db.String(100))
-    gpu1        = db.Column(db.String(100))
-    gpu2        = db.Column(db.String(100))
+    cpu         = db.Column(db.String(255))
+    ram         = db.Column(db.String(255))
+    gpu1        = db.Column(db.String(255))
+    gpu2        = db.Column(db.String(255))
     grade       = db.Column(db.String(20))
-    disk1size   = db.Column(db.String(100))
+    disk1size   = db.Column(db.String(255))
     location_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='SET NULL'), nullable=True)
     # Receiving status: expected | received | missing | extra
     status      = db.Column(db.String(20), nullable=False, default='expected')

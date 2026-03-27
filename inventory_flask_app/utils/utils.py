@@ -145,8 +145,20 @@ def upsert_instance(serial, spec_data, tenant_id, location_id=None, vendor_id=No
         s = str(val or '').strip()
         return '' if s.lower() in ('nan', 'none') else s
 
+    _FIELD_MAX = {
+        'item_name': 250, 'cpu': 250, 'ram': 250,
+        'gpu1': 250, 'gpu2': 250, 'disk1size': 250,
+        'make': 95, 'model': 95, 'display': 95, 'grade': 18,
+    }
+
+    def _truncate(field, val):
+        max_len = _FIELD_MAX.get(field, 95)
+        if val and len(val) > max_len:
+            return val[:max_len - 1] + '…'
+        return val
+
     # Normalize all incoming spec fields
-    cleaned = {f: _clean(spec_data.get(f)) for f in PRODUCT_SPEC_FIELDS}
+    cleaned = {f: _truncate(f, _clean(spec_data.get(f))) for f in PRODUCT_SPEC_FIELDS}
     raw_asset = _clean(spec_data.get('asset'))
     asset = raw_asset or None
     cleaned['item_name'] = cleaned['item_name'] or cleaned.get('model') or 'Unknown'
