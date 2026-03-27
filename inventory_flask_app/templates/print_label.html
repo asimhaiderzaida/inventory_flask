@@ -116,7 +116,7 @@
       letter-spacing: 0.03em;
     }
     .lbl-date {
-      font-size: {{ (fsize | int - 3) | max(5) }}pt;
+      font-size: {{ [(fsize | int - 3), 5] | max }}pt;
       color: #666;
       line-height: 1.1;
       white-space: nowrap;
