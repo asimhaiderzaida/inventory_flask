@@ -233,3 +233,67 @@ def _send_ar_overdue_alert(tenant_id):
         db.session.commit()
     except Exception as e:
         logger.error("AR overdue alert failed for tenant %s: %s", tenant_id, e)
+
+
+# ── Super Admin CLI ──────────────────────────────────────────────────────────
+
+@click.group('superadmin')
+def superadmin_cli():
+    """Super admin management commands."""
+    pass
+
+
+@superadmin_cli.command('create')
+@click.argument('username')
+@click.argument('password')
+@with_appcontext
+def create_superadmin(username, password):
+    """Create a super admin user.
+
+    Usage: flask superadmin create <username> <password>
+
+    Super admins exist above all tenants and can manage the entire platform.
+    They are stored under a hidden '__system__' tenant.
+    """
+    from inventory_flask_app.models import db, User, Tenant
+    from werkzeug.security import generate_password_hash
+
+    existing = User.query.filter_by(username=username).first()
+    if existing:
+        if existing.is_superadmin:
+            click.echo(f"Super admin '{username}' already exists.")
+        else:
+            existing.is_superadmin = True
+            db.session.commit()
+            click.echo(f"Existing user '{username}' promoted to super admin.")
+        return
+
+    system_tenant = Tenant.query.filter_by(name='__system__').first()
+    if not system_tenant:
+        system_tenant = Tenant(name='__system__', is_active=False)
+        db.session.add(system_tenant)
+        db.session.flush()
+
+    user = User(
+        username=username,
+        password_hash=generate_password_hash(password),
+        role='admin',
+        tenant_id=system_tenant.id,
+        is_superadmin=True,
+    )
+    db.session.add(user)
+    db.session.commit()
+    click.echo(f"Super admin '{username}' created successfully.")
+
+
+@superadmin_cli.command('list')
+@with_appcontext
+def list_superadmins():
+    """List all super admin users."""
+    from inventory_flask_app.models import User
+    admins = User.query.filter_by(is_superadmin=True).all()
+    if not admins:
+        click.echo("No super admins found. Create one with: flask superadmin create <username> <password>")
+        return
+    for u in admins:
+        click.echo(f"  {u.username} (id={u.id}, tenant_id={u.tenant_id})")

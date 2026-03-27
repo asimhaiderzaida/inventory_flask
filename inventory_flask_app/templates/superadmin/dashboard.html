@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Platform Admin{% endblock %}
+{% block page_title %}Platform Admin{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Platform Admin</h1>
+    <div class="page-subtitle">Manage tenants and platform-wide settings</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('superadmin_bp.create_tenant') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i> New Tenant
+    </a>
+  </div>
+</div>
+
+{# ── KPI cards ── #}
+<div class="row g-3 mb-4 animate-fade-up">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card db-primary">
+      <div class="kpi-icon"><i class="bi bi-buildings"></i></div>
+      <div class="kpi-value">{{ total_tenants }}</div>
+      <div class="kpi-label">Tenants</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card db-green">
+      <div class="kpi-icon"><i class="bi bi-people"></i></div>
+      <div class="kpi-value">{{ total_users }}</div>
+      <div class="kpi-label">Total Users</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card db-amber">
+      <div class="kpi-icon"><i class="bi bi-box-seam"></i></div>
+      <div class="kpi-value">{{ "{:,}".format(total_units) }}</div>
+      <div class="kpi-label">Total Units</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card {{ 'db-green' if registration_open else 'db-red' }}">
+      <div class="kpi-icon"><i class="bi bi-door-{{ 'open' if registration_open else 'closed' }}"></i></div>
+      <div class="kpi-value" style="font-size:1.1rem;margin-top:.35rem;">
+        {{ 'Open' if registration_open else 'Closed' }}
+      </div>
+      <div class="kpi-label">Registration</div>
+      <div style="margin-top:.6rem;">
+        <form method="POST" action="{{ url_for('superadmin_bp.toggle_registration') }}" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm {{ 'btn-danger' if registration_open else 'btn-success' }}"
+                  style="font-size:0.72rem;padding:0.15rem 0.6rem;">
+            {{ 'Disable' if registration_open else 'Enable' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Tenant table ── #}
+<div class="panel animate-fade-up">
+  <div class="panel-header">
+    <span class="panel-title"><i class="bi bi-buildings me-2"></i>Tenants</span>
+    <span style="font-size:0.75rem;color:var(--text-muted);">{{ total_tenants }} total</span>
+  </div>
+  <div class="table-card">
+    <table class="table align-middle mb-0" style="font-size:0.85rem;">
+      <thead>
+        <tr>
+          <th>Tenant</th>
+          <th>Admin</th>
+          <th class="text-center">Users</th>
+          <th class="text-center">Units</th>
+          <th>Last Activity</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th style="width:160px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tenant_stats %}
+        <tr>
+          <td>
+            <div style="font-weight:600;">{{ t.tenant.name }}</div>
+            <div style="font-size:0.74rem;color:var(--text-muted);">ID {{ t.tenant.id }} · {{ t.tenant.plan or 'basic' }}</div>
+          </td>
+          <td>
+            {% if t.admin_user %}
+            <span style="font-family:monospace;font-size:0.8rem;">{{ t.admin_user.username }}</span>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center">{{ t.user_count }}</td>
+          <td class="text-center">{{ "{:,}".format(t.unit_count) }}</td>
+          <td>
+            {% if t.last_activity %}
+            <span style="font-size:0.8rem;color:var(--text-secondary);">
+              {{ t.last_activity.strftime('%d %b %Y') }}
+            </span>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:0.8rem;">Never</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.tenant.is_active %}
+            <span class="status-pill status-processed">Active</span>
+            {% else %}
+            <span class="status-pill status-idle">Disabled</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.78rem;color:var(--text-muted);">
+            {{ t.tenant.created_at.strftime('%d %b %Y') if t.tenant.created_at else '—' }}
+          </td>
+          <td>
+            <div class="d-flex gap-1 flex-wrap">
+              {% if t.admin_user %}
+              <form method="POST" action="{{ url_for('superadmin_bp.impersonate_tenant', tenant_id=t.tenant.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-ghost btn-sm" title="View as this tenant's admin"
+                        onclick="return confirm('Switch to {{ t.tenant.name }} as {{ t.admin_user.username }}?')">
+                  <i class="bi bi-person-badge"></i> View
+                </button>
+              </form>
+              {% endif %}
+              <form method="POST" action="{{ url_for('superadmin_bp.toggle_tenant', tenant_id=t.tenant.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm {{ 'btn-ghost' if t.tenant.is_active else 'btn-success' }}"
+                        style="font-size:0.75rem;"
+                        onclick="return confirm('{{ 'Disable' if t.tenant.is_active else 'Enable' }} tenant {{ t.tenant.name }}?')">
+                  {{ 'Disable' if t.tenant.is_active else 'Enable' }}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state">
+              <i class="bi bi-buildings" style="font-size:2rem;color:var(--text-muted);"></i>
+              <p>No tenants yet. <a href="{{ url_for('superadmin_bp.create_tenant') }}">Create the first one</a>.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

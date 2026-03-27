@@ -38,6 +38,10 @@ def login():
             if not user.tenant_id:
                 flash("User is not assigned to any tenant. Contact administrator.", "danger")
                 return redirect(url_for('auth.login'))
+            # Block login if tenant is disabled (super admins are always allowed)
+            if not user.is_superadmin and user.tenant and not user.tenant.is_active:
+                flash("This account has been disabled. Please contact the administrator.", "danger")
+                return render_template('login.html', settings=settings)
             login_user(user)
             from datetime import datetime, timezone
             user.last_login_at = datetime.now(timezone.utc)
@@ -51,7 +55,10 @@ def login():
                 db.session.commit()
             flash("Invalid username or password.", "danger")
 
-    return render_template('login.html', settings=settings)
+    from ..models import TenantSettings
+    public_reg = TenantSettings.query.filter_by(key='allow_public_registration').first()
+    registration_disabled = public_reg is not None and public_reg.value == 'false'
+    return render_template('login.html', settings=settings, registration_disabled=registration_disabled)
 
 @auth_bp.route('/logout')
 @login_required
@@ -119,6 +126,12 @@ def register_user():
 @auth_bp.route('/register_tenant', methods=['GET', 'POST'])
 @limiter.limit("3/hour", methods=["POST"])
 def register_tenant():
+    from ..models import TenantSettings
+    public_reg = TenantSettings.query.filter_by(key='allow_public_registration').first()
+    if public_reg and public_reg.value == 'false':
+        flash("Registration is disabled. Please contact the administrator.", "warning")
+        return redirect(url_for('auth.login'))
+
     if request.method == 'POST':
         try:
             validate_csrf(request.form.get('csrf_token'))

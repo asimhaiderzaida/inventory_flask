@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Create Tenant{% endblock %}
+{% block page_title %}Create Tenant{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-up">
+  <div>
+    <h1 class="page-title">Create Tenant</h1>
+    <div class="page-subtitle">Provision a new business account on the platform</div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('superadmin_bp.dashboard') }}" class="btn btn-ghost">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+</div>
+
+<div class="row justify-content-center animate-fade-up">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-buildings me-2"></i>New Tenant</span>
+      </div>
+      <div class="panel-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Business Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" name="tenant_name" class="form-control"
+                   placeholder="e.g. Acme IT Solutions" required autofocus
+                   value="{{ request.form.tenant_name or '' }}">
+            <div class="form-text">Must be unique across the platform.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Admin Username <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" name="admin_username" class="form-control"
+                   placeholder="e.g. admin_acme" required autocomplete="off"
+                   value="{{ request.form.admin_username or '' }}">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Admin Password <span style="color:var(--color-danger);">*</span></label>
+            <input type="password" name="admin_password" class="form-control"
+                   placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check2-circle me-1"></i> Create Tenant
+            </button>
+            <a href="{{ url_for('superadmin_bp.dashboard') }}" class="btn btn-ghost">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1189,6 +1189,17 @@
       {% set is_analytics = ep.startswith('reports_bp') %}
       {% set is_admin = ep.startswith('admin_bp') or ep == 'auth.register_user' %}
 
+      {# ── Super Admin link (top of sidebar) ── #}
+      {% if current_user.is_superadmin %}
+      <a href="{{ url_for('superadmin_bp.dashboard') }}"
+         class="sidebar-link {% if ep.startswith('superadmin_bp') %}active{% endif %}"
+         style="color:#F59E0B;">
+        <i class="bi bi-shield-lock nav-icon" style="color:#F59E0B;"></i>
+        <span class="sidebar-label">Platform Admin</span>
+      </a>
+      <div style="border-bottom:1px solid rgba(255,255,255,0.08);margin:0.25rem 0.75rem 0.5rem;"></div>
+      {% endif %}
+
       {% if current_user.role == 'technician' %}
       {# ══ TECHNICIAN: focused view ══ #}
 
@@ -1857,6 +1868,25 @@
      MAIN CONTENT
 ═══════════════════════════════════════════ -->
 <main class="main-content">
+  {# ── Impersonation banner ── #}
+  {% if session.get('superadmin_original_user_id') %}
+  <div style="background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:0.45rem 1.25rem;
+              display:flex;align-items:center;justify-content:space-between;
+              margin:-1.25rem -1.25rem 1.25rem;position:sticky;top:0;z-index:900;">
+    <span style="font-size:0.82rem;color:#92400E;">
+      <i class="bi bi-person-badge me-1"></i>
+      Impersonating <strong>{{ current_user.username }}</strong>
+      ({{ current_user.tenant.name if current_user.tenant else '' }})
+    </span>
+    <form method="POST" action="{{ url_for('superadmin_bp.exit_impersonation') }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm"
+              style="background:#92400E;color:#fff;font-size:0.75rem;padding:0.2rem 0.65rem;">
+        <i class="bi bi-box-arrow-left me-1"></i>Exit Impersonation
+      </button>
+    </form>
+  </div>
+  {% endif %}
   {% block content %}{% endblock %}
 </main>
 

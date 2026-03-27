@@ -22,6 +22,8 @@ class User(db.Model, UserMixin):
     )
     tenant = db.relationship('Tenant', backref='users')
 
+    is_superadmin = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+
     __table_args__ = (
         db.UniqueConstraint('username', 'tenant_id', name='uq_user_username_tenant'),
     )
@@ -98,6 +100,7 @@ class Tenant(db.Model):
     plan = db.Column(db.String(50), default='basic')
     timezone = db.Column(db.String(64), default='UTC')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    is_active = db.Column(db.Boolean, default=True, nullable=False, server_default='true')
 
     def __repr__(self):
         return f"<Tenant {self.name}>"

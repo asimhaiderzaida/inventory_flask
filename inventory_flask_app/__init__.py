@@ -124,7 +124,7 @@ def create_app():
         order_tracking_routes, sales, invoices, import_excel,
         exports, parts, returns, reports, admin,
         pipeline, scanner, accounting, notifications, shopify_routes,
-        orders, pricing,
+        orders, pricing, superadmin,
     )
 
     app.register_blueprint(auth.auth_bp)
@@ -148,6 +148,7 @@ def create_app():
     app.register_blueprint(shopify_routes.shopify_bp)
     app.register_blueprint(orders.orders_bp)
     app.register_blueprint(pricing.pricing_bp)
+    app.register_blueprint(superadmin.superadmin_bp)
 
     # Jinja globals
     from .utils.utils import get_instance_id, get_now_for_tenant, format_duration, calc_duration_minutes
@@ -339,7 +340,8 @@ def create_app():
         except Exception:
             return dict(notifications=[], system_notifications=[], unread_notification_count=0)
 
-    from .cli import alerts_cli
+    from .cli import alerts_cli, superadmin_cli
     app.cli.add_command(alerts_cli)
+    app.cli.add_command(superadmin_cli)
 
     return app
