@@ -160,13 +160,21 @@ def remove_checkout_scan(serial):
 @login_required
 @admin_or_supervisor_required
 def bulk_price_editor():
+    tid             = current_user.tenant_id
     status_filter   = request.args.get('status', 'processed')
     model_filter    = request.args.get('model', '').strip()
     location_filter = request.args.get('location', '').strip()
-    priced_filter   = request.args.get('priced', '').strip()  # 'yes'/'no'/''
+    priced_filter   = request.args.get('priced', '').strip()
+    make_filter     = request.args.get('make', '').strip()
+    cpu_filter      = request.args.get('cpu', '').strip()
+    ram_filter      = request.args.get('ram', '').strip()
+    disk_filter     = request.args.get('disk', '').strip()
+    grade_filter    = request.args.get('grade', '').strip()
+    display_filter  = request.args.get('display', '').strip()
+    gpu_filter      = request.args.get('gpu', '').strip()
 
     q = ProductInstance.query.join(Product).filter(
-        Product.tenant_id == current_user.tenant_id,
+        Product.tenant_id == tid,
         ProductInstance.is_sold == False,
     )
     if status_filter and status_filter != 'all':
@@ -179,18 +187,43 @@ def bulk_price_editor():
         q = q.filter(ProductInstance.asking_price != None)
     elif priced_filter == 'no':
         q = q.filter(ProductInstance.asking_price == None)
+    if make_filter:
+        q = q.filter(Product.make.ilike(f'%{make_filter}%'))
+    if cpu_filter:
+        q = q.filter(Product.cpu.ilike(f'%{cpu_filter}%'))
+    if ram_filter:
+        q = q.filter(Product.ram.ilike(f'%{ram_filter}%'))
+    if disk_filter:
+        q = q.filter(Product.disk1size.ilike(f'%{disk_filter}%'))
+    if grade_filter:
+        q = q.filter(Product.grade == grade_filter)
+    if display_filter:
+        q = q.filter(Product.display.ilike(f'%{display_filter}%'))
+    if gpu_filter:
+        q = q.filter(Product.gpu1.ilike(f'%{gpu_filter}%'))
 
     instances = q.order_by(Product.model, Product.cpu, ProductInstance.serial).all()
-    locations = Location.query.filter_by(tenant_id=current_user.tenant_id).order_by(Location.name).all()
+    locations = Location.query.filter_by(tenant_id=tid).order_by(Location.name).all()
+    grades = [r[0] for r in db.session.query(Product.grade).filter(
+        Product.tenant_id == tid, Product.grade.isnot(None), Product.grade != ''
+    ).distinct().order_by(Product.grade).all()]
 
     return render_template(
         'bulk_price_editor.html',
         instances=instances,
         locations=locations,
+        grades=grades,
         status_filter=status_filter,
         model_filter=model_filter,
         location_filter=location_filter,
         priced_filter=priced_filter,
+        make_filter=make_filter,
+        cpu_filter=cpu_filter,
+        ram_filter=ram_filter,
+        disk_filter=disk_filter,
+        grade_filter=grade_filter,
+        display_filter=display_filter,
+        gpu_filter=gpu_filter,
     )
 
 
@@ -1632,11 +1665,15 @@ def under_process():
     ).filter(reserved_order.id == None)
 
     # --- Tenant scoping: only show ProductInstances for current tenant ---
-    query = query.filter(Product.tenant_id == current_user.tenant_id)
+    # Use a subquery to avoid a cartesian product when Product is not already joined
+    tenant_product_ids = db.session.query(Product.id).filter(
+        Product.tenant_id == current_user.tenant_id
+    ).subquery()
+    query = query.filter(ProductInstance.product_id.in_(tenant_product_ids))
     # --------------------------------------------------------------------
 
     # Query all matching instances (no pagination since we're grouping)
-    all_instances = query.all()
+    all_instances = query.limit(2000).all()
     # --- DEBUG: Print all grouped inventory ---
 
     # Group instances by (model + cpu)
