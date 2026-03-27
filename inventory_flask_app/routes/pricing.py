@@ -319,6 +319,11 @@ def bulk_pricing():
     model       = request.args.get('model', '').strip()
     location    = request.args.get('location', '').strip()
     priced      = request.args.get('priced', '')  # 'yes' | 'no' | ''
+    cpu         = request.args.get('cpu', '').strip()
+    ram         = request.args.get('ram', '').strip()
+    disk        = request.args.get('disk', '').strip()
+    grade       = request.args.get('grade', '').strip()
+    display     = request.args.get('display', '').strip()
 
     q = (
         ProductInstance.query
@@ -341,23 +346,38 @@ def bulk_pricing():
         q = q.filter(ProductInstance.asking_price != None)
     elif priced == 'no':
         q = q.filter(ProductInstance.asking_price == None)
+    if cpu:
+        q = q.filter(Product.cpu.ilike(f'%{cpu}%'))
+    if ram:
+        q = q.filter(Product.ram.ilike(f'%{ram}%'))
+    if disk:
+        q = q.filter(Product.disk1size.ilike(f'%{disk}%'))
+    if grade:
+        q = q.filter(Product.grade == grade)
+    if display:
+        q = q.filter(Product.display.ilike(f'%{display}%'))
 
     instances = q.order_by(Product.make, Product.model).limit(200).all()
 
-    # Sidebar data for filter dropdowns
     pos = PurchaseOrder.query.filter_by(tenant_id=tid).order_by(
         PurchaseOrder.created_at.desc()
     ).limit(50).all()
     locations = Location.query.filter_by(tenant_id=tid).order_by(Location.name).all()
+    grades = [r[0] for r in db.session.query(Product.grade).filter(
+        Product.tenant_id == tid, Product.grade.isnot(None), Product.grade != ''
+    ).distinct().order_by(Product.grade).all()]
 
     return render_template(
         'pricing/bulk_pricing.html',
         instances=instances,
         pos=pos,
         locations=locations,
+        grades=grades,
         filters={
             'po_id': po_id, 'status': status, 'make': make,
             'model': model, 'location': location, 'priced': priced,
+            'cpu': cpu, 'ram': ram, 'disk': disk,
+            'grade': grade, 'display': display,
         },
     )
 

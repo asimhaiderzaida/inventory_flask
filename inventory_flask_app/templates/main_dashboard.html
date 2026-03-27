@@ -286,6 +286,7 @@
 .sparkline-bar.zero { background: #E5E7EB; min-height: 2px; }
 </style>
 
+{% if settings.dash_show_alert_banners != 'false' %}
 {# ── SECTION 1: Alert banners ──────────────────────────────────────────────── #}
 {% if overdue_count %}
 <div class="animate-fade-up mb-3">
@@ -305,6 +306,7 @@
   </div>
 </div>
 {% endif %}
+{% endif %}{# /dash_show_alert_banners #}
 
 {# ── Page header ───────────────────────────────────────────────────────────── #}
 <div class="page-header animate-fade-up">
@@ -329,6 +331,7 @@
   </div>
 </div>
 
+{% if settings.dash_show_key_metrics != 'false' %}
 {# ── SECTION 2: Primary KPIs ───────────────────────────────────────────────── #}
 <div class="dash-section-title animate-fade-up">Key Metrics</div>
 <div class="row g-3 mb-4 animate-fade-up">
@@ -519,9 +522,11 @@
   {% endif %}
   {% endif %}
 </div>
+{% endif %}{# /dash_show_key_metrics #}
 
 {# ── SECTION 3: Operations row (hidden for sales role) ────────────────────── #}
 {% if current_user.role != 'sales' %}
+{% if settings.dash_show_operations != 'false' %}
 <div class="dash-section-title animate-fade-up">Operations</div>
 <div class="row g-3 mb-4 animate-fade-up">
 
@@ -595,10 +600,12 @@
     </a>
   </div>
 </div>
+{% endif %}{# /dash_show_operations #}
 {% endif %}{# end sales role hide #}
 
 {# ── SECTION 4: Charts row (hidden for technician role) ───────────────────── #}
 {% if current_user.role != 'technician' %}
+{% if settings.dash_show_sales_chart != 'false' %}
 <div class="row g-3 mb-4 animate-fade-up">
 
   {# Sales chart — left 8 cols #}
@@ -671,14 +678,22 @@
   </div>
 
 </div>
+{% endif %}{# /dash_show_sales_chart #}
 {% endif %}{# end technician chart hide #}
 
 {# ── SECTION 4b: Insights row (admin/supervisor/staff only) ───────────────── #}
 {% if current_user.role in ('admin', 'supervisor', 'staff') %}
+{% set _ins = namespace(vis=0) %}
+{% if settings.dash_show_top_models != 'false' %}{% set _ins.vis = _ins.vis + 1 %}{% endif %}
+{% if settings.dash_show_stock_aging != 'false' %}{% set _ins.vis = _ins.vis + 1 %}{% endif %}
+{% if settings.dash_show_inventory_value != 'false' %}{% set _ins.vis = _ins.vis + 1 %}{% endif %}
+{% if _ins.vis > 0 %}
+{% set _icol = 'col-lg-4' if _ins.vis == 3 else ('col-lg-6' if _ins.vis == 2 else 'col-lg-12') %}
 <div class="row g-3 mb-4 animate-fade-up">
 
   {# Column 1: Top Models #}
-  <div class="col-12 col-md-4">
+  {% if settings.dash_show_top_models != 'false' %}
+  <div class="col-12 {{ _icol }}">
     <div class="panel h-100">
       <div class="panel-header">
         <span class="panel-title"><i class="bi bi-trophy me-2" style="color:#F59E0B;"></i>Top Models</span>
@@ -707,9 +722,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /dash_show_top_models #}
 
   {# Column 2: Stock Aging #}
-  <div class="col-12 col-md-4">
+  {% if settings.dash_show_stock_aging != 'false' %}
+  <div class="col-12 {{ _icol }}">
     <div class="panel h-100">
       <div class="panel-header">
         <span class="panel-title"><i class="bi bi-clock-history me-2" style="color:#EF4444;"></i>Stock Aging</span>
@@ -739,9 +756,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /dash_show_stock_aging #}
 
   {# Column 3: Processing & Value #}
-  <div class="col-12 col-md-4">
+  {% if settings.dash_show_inventory_value != 'false' %}
+  <div class="col-12 {{ _icol }}">
     <div class="panel h-100">
       <div class="panel-header">
         <span class="panel-title"><i class="bi bi-activity me-2" style="color:#06B6D4;"></i>Processing &amp; Value</span>
@@ -790,15 +809,17 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /dash_show_inventory_value #}
 
 </div>
+{% endif %}{# /_ins.vis > 0 #}
 {% endif %}{# end admin/supervisor/staff insights #}
 
 {# ── SECTION 5: Recent sales + Alerts ─────────────────────────────────────── #}
 <div class="row g-3 mb-4 animate-fade-up">
 
-  {# Left: Recent Sales (hidden for technician) #}
-  {% if current_user.role != 'technician' %}
+  {# Left: Recent Sales (hidden for technician and when disabled) #}
+  {% if current_user.role != 'technician' and settings.dash_show_recent_sales != 'false' %}
   <div class="col-12 col-lg-7">
     <div class="panel h-100">
       <div class="panel-header">
@@ -851,7 +872,8 @@
   {% endif %}{# end technician hide recent sales #}
 
   {# Right: Alerts & Attention #}
-  <div class="col-12 {% if current_user.role == 'technician' %}col-lg-12{% else %}col-lg-5{% endif %}">
+  {% if settings.dash_show_alerts_panel != 'false' %}
+  <div class="col-12 {% if current_user.role == 'technician' or settings.dash_show_recent_sales == 'false' %}col-lg-12{% else %}col-lg-5{% endif %}">
     <div class="panel h-100">
       <div class="panel-header">
         <span class="panel-title"><i class="bi bi-bell me-2" style="color:#F59E0B;"></i>Alerts &amp; Attention</span>
@@ -925,10 +947,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# /dash_show_alerts_panel #}
 </div>
 
 {# ── SECTION 6: Technician Workload (admin/supervisor only) ───────────────── #}
-{% if tech_workload and current_user.role in ('admin', 'supervisor', 'staff') %}{% if tech_workload %}
+{% if tech_workload and current_user.role in ('admin', 'supervisor', 'staff') and settings.dash_show_tech_workload != 'false' %}{% if tech_workload %}
 <div class="animate-fade-up mb-4">
   <div class="panel">
     <div class="panel-header">
@@ -1055,7 +1078,7 @@
 {% endif %}{# end technician my units #}
 
 {# ── SECTION 8: Sales — Pending Reservations ──────────────────────────────── #}
-{% if current_user.role == 'sales' and pending_orders > 0 %}
+{% if current_user.role == 'sales' and pending_orders > 0 and settings.dash_show_reservations != 'false' %}
 <div class="animate-fade-up mb-4">
   <div class="panel">
     <div class="panel-header">

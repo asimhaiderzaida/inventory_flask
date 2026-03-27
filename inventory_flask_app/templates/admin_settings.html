@@ -67,6 +67,7 @@
       ('bi-palette',         'Appearance',      'sec-appearance'),
       ('bi-bell',            'Notifications',   'sec-notifications'),
       ('bi-toggles',         'Modules',         'sec-modules'),
+      ('bi-grid-1x2',        'Dashboard',       'sec-dashboard'),
       ('bi-receipt',         'Invoice',         'sec-invoice'),
       ('bi-gear',            'Processing',      'sec-processing'),
       ('bi-tag',             'Status Labels',   'sec-status'),
@@ -371,7 +372,44 @@
         </div>
       </div>
 
-      {# ═══ 5. INVOICE BRANDING ═══ #}
+      {# ═══ 5. DASHBOARD LAYOUT ═══ #}
+      <div class="s-section" id="sec-dashboard">
+        <div class="s-heading"><i class="bi bi-grid-1x2"></i> Dashboard Layout</div>
+        <div class="s-subhead">Choose which sections appear on the main dashboard. Disabled sections are hidden for all users.</div>
+
+        <div class="row g-2">
+          {% for key, label, hint in [
+            ('dash_show_alert_banners',  'Alert Banners',                  'SLA overdue warnings at top of page'),
+            ('dash_show_key_metrics',    'Key Metrics (KPI Cards)',         'Revenue, inventory count, units sold, net profit'),
+            ('dash_show_operations',     'Operations Row',                  'Processing, SLA, backlog, AR, returns mini-cards'),
+            ('dash_show_sales_chart',    'Sales Activity Chart',            'Bar chart with 7d/30d/90d period toggle'),
+            ('dash_show_recent_sales',   'Recent Sales Table',              'Last 10 sales with customer and amount'),
+            ('dash_show_alerts_panel',   'Alerts &amp; Attention Panel',    'SLA overdue count, reservations, backlog warnings'),
+            ('dash_show_tech_workload',  'Technician Workload Table',       'Per-tech assigned units, oldest unit, avg time'),
+            ('dash_show_top_models',     'Top Models',                      'Horizontal bar list of most stocked models'),
+            ('dash_show_stock_aging',    'Stock Aging Breakdown',           'Age tier distribution (0–7d, 7–30d, 30–60d, 60+d)'),
+            ('dash_show_inventory_value','Inventory Value &amp; Processing','Cost vs asking price, margin, completions sparkline'),
+            ('dash_show_reservations',   'Pending Reservations',            'Shown only to sales role users'),
+          ] %}
+          <div class="col-12 col-sm-6">
+            <div class="toggle-row" style="padding:.5rem 0;">
+              <div>
+                <div class="toggle-lbl" style="font-size:.85rem;">{{ label }}</div>
+                <div class="toggle-desc">{{ hint }}</div>
+              </div>
+              <div class="form-check form-switch" style="padding-left:0;flex-shrink:0;">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="{{ key }}" id="{{ key }}"
+                       style="width:42px;height:23px;cursor:pointer;margin:0;"
+                       {% if settings[key] != 'false' %}checked{% endif %}>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ═══ 6. INVOICE BRANDING ═══ #}
       <div class="s-section" id="sec-invoice">
         <div class="s-heading"><i class="bi bi-receipt"></i> Invoice Branding</div>
         <div class="s-subhead">

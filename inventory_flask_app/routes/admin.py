@@ -73,6 +73,10 @@ def admin_settings():
         'label_status_unprocessed', 'label_status_under_process', 'label_status_processed',
         'label_status_idle', 'label_status_disputed', 'label_status_sold',
         'processing_teams',
+        'dash_show_alert_banners', 'dash_show_key_metrics', 'dash_show_operations',
+        'dash_show_sales_chart', 'dash_show_recent_sales', 'dash_show_alerts_panel',
+        'dash_show_tech_workload', 'dash_show_top_models', 'dash_show_stock_aging',
+        'dash_show_inventory_value', 'dash_show_reservations',
     ]
 
     unified_column_order = [
@@ -85,7 +89,7 @@ def admin_settings():
     if request.method == 'POST':
         logging.info(f"SAVED COLUMN ORDER: {request.form.get('column_order_instance_table')}")
         for key in settings_keys:
-            if key.startswith("enable_") or key.startswith("show_column_") or key.startswith("invoice_show_"):
+            if key.startswith("enable_") or key.startswith("show_column_") or key.startswith("invoice_show_") or key.startswith("dash_show_"):
                 value = 'true' if key in request.form else 'false'
             else:
                 value = request.form.get(key)

@@ -167,6 +167,30 @@ def main_dashboard():
 
     open_orders_count = CustomerOrder.query.filter_by(tenant_id=tid, status='open').count()
 
+    # ── Dashboard section visibility prefs ───────────────────────────────────
+    _dash_pref_rows = TenantSettings.query.filter(
+        TenantSettings.tenant_id == tid,
+        TenantSettings.key.in_([
+            'dash_show_alert_banners', 'dash_show_key_metrics', 'dash_show_operations',
+            'dash_show_sales_chart', 'dash_show_recent_sales', 'dash_show_alerts_panel',
+            'dash_show_tech_workload', 'dash_show_top_models', 'dash_show_stock_aging',
+            'dash_show_inventory_value',
+        ])
+    ).all()
+    _dash_map = {r.key: r.value for r in _dash_pref_rows}
+    dash_prefs = {
+        'alert_banners':   _dash_map.get('dash_show_alert_banners',   'true') != 'false',
+        'key_metrics':     _dash_map.get('dash_show_key_metrics',      'true') != 'false',
+        'operations':      _dash_map.get('dash_show_operations',       'true') != 'false',
+        'sales_chart':     _dash_map.get('dash_show_sales_chart',      'true') != 'false',
+        'recent_sales':    _dash_map.get('dash_show_recent_sales',     'true') != 'false',
+        'alerts_panel':    _dash_map.get('dash_show_alerts_panel',     'true') != 'false',
+        'tech_workload':   _dash_map.get('dash_show_tech_workload',    'true') != 'false',
+        'top_models':      _dash_map.get('dash_show_top_models',       'true') != 'false',
+        'stock_aging':     _dash_map.get('dash_show_stock_aging',      'true') != 'false',
+        'inventory_value': _dash_map.get('dash_show_inventory_value',  'true') != 'false',
+    }
+
     # Aged inventory
     _aged_setting = TenantSettings.query.filter_by(tenant_id=tid, key='aged_threshold_days').first()
     aged_threshold_days = int((_aged_setting.value if _aged_setting else None) or 60)
@@ -181,42 +205,48 @@ def main_dashboard():
     )
 
     # ── Stock Aging Breakdown ─────────────────────────────────────────────────
-    _now_age = datetime.now(timezone.utc).replace(tzinfo=None)
-    _age7    = _now_age - timedelta(days=7)
-    _age30   = _now_age - timedelta(days=30)
-    _age60   = _now_age - timedelta(days=60)
-    _base_age = (
-        ProductInstance.query.join(Product)
-        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
-    )
-    aging_buckets = {
-        '0_7':    _base_age.filter(ProductInstance.created_at >= _age7).count(),
-        '7_30':   _base_age.filter(ProductInstance.created_at >= _age30, ProductInstance.created_at < _age7).count(),
-        '30_60':  _base_age.filter(ProductInstance.created_at >= _age60, ProductInstance.created_at < _age30).count(),
-        '60_plus': _base_age.filter(ProductInstance.created_at < _age60).count(),
-    }
+    if dash_prefs['stock_aging']:
+        _now_age = datetime.now(timezone.utc).replace(tzinfo=None)
+        _age7    = _now_age - timedelta(days=7)
+        _age30   = _now_age - timedelta(days=30)
+        _age60   = _now_age - timedelta(days=60)
+        _base_age = (
+            ProductInstance.query.join(Product)
+            .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+        )
+        aging_buckets = {
+            '0_7':    _base_age.filter(ProductInstance.created_at >= _age7).count(),
+            '7_30':   _base_age.filter(ProductInstance.created_at >= _age30, ProductInstance.created_at < _age7).count(),
+            '30_60':  _base_age.filter(ProductInstance.created_at >= _age60, ProductInstance.created_at < _age30).count(),
+            '60_plus': _base_age.filter(ProductInstance.created_at < _age60).count(),
+        }
+    else:
+        aging_buckets = {'0_7': 0, '7_30': 0, '30_60': 0, '60_plus': 0}
 
     # ── Top Models ────────────────────────────────────────────────────────────
-    _model_label = func.coalesce(Product.model, Product.item_name)
-    _top_raw = (
-        db.session.query(_model_label.label('name'), func.count(ProductInstance.id).label('cnt'))
-        .join(ProductInstance, ProductInstance.product_id == Product.id)
-        .filter(
-            Product.tenant_id == tid,
-            ProductInstance.is_sold == False,
-            _model_label.isnot(None),
-            _model_label != 'nan',
+    if dash_prefs['top_models']:
+        _model_label = func.coalesce(Product.model, Product.item_name)
+        _top_raw = (
+            db.session.query(_model_label.label('name'), func.count(ProductInstance.id).label('cnt'))
+            .join(ProductInstance, ProductInstance.product_id == Product.id)
+            .filter(
+                Product.tenant_id == tid,
+                ProductInstance.is_sold == False,
+                _model_label.isnot(None),
+                _model_label != 'nan',
+            )
+            .group_by(_model_label)
+            .order_by(func.count(ProductInstance.id).desc())
+            .limit(6)
+            .all()
         )
-        .group_by(_model_label)
-        .order_by(func.count(ProductInstance.id).desc())
-        .limit(6)
-        .all()
-    )
-    top_models = [
-        {'name': r.name, 'count': r.cnt}
-        for r in _top_raw
-        if r.name and r.name.lower() != 'nan'
-    ][:5]
+        top_models = [
+            {'name': r.name, 'count': r.cnt}
+            for r in _top_raw
+            if r.name and r.name.lower() != 'nan'
+        ][:5]
+    else:
+        top_models = []
 
     # ── Processing Throughput ─────────────────────────────────────────────────
     from inventory_flask_app.models import ProductProcessLog as _PPLog
@@ -267,27 +297,31 @@ def main_dashboard():
     throughput_sparkline = [_spark_map.get(d, 0) for d in _spark_days]
 
     # ── Inventory Value ───────────────────────────────────────────────────────
-    _inv_val = (
-        db.session.query(
-            func.coalesce(func.sum(UnitCost.total_cost), 0).label('cost'),
-            func.coalesce(func.sum(ProductInstance.asking_price), 0).label('asking'),
+    if dash_prefs['inventory_value']:
+        _inv_val = (
+            db.session.query(
+                func.coalesce(func.sum(UnitCost.total_cost), 0).label('cost'),
+                func.coalesce(func.sum(ProductInstance.asking_price), 0).label('asking'),
+            )
+            .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
+            .join(Product, ProductInstance.product_id == Product.id)
+            .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
+            .first()
         )
-        .join(ProductInstance, UnitCost.instance_id == ProductInstance.id)
-        .join(Product, ProductInstance.product_id == Product.id)
-        .filter(Product.tenant_id == tid, ProductInstance.is_sold == False)
-        .first()
-    )
-    inventory_cost   = round(float(_inv_val.cost   or 0), 2)
-    inventory_asking = round(float(_inv_val.asking or 0), 2)
-    priced_count = (
-        ProductInstance.query.join(Product)
-        .filter(
-            Product.tenant_id == tid,
-            ProductInstance.is_sold == False,
-            ProductInstance.asking_price > 0,
+        inventory_cost   = round(float(_inv_val.cost   or 0), 2)
+        inventory_asking = round(float(_inv_val.asking or 0), 2)
+        priced_count = (
+            ProductInstance.query.join(Product)
+            .filter(
+                Product.tenant_id == tid,
+                ProductInstance.is_sold == False,
+                ProductInstance.asking_price > 0,
+            )
+            .count()
         )
-        .count()
-    )
+    else:
+        inventory_cost = inventory_asking = 0.0
+        priced_count = 0
 
     # ── Sales / Revenue KPIs ──────────────────────────────────────────────────
     def _revenue_query(start, end):
@@ -377,84 +411,87 @@ def main_dashboard():
     )
 
     # ── Recent Sales (last 5) ─────────────────────────────────────────────────
-    recent_sale_rows = (
-        db.session.query(SaleTransaction, Customer, Invoice)
-        .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
-        .join(Product, ProductInstance.product_id == Product.id)
-        .join(Customer, SaleTransaction.customer_id == Customer.id)
-        .outerjoin(Invoice, SaleTransaction.invoice_id == Invoice.id)
-        .filter(Product.tenant_id == tid)
-        .order_by(SaleTransaction.date_sold.desc())
-        .limit(5)
-        .all()
-    )
-    recent_sales = []
-    for txn, cust, inv in recent_sale_rows:
-        recent_sales.append({
-            'date':           txn.date_sold,
-            'customer':       cust.name if cust else '—',
-            'amount':         float(txn.price_at_sale or 0),
-            'payment_method': txn.payment_method or '—',
-            'invoice_id':     inv.id if inv else None,
-            'invoice_number': inv.invoice_number if inv else None,
-        })
+    if dash_prefs['recent_sales']:
+        recent_sale_rows = (
+            db.session.query(SaleTransaction, Customer, Invoice)
+            .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+            .join(Product, ProductInstance.product_id == Product.id)
+            .join(Customer, SaleTransaction.customer_id == Customer.id)
+            .outerjoin(Invoice, SaleTransaction.invoice_id == Invoice.id)
+            .filter(Product.tenant_id == tid)
+            .order_by(SaleTransaction.date_sold.desc())
+            .limit(5)
+            .all()
+        )
+        recent_sales = []
+        for txn, cust, inv in recent_sale_rows:
+            recent_sales.append({
+                'date':           txn.date_sold,
+                'customer':       cust.name if cust else '—',
+                'amount':         float(txn.price_at_sale or 0),
+                'payment_method': txn.payment_method or '—',
+                'invoice_id':     inv.id if inv else None,
+                'invoice_number': inv.invoice_number if inv else None,
+            })
+    else:
+        recent_sales = []
 
     # ── Technician Workload ───────────────────────────────────────────────────
     from inventory_flask_app.models import User as UserModel, ProductProcessLog
-    tech_rows = (
-        db.session.query(
-            UserModel.id,
-            UserModel.username,
-            UserModel.full_name,
-            func.count(ProductInstance.id).label('unit_count'),
-            func.min(ProductInstance.entered_stage_at).label('oldest_stage_at'),
-            func.min(ProductInstance.created_at).label('oldest_created'),
-        )
-        .join(ProductInstance, ProductInstance.assigned_to_user_id == UserModel.id)
-        .join(Product, ProductInstance.product_id == Product.id)
-        .filter(
-            Product.tenant_id == tid,
-            ProductInstance.status.in_(['under_process']),
-            ProductInstance.is_sold == False,
-        )
-        .group_by(UserModel.id, UserModel.username, UserModel.full_name)
-        .order_by(func.count(ProductInstance.id).desc())
-        .limit(10)
-        .all()
-    )
-
-    # Avg stage time per tech from process log
-    avg_times = {}
-    if tech_rows:
-        tech_ids = [r.id for r in tech_rows]
-        avg_rows = (
+    if not dash_prefs['tech_workload']:
+        tech_workload = []
+    else:
+        tech_rows = (
             db.session.query(
-                ProductProcessLog.moved_by,
-                func.avg(ProductProcessLog.duration_minutes).label('avg_min'),
+                UserModel.id,
+                UserModel.username,
+                UserModel.full_name,
+                func.count(ProductInstance.id).label('unit_count'),
+                func.min(ProductInstance.entered_stage_at).label('oldest_stage_at'),
+                func.min(ProductInstance.created_at).label('oldest_created'),
             )
+            .join(ProductInstance, ProductInstance.assigned_to_user_id == UserModel.id)
+            .join(Product, ProductInstance.product_id == Product.id)
             .filter(
-                ProductProcessLog.moved_by.in_(tech_ids),
-                ProductProcessLog.duration_minutes.isnot(None),
+                Product.tenant_id == tid,
+                ProductInstance.status.in_(['under_process']),
+                ProductInstance.is_sold == False,
             )
-            .group_by(ProductProcessLog.moved_by)
+            .group_by(UserModel.id, UserModel.username, UserModel.full_name)
+            .order_by(func.count(ProductInstance.id).desc())
+            .limit(10)
             .all()
         )
-        avg_times = {r.moved_by: round(float(r.avg_min), 0) for r in avg_rows}
-
-    tech_workload = []
-    for r in tech_rows:
-        oldest_dt = r.oldest_stage_at or r.oldest_created
-        if oldest_dt:
-            age_hours = int((datetime.now(timezone.utc).replace(tzinfo=None) - oldest_dt).total_seconds() / 3600)
-        else:
-            age_hours = None
-        avg_min = avg_times.get(r.id)
-        tech_workload.append({
-            'name':       r.full_name or r.username,
-            'count':      r.unit_count,
-            'age_hours':  age_hours,
-            'avg_minutes': int(avg_min) if avg_min else None,
-        })
+        avg_times = {}
+        if tech_rows:
+            tech_ids = [r.id for r in tech_rows]
+            avg_rows = (
+                db.session.query(
+                    ProductProcessLog.moved_by,
+                    func.avg(ProductProcessLog.duration_minutes).label('avg_min'),
+                )
+                .filter(
+                    ProductProcessLog.moved_by.in_(tech_ids),
+                    ProductProcessLog.duration_minutes.isnot(None),
+                )
+                .group_by(ProductProcessLog.moved_by)
+                .all()
+            )
+            avg_times = {r.moved_by: round(float(r.avg_min), 0) for r in avg_rows}
+        tech_workload = []
+        for r in tech_rows:
+            oldest_dt = r.oldest_stage_at or r.oldest_created
+            if oldest_dt:
+                age_hours = int((datetime.now(timezone.utc).replace(tzinfo=None) - oldest_dt).total_seconds() / 3600)
+            else:
+                age_hours = None
+            avg_min = avg_times.get(r.id)
+            tech_workload.append({
+                'name':        r.full_name or r.username,
+                'count':       r.unit_count,
+                'age_hours':   age_hours,
+                'avg_minutes': int(avg_min) if avg_min else None,
+            })
 
     # ── Technician: my assigned units + today's completions ──────────────────
     from inventory_flask_app.models import ProductProcessLog, ProcessStage
@@ -506,35 +543,36 @@ def main_dashboard():
         )
 
     # ── Chart data (30-day default, JS handles 7d/90d slicing) ───────────────
-    chart_days = 90  # send 90 days; JS will slice to 7/30/90
-    chart_start = datetime.combine(today - timedelta(days=chart_days - 1), datetime.min.time())
-    chart_end   = datetime.combine(today + timedelta(days=1), datetime.min.time())
-
-    daily_rows = (
-        db.session.query(
-            func.date(SaleTransaction.date_sold).label('sale_day'),
-            func.count(SaleTransaction.id).label('cnt'),
-            func.sum(SaleTransaction.price_at_sale).label('revenue'),
+    if dash_prefs['sales_chart']:
+        chart_days = 90  # send 90 days; JS will slice to 7/30/90
+        chart_start = datetime.combine(today - timedelta(days=chart_days - 1), datetime.min.time())
+        chart_end   = datetime.combine(today + timedelta(days=1), datetime.min.time())
+        daily_rows = (
+            db.session.query(
+                func.date(SaleTransaction.date_sold).label('sale_day'),
+                func.count(SaleTransaction.id).label('cnt'),
+                func.sum(SaleTransaction.price_at_sale).label('revenue'),
+            )
+            .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
+            .join(Product, ProductInstance.product_id == Product.id)
+            .filter(
+                Product.tenant_id == tid,
+                SaleTransaction.date_sold >= chart_start,
+                SaleTransaction.date_sold < chart_end,
+            )
+            .group_by(func.date(SaleTransaction.date_sold))
+            .all()
         )
-        .join(ProductInstance, SaleTransaction.product_instance_id == ProductInstance.id)
-        .join(Product, ProductInstance.product_id == Product.id)
-        .filter(
-            Product.tenant_id == tid,
-            SaleTransaction.date_sold >= chart_start,
-            SaleTransaction.date_sold < chart_end,
-        )
-        .group_by(func.date(SaleTransaction.date_sold))
-        .all()
-    )
-    cnt_map = {r.sale_day: r.cnt for r in daily_rows}
-    rev_map = {r.sale_day: round(float(r.revenue or 0), 2) for r in daily_rows}
-    all_days = [today - timedelta(days=i) for i in range(chart_days - 1, -1, -1)]
-
-    sales_chart = {
-        'labels':  [d.strftime('%Y-%m-%d') for d in all_days],
-        'sales':   [cnt_map.get(d, 0) for d in all_days],
-        'revenue': [rev_map.get(d, 0) for d in all_days],
-    }
+        cnt_map = {r.sale_day: r.cnt for r in daily_rows}
+        rev_map = {r.sale_day: round(float(r.revenue or 0), 2) for r in daily_rows}
+        all_days = [today - timedelta(days=i) for i in range(chart_days - 1, -1, -1)]
+        sales_chart = {
+            'labels':  [d.strftime('%Y-%m-%d') for d in all_days],
+            'sales':   [cnt_map.get(d, 0) for d in all_days],
+            'revenue': [rev_map.get(d, 0) for d in all_days],
+        }
+    else:
+        sales_chart = {'labels': [], 'sales': [], 'revenue': []}
 
     return render_template('main_dashboard.html',
         # Primary KPIs
