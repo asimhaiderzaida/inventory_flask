@@ -23,6 +23,9 @@ class User(db.Model, UserMixin):
     tenant = db.relationship('Tenant', backref='users')
 
     is_superadmin = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+    email = db.Column(db.String(150), nullable=True, unique=True)
+    reset_token = db.Column(db.String(100), nullable=True, unique=True)
+    reset_token_expires_at = db.Column(db.DateTime, nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint('username', 'tenant_id', name='uq_user_username_tenant'),

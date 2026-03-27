@@ -1,4 +1,6 @@
 import logging
+import secrets
+from datetime import datetime, timedelta, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
@@ -27,12 +29,15 @@ def login():
             flash("Invalid or missing CSRF token. Please try again.", "danger")
             return render_template('login.html', settings=settings)
 
-        username = request.form.get('username', '').strip()
+        login_input = request.form.get('username', '').strip()
         password = request.form.get('password', '')
 
         from ..models import User
 
-        user = User.query.filter_by(username=username).first()
+        # Accept username or email
+        user = User.query.filter_by(username=login_input).first()
+        if not user:
+            user = User.query.filter(db.func.lower(User.email) == login_input.lower()).first()
 
         if user and user.check_password(password):
             if not user.tenant_id:
@@ -95,6 +100,7 @@ def register_user():
         password = request.form.get('password', '')
         role = request.form.get('role', 'technician')
         full_name = request.form.get('full_name', '').strip() or None
+        email = request.form.get('email', '').strip().lower() or None
 
         if not username or not password:
             flash("Username and password are required.", "warning")
@@ -108,9 +114,14 @@ def register_user():
             flash("Username already taken, please choose another.", "warning")
             return render_template('register_user.html', settings=settings, username=username, role=role, users=users)
 
+        if email and User.query.filter(db.func.lower(User.email) == email).first():
+            flash("A user with that email already exists.", "warning")
+            return render_template('register_user.html', settings=settings, username=username, role=role, users=users)
+
         user = User(
             username=username,
             full_name=full_name,
+            email=email,
             role=role,
             tenant_id=current_user.tenant_id,
             password_hash=generate_password_hash(password)
@@ -143,8 +154,9 @@ def register_tenant():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm', '')
+        email = request.form.get('email', '').strip().lower()
 
-        if not tenant_name or not username or not password or password != confirm:
+        if not tenant_name or not username or not password or not email or password != confirm:
             flash("All fields are required and passwords must match.", "danger")
             return render_template('register_tenant.html')
 
@@ -159,6 +171,10 @@ def register_tenant():
             flash("Username already taken, please choose another.", "danger")
             return render_template('register_tenant.html')
 
+        if User.query.filter(db.func.lower(User.email) == email).first():
+            flash("An account with that email already exists.", "danger")
+            return render_template('register_tenant.html')
+
         try:
             tenant = Tenant(name=tenant_name)
             db.session.add(tenant)
@@ -171,6 +187,7 @@ def register_tenant():
 
             user = User(
                 username=username,
+                email=email,
                 role='admin',
                 tenant_id=tenant.id,
                 password_hash=generate_password_hash(password)
@@ -205,15 +222,21 @@ def edit_user(user_id):
         role = request.form.get('role', 'technician')
         full_name = request.form.get('full_name', '').strip() or None
         new_password = request.form.get('new_password', '').strip()
+        email = request.form.get('email', '').strip().lower() or None
 
         if username:
             if User.query.filter(User.username == username, User.id != user.id).first():
                 flash("Username already taken, please choose another.", "warning")
                 return redirect(url_for('auth.edit_user', user_id=user_id))
 
+            if email and User.query.filter(db.func.lower(User.email) == email, User.id != user.id).first():
+                flash("A user with that email already exists.", "warning")
+                return redirect(url_for('auth.edit_user', user_id=user_id))
+
             user.username = username
             user.role = role
             user.full_name = full_name
+            user.email = email
             if new_password:
                 user.password_hash = generate_password_hash(new_password)
             db.session.commit()
@@ -252,3 +275,114 @@ def delete_user(user_id):
     db.session.commit()
     flash("User deleted successfully.", "success")
     return redirect(url_for('auth.register_user'))
+
+
+@auth_bp.route('/forgot_password', methods=['GET', 'POST'])
+@limiter.limit("5 per hour", methods=["POST"])
+def forgot_password():
+    """Request a password reset link sent to the user's email."""
+    if request.method == 'POST':
+        email_input = request.form.get('email', '').strip().lower()
+        if not email_input:
+            flash("Please enter your email address.", "warning")
+            return render_template('forgot_password.html')
+
+        from ..models import User, TenantSettings
+
+        user = User.query.filter(db.func.lower(User.email) == email_input).first()
+
+        if user and user.email:
+            token = secrets.token_urlsafe(48)
+            user.reset_token = token
+            user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+            db.session.commit()
+
+            try:
+                from inventory_flask_app import mail
+                from flask_mail import Message
+
+                _ts = TenantSettings.query.filter_by(tenant_id=user.tenant_id).all()
+                settings = {s.key: s.value for s in _ts}
+                company = settings.get('company_name') or settings.get('dashboard_name') or 'PCMart ERP'
+                reset_url = url_for('auth.reset_password', token=token, _external=True)
+
+                html_body = f"""
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
+  <div style="background:#3B82F6;padding:1.5rem;border-radius:8px 8px 0 0;text-align:center;">
+    <h2 style="color:#fff;margin:0;font-size:1.2rem;">Password Reset Request</h2>
+  </div>
+  <div style="background:#fff;padding:1.75rem;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 8px 8px;">
+    <p style="color:#374151;font-size:0.9rem;">Hi <strong>{user.username}</strong>,</p>
+    <p style="color:#374151;font-size:0.9rem;">We received a request to reset your password for <strong>{company}</strong>. Click the button below to choose a new password:</p>
+    <div style="text-align:center;margin:2rem 0;">
+      <a href="{reset_url}" style="background:#3B82F6;color:#fff;padding:0.85rem 2.25rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.95rem;display:inline-block;">Reset My Password</a>
+    </div>
+    <p style="color:#6B7280;font-size:0.82rem;">This link expires in <strong>1 hour</strong>. If you didn't request this, you can safely ignore this email — your password won't change.</p>
+    <hr style="border:none;border-top:1px solid #E5E7EB;margin:1.25rem 0;">
+    <p style="color:#9CA3AF;font-size:0.75rem;text-align:center;margin:0;">{company}</p>
+  </div>
+</div>
+"""
+                msg = Message(
+                    subject=f"Password Reset — {company}",
+                    recipients=[user.email],
+                    html=html_body,
+                    body=(
+                        f"Password Reset\n\n"
+                        f"Hi {user.username},\n\n"
+                        f"Click here to reset your password:\n{reset_url}\n\n"
+                        f"This link expires in 1 hour.\n\n"
+                        f"— {company}"
+                    ),
+                )
+                mail.send(msg)
+                logger.info("Password reset email sent to %s (user: %s)", user.email, user.username)
+            except Exception as e:
+                logger.error("Failed to send reset email to %s: %s", email_input, e)
+
+        # Always show the same message — don't reveal whether the email exists
+        flash("If an account with that email exists, a password reset link has been sent.", "info")
+        return redirect(url_for('auth.login'))
+
+    return render_template('forgot_password.html')
+
+
+@auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Reset password using a valid time-limited token."""
+    from ..models import User
+
+    user = User.query.filter_by(reset_token=token).first()
+    now = datetime.now(timezone.utc)
+
+    expires = user.reset_token_expires_at if user else None
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+
+    if not user or not expires or expires < now:
+        flash("This reset link is invalid or has expired. Please request a new one.", "danger")
+        return redirect(url_for('auth.forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm', '')
+
+        if not password or len(password) < 8:
+            flash("Password must be at least 8 characters.", "warning")
+            return render_template('reset_password.html', token=token)
+
+        if password != confirm:
+            flash("Passwords do not match.", "warning")
+            return render_template('reset_password.html', token=token)
+
+        user.password_hash = generate_password_hash(password)
+        user.reset_token = None
+        user.reset_token_expires_at = None
+        user.failed_login_attempts = 0
+        db.session.commit()
+
+        logger.info("Password reset completed for user %s", user.username)
+        flash("Your password has been reset. You can now sign in.", "success")
+        return redirect(url_for('auth.login'))
+
+    return render_template('reset_password.html', token=token)

@@ -47,6 +47,12 @@
         </div>
 
         <div class="mb-3">
+          <label class="form-label">Email <span style="font-weight:400;color:var(--text-muted);">(used for password reset)</span></label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ user.email or '' }}" placeholder="user@company.com">
+        </div>
+
+        <div class="mb-3">
           <label class="form-label">Role</label>
           <select name="role" class="form-select">
             <option value="admin"       {% if user.role == 'admin' %}selected{% endif %}>Admin</option>

@@ -40,6 +40,14 @@
                    value="{{ request.form.admin_username or '' }}">
           </div>
 
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Admin Email <span style="color:var(--color-danger);">*</span></label>
+            <input type="email" name="admin_email" class="form-control"
+                   placeholder="admin@acme.com" required autocomplete="off"
+                   value="{{ request.form.admin_email or '' }}">
+            <div class="form-text">Used for password reset. Must be unique.</div>
+          </div>
+
           <div class="mb-4">
             <label class="form-label fw-semibold">Admin Password <span style="color:var(--color-danger);">*</span></label>
             <input type="password" name="admin_password" class="form-control"

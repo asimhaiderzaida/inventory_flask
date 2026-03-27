@@ -36,11 +36,11 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div style="margin-bottom:1rem;">
-        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Username</label>
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Username or Email</label>
         <input
           type="text"
           name="username"
-          placeholder="Enter your username"
+          placeholder="Username or email address"
           required
           autofocus
           class="form-control"
@@ -49,7 +49,14 @@
       </div>
 
       <div style="margin-bottom:1.5rem;">
-        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Password</label>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;">
+          <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);letter-spacing:0.04em;text-transform:uppercase;margin:0;">Password</label>
+          <a href="{{ url_for('auth.forgot_password') }}"
+             style="font-size:0.74rem;color:rgba(255,255,255,0.38);text-decoration:none;transition:color 0.12s;"
+             onmouseover="this.style.color='rgba(255,255,255,0.7)'" onmouseout="this.style.color='rgba(255,255,255,0.38)'">
+            Forgot password?
+          </a>
+        </div>
         <div style="position:relative;">
           <input
             type="password"

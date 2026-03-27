@@ -114,8 +114,9 @@ def create_tenant():
         tenant_name = request.form.get('tenant_name', '').strip()
         admin_username = request.form.get('admin_username', '').strip()
         admin_password = request.form.get('admin_password', '').strip()
+        admin_email = request.form.get('admin_email', '').strip().lower()
 
-        if not tenant_name or not admin_username or not admin_password:
+        if not tenant_name or not admin_username or not admin_password or not admin_email:
             flash("All fields are required.", "danger")
             return render_template('superadmin/create_tenant.html')
 
@@ -129,6 +130,11 @@ def create_tenant():
 
         if User.query.filter_by(username=admin_username).first():
             flash(f"Username '{admin_username}' is already taken.", "danger")
+            return render_template('superadmin/create_tenant.html')
+
+        from sqlalchemy import func as _func
+        if User.query.filter(_func.lower(User.email) == admin_email).first():
+            flash(f"Email '{admin_email}' is already in use.", "danger")
             return render_template('superadmin/create_tenant.html')
 
         try:
@@ -146,6 +152,7 @@ def create_tenant():
 
             admin_user = User(
                 username=admin_username,
+                email=admin_email,
                 password_hash=generate_password_hash(admin_password),
                 role='admin',
                 tenant_id=tenant.id,

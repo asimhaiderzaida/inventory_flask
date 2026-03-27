@@ -39,6 +39,14 @@
       </div>
 
       <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Admin Email</label>
+        <input type="email" name="email" class="form-control" placeholder="admin@yourcompany.com" required
+          value="{{ request.form.get('email', '') }}"
+          style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:0.3rem;">Used to receive password reset links</div>
+      </div>
+
+      <div style="margin-bottom:1rem;">
         <label style="display:block;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.6);margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">Password</label>
         <input type="password" name="password" class="form-control" placeholder="At least 8 characters" required
           style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:#fff;">
