@@ -254,7 +254,7 @@ def inventory_export():
                     end = datetime.strptime(end_date, '%Y-%m-%d')
                     query = query.filter(Product.created_at.between(start, end))
                 except ValueError:
-                    flash("Invalid date format. Use YYYY-MM-DD", "error")
+                    flash("Invalid date format. Use YYYY-MM-DD", "danger")
                     return redirect('/inventory/export')
 
         products = query.all()

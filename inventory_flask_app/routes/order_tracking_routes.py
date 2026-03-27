@@ -311,7 +311,7 @@ def mark_delivered(order_id):
         flash(f"✅ {order.product_instance.serial} marked as ready for pickup.{email_note}", "success")
 
     else:
-        flash("❌ Order not found.", "error")
+        flash("❌ Order not found.", "danger")
 
     return redirect(url_for('order_bp.customer_orders'))
 
