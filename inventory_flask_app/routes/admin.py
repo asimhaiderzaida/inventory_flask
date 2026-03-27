@@ -77,6 +77,7 @@ def admin_settings():
         'dash_show_sales_chart', 'dash_show_recent_sales', 'dash_show_alerts_panel',
         'dash_show_tech_workload', 'dash_show_top_models', 'dash_show_stock_aging',
         'dash_show_inventory_value', 'dash_show_reservations',
+        'dash_show_shopify_orders',
     ]
 
     unified_column_order = [

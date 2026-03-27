@@ -397,6 +397,18 @@ def main_dashboard():
     overdue_units   = get_overdue_units(tid)
     overdue_count   = len(overdue_units)
 
+    # ── Shopify pending orders ────────────────────────────────────────────────
+    shopify_pending = 0
+    _shopify_enabled = TenantSettings.query.filter_by(
+        tenant_id=tid, key='enable_shopify_sync'
+    ).first()
+    if _shopify_enabled and _shopify_enabled.value == 'true':
+        from inventory_flask_app.models import ShopifyOrder
+        shopify_pending = ShopifyOrder.query.filter(
+            ShopifyOrder.tenant_id == tid,
+            ShopifyOrder.status.in_(['draft', 'pending', 'new']),
+        ).count()
+
     # ── Recently returned units (last 7 days) ─────────────────────────────────
     seven_days_ago = datetime.combine(today - timedelta(days=7), datetime.min.time())
     recently_returned_count = (
@@ -600,6 +612,7 @@ def main_dashboard():
         idle_units_count=idle_units_count,
         pending_orders=pending_orders,
         open_orders_count=open_orders_count,
+        shopify_pending=shopify_pending,
         # Tables
         recent_sales=recent_sales,
         tech_workload=tech_workload,
@@ -1074,6 +1087,17 @@ def dashboard_stats():
         Return.return_date >= month_start,
     ).count()
 
+    _shopify_setting = TenantSettings.query.filter_by(
+        tenant_id=tid, key='enable_shopify_sync'
+    ).first()
+    shopify_pending = 0
+    if _shopify_setting and _shopify_setting.value == 'true':
+        from inventory_flask_app.models import ShopifyOrder
+        shopify_pending = ShopifyOrder.query.filter(
+            ShopifyOrder.tenant_id == tid,
+            ShopifyOrder.status.in_(['draft', 'pending', 'new']),
+        ).count()
+
     result = {
         'under_process':        under_process,
         'unprocessed':          unprocessed,
@@ -1086,6 +1110,7 @@ def dashboard_stats():
         'stale_backlog':        stale_backlog,
         'outstanding_ar':       outstanding_ar,
         'returns_this_month':   returns_this_month,
+        'shopify_pending':      shopify_pending,
     }
     _stats_cache[tid] = (_time.time(), result)
     return jsonify(result)

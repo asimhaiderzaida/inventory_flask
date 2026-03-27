@@ -599,6 +599,18 @@
       </div>
     </a>
   </div>
+
+  {% if settings.dash_show_shopify_orders != 'false' and settings.enable_shopify_sync == 'true' %}
+  <div class="col-6 col-sm-4 col-lg-2">
+    <a href="{{ url_for('shopify_bp.orders_list') }}" class="ops-card db-purple">
+      <div class="ops-dot"><i class="bi bi-bag-check"></i></div>
+      <div>
+        <div class="ops-num" id="ops-shopify">{{ shopify_pending }}</div>
+        <div class="ops-lbl">Shopify Orders</div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
 </div>
 {% endif %}{# /dash_show_operations #}
 {% endif %}{# end sales role hide #}
@@ -934,6 +946,14 @@
         <a href="{{ url_for('stock_bp.under_process', status='unprocessed') }}" class="alert-item db-amber">
           <span><i class="bi bi-hourglass-split me-2"></i>{{ stale_backlog }} unprocessed unit{{ 's' if stale_backlog != 1 }} &gt;3 days old</span>
           <span class="alert-item-count">{{ stale_backlog }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
+        </a>
+        {% endif %}
+
+        {% if settings.dash_show_shopify_orders != 'false' and settings.enable_shopify_sync == 'true' and shopify_pending > 0 %}
+        {% set has_alert = true %}
+        <a href="{{ url_for('shopify_bp.orders_list') }}" class="alert-item db-purple">
+          <span><i class="bi bi-bag-check me-2"></i>{{ shopify_pending }} new Shopify order{{ 's' if shopify_pending != 1 }}</span>
+          <span class="alert-item-count">{{ shopify_pending }}<i class="bi bi-chevron-right ms-1" style="font-size:.65rem;opacity:.7;"></i></span>
         </a>
         {% endif %}
 
