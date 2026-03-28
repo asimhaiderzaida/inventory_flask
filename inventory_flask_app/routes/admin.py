@@ -20,6 +20,7 @@ from inventory_flask_app.models import (
     PurchaseOrder,
     Expense, AccountReceivable, ARPayment, OtherIncome, CreditNote,
     ProductProcessLog, Return, User,
+    Location, Bin,
 )
 from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
@@ -79,6 +80,7 @@ def admin_settings():
         'dash_show_tech_workload', 'dash_show_top_models', 'dash_show_stock_aging',
         'dash_show_inventory_value', 'dash_show_reservations',
         'dash_show_shopify_orders',
+        'show_price_on_receive',
     ]
 
     unified_column_order = [
@@ -91,7 +93,7 @@ def admin_settings():
     if request.method == 'POST':
         logging.info(f"SAVED COLUMN ORDER: {request.form.get('column_order_instance_table')}")
         for key in settings_keys:
-            if key.startswith("enable_") or key.startswith("show_column_") or key.startswith("invoice_show_") or key.startswith("dash_show_"):
+            if key.startswith("enable_") or key.startswith("show_column_") or key.startswith("invoice_show_") or key.startswith("dash_show_") or key == 'show_price_on_receive':
                 value = 'true' if key in request.form else 'false'
             else:
                 value = request.form.get(key)
@@ -1005,6 +1007,11 @@ def _execute_reset(tid, uid, sel):
     if sel['inventory']:
         ProductInstance.query.filter_by(tenant_id=tid).delete()
         Product.query.filter_by(tenant_id=tid).delete()
+
+    # ── 8b. Locations & Bins (clear when inventory is reset) ─────────────
+    if sel['inventory']:
+        Bin.query.filter_by(tenant_id=tid).delete()
+        Location.query.filter_by(tenant_id=tid).delete()
 
     # ── 9. Customers (cascade → CustomerNote, CustomerCommunication,
     #                  CustomerOrderTracking) ────────────────────────────

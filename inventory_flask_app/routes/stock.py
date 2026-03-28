@@ -958,8 +958,10 @@ def stock_receiving_summary():
         return redirect(url_for('stock_bp.stock_receiving_select'))
 
     po = PurchaseOrder.query.filter_by(id=po_id, tenant_id=current_user.tenant_id).first_or_404()
-    from inventory_flask_app.models import PurchaseOrderItem
+    from inventory_flask_app.models import PurchaseOrderItem, TenantSettings
     items = PurchaseOrderItem.query.filter_by(po_id=po.id).all()
+    _ts = TenantSettings.query.filter_by(tenant_id=current_user.tenant_id).all()
+    settings = {s.key: s.value for s in _ts}
 
     serial_map = {i.serial.strip().lower(): i for i in items}
     asset_map  = {i.asset_tag.strip().lower(): i for i in items if i.asset_tag}
@@ -1032,6 +1034,7 @@ def stock_receiving_summary():
         prev_count=prev_count,
         locations=locations,
         models_summary=models_summary,
+        settings=settings,
     )
 
 

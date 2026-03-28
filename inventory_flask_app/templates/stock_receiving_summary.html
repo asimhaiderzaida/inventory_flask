@@ -154,7 +154,7 @@
           {% endfor %}
         </select>
       </div>
-      {% if models_summary %}
+      {% if models_summary and settings.show_price_on_receive == 'true' %}
       <div class="mb-4">
         <label class="form-label">Purchase Cost per Model <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
         <div class="form-text mb-2">Set per-unit cost for each model. Leave blank to set costs later in Pricing.</div>

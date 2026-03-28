@@ -15,7 +15,7 @@
     <a href="{{ url_for('stock_bp.stock_receiving_select') }}" class="btn btn-ghost">
       <i class="bi bi-arrow-left"></i> Receive Another PO
     </a>
-    <a href="javascript:history.back()" onclick="if(history.length<=1) window.location='{{ url_for('dashboard_bp.main_dashboard') }}'" class="btn btn-ghost">
+    <a href="{{ url_for('dashboard_bp.main_dashboard') }}" class="btn btn-ghost">
       <i class="bi bi-house"></i> Dashboard
     </a>
   </div>

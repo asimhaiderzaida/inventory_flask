@@ -511,6 +511,14 @@
         <div class="s-heading"><i class="bi bi-gear"></i> Processing</div>
         <div class="s-subhead">Configure teams available for check-in and stage assignment.</div>
         <div class="mb-3">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" name="show_price_on_receive" id="showPriceReceive"
+              {% if settings.show_price_on_receive == 'true' %}checked{% endif %}>
+            <label class="form-check-label" for="showPriceReceive">Show Price Fields on Stock Receiving</label>
+            <div style="font-size:0.72rem;color:var(--text-muted);">Show cost/price columns when receiving PO units (off by default — use Pricing module instead)</div>
+          </div>
+        </div>
+        <div class="mb-3">
           <a href="{{ url_for('admin_bp.label_template') }}" class="btn btn-ghost btn-sm">
             <i class="bi bi-upc-scan me-1"></i>Configure Label Template
           </a>
